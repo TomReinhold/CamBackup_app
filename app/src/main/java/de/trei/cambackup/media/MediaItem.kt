@@ -1,6 +1,16 @@
 package de.trei.cambackup.media
 
 import android.net.Uri
+import android.provider.MediaStore
+
+/**
+ * URI zum Lesen der **unveränderten** Datei. Ohne setRequireOriginal schwärzt Android beim Lesen
+ * die GPS-Daten in Fotos und Videos – die Sicherung wäre dann nicht bitgenau und der Ort ginge
+ * verloren. Erfordert die Berechtigung ACCESS_MEDIA_LOCATION. Nur für content://-URIs nötig.
+ */
+fun originalUri(uri: Uri): Uri = if (uri.scheme == "content") MediaStore.setRequireOriginal(uri) else uri
+
+val MediaItem.readUri: Uri get() = originalUri(uri)
 
 /** Ein Foto oder Video aus dem Kameraordner, wie es der MediaStore liefert. */
 data class MediaItem(

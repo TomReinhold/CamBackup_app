@@ -16,12 +16,19 @@ enum class MediaAccess {
 
 object MediaPermissions {
 
-    /** Berechtigungen, die beim Nutzer angefragt werden. */
+    /**
+     * Berechtigungen, die beim Nutzer angefragt werden. ACCESS_MEDIA_LOCATION ist Pflicht:
+     * ohne sie liefert Android Fotos und Videos nur mit geschwärzten GPS-Daten aus.
+     */
     val required: Array<String>
         get() = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            arrayOf(Manifest.permission.READ_MEDIA_IMAGES, Manifest.permission.READ_MEDIA_VIDEO)
+            arrayOf(
+                Manifest.permission.READ_MEDIA_IMAGES,
+                Manifest.permission.READ_MEDIA_VIDEO,
+                Manifest.permission.ACCESS_MEDIA_LOCATION,
+            )
         } else {
-            arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE)
+            arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE, Manifest.permission.ACCESS_MEDIA_LOCATION)
         }
 
     fun currentAccess(context: Context): MediaAccess {

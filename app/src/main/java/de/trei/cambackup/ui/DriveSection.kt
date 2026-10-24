@@ -10,16 +10,20 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.Surface
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -33,8 +37,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
@@ -43,6 +49,12 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import de.trei.cambackup.R
+import de.trei.cambackup.ui.components.Banner
+import de.trei.cambackup.ui.components.BannerTone
+import de.trei.cambackup.ui.components.BarSegment
+import de.trei.cambackup.ui.components.FeatureCard
+import de.trei.cambackup.ui.components.StackedBar
 import de.trei.cambackup.storage.DeviceFolder
 import de.trei.cambackup.storage.DeviceMatch
 import de.trei.cambackup.storage.DriveInfo
@@ -53,9 +65,12 @@ import java.text.DateFormat
 import java.time.Instant
 import java.util.Date
 
-/** Karte mit Speichermedium, freiem Platz, Geräteordner und Backup. */
+/**
+ * Karten für Speichermedium (freier Platz, Geräteordner), Backup und Speicher freigeben.
+ * [onLibraryChanged]: nach Backup/Ersetzen, damit Übersicht und Fotos neu einlesen.
+ */
 @Composable
-fun DriveSection(modifier: Modifier = Modifier, vm: DriveViewModel = viewModel()) {
+fun DriveSection(onLibraryChanged: () -> Unit, modifier: Modifier = Modifier, vm: DriveViewModel = viewModel()) {
     val state by vm.state.collectAsStateWithLifecycle()
     val pickTree = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree(), vm::onTreePicked)
     val pick = { pickTree.launch(null) }
@@ -64,24 +79,27 @@ fun DriveSection(modifier: Modifier = Modifier, vm: DriveViewModel = viewModel()
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { vm.refresh() }
     MediaChangeListener(onChange = vm::refresh)
 
-    Card(modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("Speichermedium", style = MaterialTheme.typography.titleMedium)
+    val ready = state as? DriveState.Ready
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        FeatureCard(
+            icon = R.drawable.ic_usb,
+            title = "Speichermedium",
+            subtitle = ready?.info?.let { it.volumeLabel + if (it.path.isNotEmpty()) " / ${it.path}" else "" },
+        ) {
             when (val s = state) {
                 DriveState.Loading -> LinearProgressIndicator(Modifier.fillMaxWidth())
 
                 DriveState.NotSelected -> {
-                    Text("Noch kein Speichermedium gewählt. Bitte USB-Stick oder SD-Karte anschließen und den Zielordner auswählen.")
-                    Text(
-                        "Hinweis: Android erlaubt nicht die oberste Ebene des Mediums. Bitte dort einen Ordner " +
-                            "anlegen (z. B. „CamBackup“) und diesen wählen.",
-                        style = MaterialTheme.typography.bodySmall,
+                    Text("Schließe einen USB-Stick oder eine SD-Karte an und wähle den Zielordner für die Sicherung.")
+                    Banner(
+                        "Android erlaubt nicht die oberste Ebene des Mediums. Lege dort einen Ordner an " +
+                            "(z. B. „CamBackup“) und wähle diesen.",
                     )
                     Button(onClick = pick) { Text("Speichermedium wählen") }
                 }
 
                 DriveState.Unavailable -> {
-                    Text("Das Speichermedium ist nicht verbunden oder der Zugriff wurde entzogen.")
+                    Banner("Das Speichermedium ist nicht verbunden. Bitte einstecken – die App erkennt es automatisch.", BannerTone.WARNING)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Button(onClick = vm::refresh) { Text("Erneut prüfen") }
                         OutlinedButton(onClick = pick) { Text("Anderes wählen") }
@@ -90,16 +108,16 @@ fun DriveSection(modifier: Modifier = Modifier, vm: DriveViewModel = viewModel()
 
                 is DriveState.InternalStorage -> {
                     DriveDetails(s.info)
-                    Text(
+                    Banner(
                         "Dieser Ordner liegt im internen Speicher des Smartphones und ist als Backup-Ziel " +
                             "ungeeignet. Bitte einen Ordner auf dem USB-Stick oder der SD-Karte wählen.",
-                        color = MaterialTheme.colorScheme.error,
+                        BannerTone.ERROR,
                     )
                     Button(onClick = pick) { Text("Anderes wählen") }
                 }
 
                 is DriveState.Error -> {
-                    Text("Fehler: ${s.message}", color = MaterialTheme.colorScheme.error)
+                    Banner("Fehler: ${s.message}", BannerTone.ERROR)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Button(onClick = vm::refresh) { Text("Erneut versuchen") }
                         OutlinedButton(onClick = pick) { Text("Anderes wählen") }
@@ -108,24 +126,58 @@ fun DriveSection(modifier: Modifier = Modifier, vm: DriveViewModel = viewModel()
 
                 is DriveState.Ready -> {
                     DriveDetails(s.info)
-                    DeviceStatus(s, onCreate = vm::createDevice, onAssign = vm::assignExisting, onBackupFinished = vm::refresh)
-                    TextButton(onClick = pick) { Text("Anderes Speichermedium wählen") }
+                    DeviceStatus(s, onCreate = vm::createDevice, onAssign = vm::assignExisting)
+                    TextButton(onClick = pick, contentPadding = ButtonDefaults.TextButtonWithIconContentPadding) {
+                        Text("Anderes Speichermedium wählen")
+                    }
                 }
             }
+        }
+
+        val recognized = ready?.match as? DeviceMatch.Recognized
+        if (recognized != null) {
+            BackupPanel(
+                deviceFolderName = recognized.folder.folderName,
+                onBackupFinished = {
+                    vm.refresh()
+                    onLibraryChanged()
+                },
+            )
+            FreeUpPanel(deviceFolderName = recognized.folder.folderName, onFinished = onLibraryChanged)
         }
     }
 }
 
 @Composable
 private fun DriveDetails(info: DriveInfo) {
-    Text(info.volumeLabel + if (info.path.isNotEmpty()) " / ${info.path}" else "", style = MaterialTheme.typography.bodyLarge)
     val space = info.space
     if (space == null) {
-        Text("Freier Speicher: unbekannt")
+        Text("Freier Speicher: unbekannt", style = MaterialTheme.typography.bodyMedium)
     } else {
-        Text("Frei: ${formatBytes(space.freeBytes)} von ${formatBytes(space.totalBytes)}")
+        StackedBar(
+            listOf(BarSegment(space.totalBytes - space.freeBytes, MaterialTheme.colorScheme.primary)),
+            height = 8,
+            total = space.totalBytes,
+        )
+        Row {
+            Text(
+                "${formatBytes(space.freeBytes)} frei",
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.weight(1f),
+            )
+            Text(
+                "von ${formatBytes(space.totalBytes)}" + (info.fsType?.let { " · ${fsLabel(it)}" } ?: ""),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
-    info.fsType?.let { Text("Dateisystem: $it", style = MaterialTheme.typography.bodySmall) }
+}
+
+private fun fsLabel(fs: String) = when (fs.lowercase()) {
+    "vfat", "msdos", "fat", "fat32" -> "FAT32"
+    "exfat", "sdfat" -> "exFAT"
+    else -> fs
 }
 
 @Composable
@@ -133,7 +185,6 @@ private fun DeviceStatus(
     s: DriveState.Ready,
     onCreate: (String) -> Unit,
     onAssign: (DeviceFolder) -> Unit,
-    onBackupFinished: () -> Unit,
 ) {
     var showCreate by rememberSaveable { mutableStateOf(false) }
     var showAssign by rememberSaveable { mutableStateOf(false) }
@@ -141,17 +192,20 @@ private fun DeviceStatus(
     when (val m = s.match) {
         is DeviceMatch.Recognized -> {
             val r = m.folder.record
-            Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
-                Column(Modifier.fillMaxWidth().padding(12.dp)) {
-                    Text("Gerät erkannt: Ordner „${m.folder.folderName}“", style = MaterialTheme.typography.titleSmall)
-                    Text("Angelegt: ${formatInstant(r.createdAt)}", style = MaterialTheme.typography.bodySmall)
-                    Text(
-                        "Letzte Sicherung: " + (r.lastBackupAt?.let(::formatInstant) ?: "noch keine"),
-                        style = MaterialTheme.typography.bodySmall,
-                    )
+            Surface(shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.surfaceContainerHighest) {
+                Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(painterResource(R.drawable.ic_smartphone), null, tint = MaterialTheme.colorScheme.primary)
+                    Spacer(Modifier.width(12.dp))
+                    Column {
+                        Text(m.folder.folderName, style = MaterialTheme.typography.titleSmall)
+                        Text(
+                            "Letzte Sicherung: " + (r.lastBackupAt?.let(::formatInstant) ?: "noch keine"),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
             }
-            BackupPanel(deviceFolderName = m.folder.folderName, onBackupFinished = onBackupFinished)
         }
 
         is DeviceMatch.Unknown -> {

@@ -43,6 +43,7 @@ class DeviceRegistry(private val context: Context, private val appVersion: Strin
                 appVersion = appVersion,
             )
             writeRecord(metadata, record)
+            ensureNoMedia(dir)
             DeviceFolder(dir.name ?: folderName, record)
         }
 
@@ -73,6 +74,14 @@ class DeviceRegistry(private val context: Context, private val appVersion: Strin
             folder.copy(record = updated)
         }
 
+    /**
+     * Legt ".nomedia" im Geräteordner an: Android indiziert die Sicherungskopien dann nicht, sonst
+     * erschienen sie bei eingestecktem Medium doppelt in Galerie-Apps.
+     */
+    fun ensureNoMedia(deviceDir: DocumentFile) {
+        if (deviceDir.findFile(NO_MEDIA) == null) runCatching { deviceDir.createFile(SafIo.OCTET_STREAM, NO_MEDIA) }
+    }
+
     /** Trägt den Zeitpunkt der letzten erfolgreichen Sicherung in device.json ein. */
     suspend fun markBackup(deviceDir: DocumentFile, at: Instant) = withContext(Dispatchers.IO) {
         val metadata = deviceDir.findFile(METADATA_DIR) ?: throw IOException("Ordner „$METADATA_DIR“ fehlt")
@@ -100,5 +109,6 @@ class DeviceRegistry(private val context: Context, private val appVersion: Strin
     companion object {
         const val METADATA_DIR = "Metadata"
         const val DEVICE_FILE = "device.json"
+        const val NO_MEDIA = ".nomedia"
     }
 }

@@ -3,6 +3,7 @@ package de.trei.cambackup.backup
 import android.content.Context
 import androidx.documentfile.provider.DocumentFile
 import de.trei.cambackup.index.BackupIndex
+import de.trei.cambackup.index.IndexCache
 import de.trei.cambackup.media.MediaScanner
 import de.trei.cambackup.settings.SettingsRepository
 import de.trei.cambackup.storage.DeviceRegistry
@@ -47,8 +48,10 @@ class BackupRunner(private val context: Context) {
         val metadata = withContext(Dispatchers.IO) { deviceDir.findFile(DeviceRegistry.METADATA_DIR) }
             ?: throw IOException("Ordner Metadata fehlt")
         val index = BackupIndex.open(io, metadata)
+        IndexCache.get(context).update(index.state)
         // Reste abgebrochener Läufe vor der Platzprüfung entfernen
         engine.cleanupStaging(deviceDir)
+        withContext(Dispatchers.IO) { registry.ensureNoMedia(deviceDir) }
         val info = drives.info(drives.selectedTree!!)
         val plan = planBackup(scanner.scanCameraFolder(), index.state, info.fsType)
         return Prepared(deviceDir, index, plan, checkSpace(plan.bytesToCopy, info.space?.freeBytes), index.state.size)
@@ -83,6 +86,7 @@ class BackupRunner(private val context: Context) {
     private suspend fun finish(p: Prepared, result: BackupResult) = withContext(Dispatchers.IO) {
         if (!p.deviceDir.exists()) return@withContext
         p.index.compact()
+        IndexCache.get(context).update(p.index.state)
         engine.cleanupStaging(p.deviceDir)
         val now = Instant.now()
         if (result.copied + result.adopted > 0) registry.markBackup(p.deviceDir, now)

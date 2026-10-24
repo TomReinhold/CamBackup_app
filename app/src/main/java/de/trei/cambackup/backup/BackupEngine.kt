@@ -7,6 +7,7 @@ import androidx.documentfile.provider.DocumentFile
 import de.trei.cambackup.index.BackupIndex
 import de.trei.cambackup.index.IndexEntry
 import de.trei.cambackup.media.MediaItem
+import de.trei.cambackup.media.readUri
 import de.trei.cambackup.settings.FolderLayout
 import de.trei.cambackup.storage.DeviceRegistry
 import de.trei.cambackup.storage.DirCache
@@ -152,7 +153,7 @@ class BackupEngine(private val context: Context) {
         val part = io.createFile(staging, "$finalName.part")
         var moved = false
         try {
-            val source = resolver.openInputStream(item.uri) ?: throw IOException("Quelle nicht lesbar")
+            val source = resolver.openInputStream(item.readUri) ?: throw IOException("Quelle nicht lesbar")
             val copy = source.use { input ->
                 io.writeSynced(part) { out -> copyWithSha256(input, out) { report(it) } }
             }
@@ -178,7 +179,7 @@ class BackupEngine(private val context: Context) {
     }
 
     private suspend fun hashSource(item: MediaItem, onBytes: (Long) -> Unit): StreamResult =
-        (resolver.openInputStream(item.uri) ?: throw IOException("Quelle nicht lesbar")).use { sha256(it, onBytes) }
+        (resolver.openInputStream(item.readUri) ?: throw IOException("Quelle nicht lesbar")).use { sha256(it, onBytes) }
 
     private suspend fun hashDocument(file: DocumentFile, onBytes: (Long) -> Unit): StreamResult =
         (resolver.openInputStream(file.uri) ?: throw IOException("Kopie nicht lesbar")).use { sha256(it, onBytes) }

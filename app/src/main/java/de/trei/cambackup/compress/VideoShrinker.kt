@@ -25,6 +25,8 @@ import androidx.media3.transformer.Transformer
 import androidx.media3.transformer.VideoEncoderSettings
 import de.trei.cambackup.backup.sha256
 import de.trei.cambackup.media.MediaItem
+import de.trei.cambackup.media.originalUri
+import de.trei.cambackup.media.readUri
 import de.trei.cambackup.settings.CompressionSettings
 import de.trei.cambackup.settings.VideoCodec
 import kotlinx.coroutines.Dispatchers
@@ -75,14 +77,14 @@ class VideoShrinker(private val context: Context) {
     ): ShrinkResult {
         precheckVideo(item, settings, nowMillis)?.let { return ShrinkResult.Skipped(it) }
 
-        val info = withContext(Dispatchers.IO) { readInfo(item.uri) }
+        val info = withContext(Dispatchers.IO) { readInfo(item.readUri) }
         if (info.isHdr && settings.videoCodec != VideoCodec.HEVC) return ShrinkResult.Skipped(SkipReason.HDR_VIDEO)
 
         outDir.mkdirs()
         val out = File(outDir, "${item.id}.mp4")
         out.delete()
         val (w, h) = targetVideoSize(info.displayWidth, info.displayHeight, settings.videoMaxShortEdge)
-        export(item.uri, out, info, w, h, settings, onProgress)
+        export(item.readUri, out, info, w, h, settings, onProgress)
 
         return withContext(Dispatchers.IO) {
             val result = readInfo(Uri.fromFile(out))
@@ -119,7 +121,7 @@ class VideoShrinker(private val context: Context) {
     fun readInfo(uri: Uri): VideoInfo {
         val r = MediaMetadataRetriever()
         try {
-            if (uri.scheme == "file") r.setDataSource(uri.path) else r.setDataSource(context, uri)
+            if (uri.scheme == "file") r.setDataSource(uri.path) else r.setDataSource(context, originalUri(uri))
             fun int(key: Int) = r.extractMetadata(key)?.toIntOrNull() ?: 0
             val transfer = int(MediaMetadataRetriever.METADATA_KEY_COLOR_TRANSFER)
             return VideoInfo(

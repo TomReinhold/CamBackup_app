@@ -10,6 +10,7 @@ import de.trei.cambackup.MainActivity
 import de.trei.cambackup.R
 import de.trei.cambackup.backup.BackupProgress
 import de.trei.cambackup.backup.RunSummary
+import de.trei.cambackup.freeup.FreeUpSummary
 import de.trei.cambackup.util.fileCount
 import de.trei.cambackup.util.formatBytes
 
@@ -60,6 +61,40 @@ object Notifications {
             .setContentText(
                 buildString {
                     append("${fileCount(s.copied)} gesichert (${formatBytes(s.bytesCopied)})")
+                    if (s.failures.isNotEmpty()) append(", ${s.failures.size} Fehler")
+                    s.abortReason?.let { append(" – $it") }
+                },
+            )
+            .setAutoCancel(true)
+            .setContentIntent(openApp(context))
+            .build()
+
+    fun simpleProgress(context: Context, title: String, text: String, percent: Int?, cancelIntent: PendingIntent) =
+        NotificationCompat.Builder(context, CHANNEL_PROGRESS)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle(title)
+            .setContentText(text)
+            .setProgress(100, percent ?: 0, percent == null)
+            .setOngoing(true)
+            .setOnlyAlertOnce(true)
+            .setContentIntent(openApp(context))
+            .addAction(0, "Abbrechen", cancelIntent)
+            .build()
+
+    fun freeUpResult(context: Context, s: FreeUpSummary) =
+        NotificationCompat.Builder(context, CHANNEL_EVENTS)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle(
+                when {
+                    s.abortReason != null -> "Speicher freigeben: abgebrochen"
+                    s.replacing -> "Speicher freigegeben"
+                    else -> "Verkleinerung vorbereitet"
+                },
+            )
+            .setContentText(
+                buildString {
+                    if (s.replacing) append("${fileCount(s.done)} ersetzt, ${formatBytes(s.bytesSaved)} frei")
+                    else append("${fileCount(s.done)} bereit, spart ${formatBytes(s.bytesSaved)}")
                     if (s.failures.isNotEmpty()) append(", ${s.failures.size} Fehler")
                     s.abortReason?.let { append(" – $it") }
                 },

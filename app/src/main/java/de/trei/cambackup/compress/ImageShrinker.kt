@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.exifinterface.media.ExifInterface
 import de.trei.cambackup.backup.sha256
 import de.trei.cambackup.media.MediaItem
+import de.trei.cambackup.media.readUri
 import de.trei.cambackup.settings.CompressionSettings
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -47,7 +48,7 @@ class ImageShrinker(private val context: Context) {
             return ShrinkResult.Skipped(SkipReason.MOTION_PHOTO)
         }
 
-        val compressed = compressor.compress(item.uri, settings.imageMaxEdge, settings.jpegQuality)
+        val compressed = compressor.compress(item.readUri, settings.imageMaxEdge, settings.jpegQuality)
         // Grobe Vorprüfung; EXIF fügt nur wenige KB hinzu, die genaue Prüfung folgt unten
         if (!worthReplacing(item.sizeBytes, compressed.bytes.size.toLong(), settings.minSavingsPercent)) {
             return ShrinkResult.Skipped(SkipReason.TOO_LITTLE_SAVING)
@@ -82,11 +83,11 @@ class ImageShrinker(private val context: Context) {
     }
 
     private fun readExif(item: MediaItem): ExifInterface =
-        resolver.openInputStream(item.uri)?.use { ExifInterface(it) } ?: throw IOException("${item.displayName} nicht lesbar")
+        resolver.openInputStream(item.readUri)?.use { ExifInterface(it) } ?: throw IOException("${item.displayName} nicht lesbar")
 
     /** Letzte 64 KB der Datei – dort hängen Samsung-Motion-Photos ihr Video an. */
     private fun readTail(item: MediaItem): ByteArray? = runCatching {
-        resolver.openInputStream(item.uri)?.use { input ->
+        resolver.openInputStream(item.readUri)?.use { input ->
             val skip = (item.sizeBytes - TAIL_BYTES).coerceAtLeast(0)
             var skipped = 0L
             while (skipped < skip) {

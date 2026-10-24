@@ -5,13 +5,9 @@ import android.content.pm.PackageManager
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -21,15 +17,18 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import de.trei.cambackup.R
 import de.trei.cambackup.backup.BackupPlan
 import de.trei.cambackup.backup.RunSummary
 import de.trei.cambackup.backup.SpaceCheck
+import de.trei.cambackup.ui.components.Banner
+import de.trei.cambackup.ui.components.BannerTone
+import de.trei.cambackup.ui.components.FeatureCard
 import de.trei.cambackup.util.fileCount
 import de.trei.cambackup.util.formatBytes
 
@@ -40,6 +39,9 @@ fun BackupPanel(deviceFolderName: String, onBackupFinished: () -> Unit, vm: Back
     val context = LocalContext.current
 
     LaunchedEffect(deviceFolderName) { vm.prepareIfIdle(deviceFolderName) }
+    // Nach Ende eines Laufs sofort neu einlesen (Status in Übersicht und Fotos)
+    val finished = state is BackupState.Finished
+    LaunchedEffect(finished) { if (finished) onBackupFinished() }
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { vm.prepareIfIdle(deviceFolderName) }
 
     // Benachrichtigungen (Fortschritt/Ergebnis) beim ersten Start erfragen; das Backup startet in jedem Fall
@@ -52,49 +54,47 @@ fun BackupPanel(deviceFolderName: String, onBackupFinished: () -> Unit, vm: Back
         if (needsAsk) notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS) else vm.start(deviceFolderName)
     }
 
-    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-        Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text("Backup", style = MaterialTheme.typography.titleSmall)
-            when (val s = state) {
-                BackupState.Preparing -> {
-                    Text("Vergleiche Kameraordner mit dem Speichermedium …")
+    FeatureCard(
+        icon = R.drawable.ic_cloud_upload,
+        title = "Backup",
+        subtitle = "Originale bitgenau auf das Speichermedium kopieren",
+    ) {
+        when (val s = state) {
+            BackupState.Preparing -> {
+                Text("Vergleiche Kameraordner mit dem Speichermedium …", style = MaterialTheme.typography.bodyMedium)
+                LinearProgressIndicator(Modifier.fillMaxWidth())
+            }
+
+            is BackupState.Ready -> PlanView(s.plan, s.space, onStart = start)
+
+            is BackupState.Running -> {
+                val p = s.progress
+                if (p == null || p.bytesTotal == 0L) {
+                    Text("Backup wird vorbereitet …")
                     LinearProgressIndicator(Modifier.fillMaxWidth())
-                }
-
-                is BackupState.Ready -> PlanView(s.plan, s.space, onStart = start)
-
-                is BackupState.Running -> {
-                    val p = s.progress
-                    if (p == null || p.bytesTotal == 0L) {
-                        Text("Backup wird vorbereitet …")
-                        LinearProgressIndicator(Modifier.fillMaxWidth())
-                    } else {
-                        Text("Datei ${minOf(p.fileIndex + 1, p.fileCount)} von ${p.fileCount}: ${p.currentName}")
-                        LinearProgressIndicator(
-                            progress = { (p.bytesDone.toFloat() / p.bytesTotal).coerceIn(0f, 1f) },
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                        Text(
-                            "${formatBytes(p.bytesDone / 2)} von ${formatBytes(p.bytesTotal / 2)} kopiert und geprüft",
-                            style = MaterialTheme.typography.bodySmall,
-                        )
-                    }
+                } else {
+                    Text("Datei ${minOf(p.fileIndex + 1, p.fileCount)} von ${p.fileCount}: ${p.currentName}", maxLines = 1)
+                    LinearProgressIndicator(
+                        progress = { (p.bytesDone.toFloat() / p.bytesTotal).coerceIn(0f, 1f) },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
                     Text(
-                        "Läuft auch im Hintergrund weiter. Speichermedium bitte nicht abziehen.",
+                        "${formatBytes(p.bytesDone / 2)} von ${formatBytes(p.bytesTotal / 2)} kopiert und geprüft",
                         style = MaterialTheme.typography.bodySmall,
                     )
-                    OutlinedButton(onClick = vm::cancel) { Text("Abbrechen") }
                 }
+                Banner("Läuft auch im Hintergrund weiter. Speichermedium bitte nicht abziehen.")
+                OutlinedButton(onClick = vm::cancel) { Text("Abbrechen") }
+            }
 
-                is BackupState.Finished -> ResultView(s.summary) {
-                    vm.acknowledge(deviceFolderName)
-                    onBackupFinished()
-                }
+            is BackupState.Finished -> ResultView(s.summary) {
+                vm.acknowledge(deviceFolderName)
+                onBackupFinished()
+            }
 
-                is BackupState.Error -> {
-                    Text("Fehler: ${s.message}", color = MaterialTheme.colorScheme.error)
-                    Button(onClick = { vm.prepare(deviceFolderName) }) { Text("Erneut versuchen") }
-                }
+            is BackupState.Error -> {
+                Banner("Fehler: ${s.message}", BannerTone.ERROR)
+                Button(onClick = { vm.prepare(deviceFolderName) }) { Text("Erneut versuchen") }
             }
         }
     }
@@ -102,50 +102,61 @@ fun BackupPanel(deviceFolderName: String, onBackupFinished: () -> Unit, vm: Back
 
 @Composable
 private fun PlanView(plan: BackupPlan, space: SpaceCheck, onStart: () -> Unit) {
-    if (plan.alreadyBackedUp > 0) Text("Bereits gesichert: ${fileCount(plan.alreadyBackedUp)}")
     if (plan.tooLargeForFileSystem.isNotEmpty()) {
-        Text(
-            "${fileCount(plan.tooLargeForFileSystem.size)} größer als 4 GB – passt nicht auf ein " +
-                "FAT32-Medium: ${plan.tooLargeForFileSystem.joinToString { it.displayName }}. " +
-                "Bitte ein mit exFAT formatiertes Medium verwenden.",
-            color = MaterialTheme.colorScheme.error,
+        Banner(
+            "${fileCount(plan.tooLargeForFileSystem.size)} größer als 4 GB – passt nicht auf ein FAT32-Medium: " +
+                "${plan.tooLargeForFileSystem.joinToString { it.displayName }}. Bitte ein mit exFAT formatiertes Medium verwenden.",
+            BannerTone.WARNING,
         )
     }
     if (plan.toCopy.isEmpty()) {
-        Text("Alles gesichert – keine neuen Fotos oder Videos.", color = MaterialTheme.colorScheme.primary)
+        Banner(
+            "Alles gesichert" + (if (plan.alreadyBackedUp > 0) " – ${fileCount(plan.alreadyBackedUp)} liegen auf dem Medium." else "."),
+            BannerTone.SUCCESS,
+        )
         return
     }
-    Text("Neu zu sichern: ${fileCount(plan.toCopy.size)} (${formatBytes(plan.bytesToCopy)})")
+    Row {
+        Text("Neu zu sichern", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+        Text("${fileCount(plan.toCopy.size)} · ${formatBytes(plan.bytesToCopy)}", style = MaterialTheme.typography.titleSmall)
+    }
+    if (plan.alreadyBackedUp > 0) {
+        Row {
+            Text("Bereits gesichert", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+            Text(fileCount(plan.alreadyBackedUp), style = MaterialTheme.typography.bodyMedium)
+        }
+    }
     when (space) {
         is SpaceCheck.Enough -> Text(
             "Benötigt inkl. Reserve: ${formatBytes(space.requiredBytes)} – frei: ${formatBytes(space.freeBytes)}",
             style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        is SpaceCheck.NotEnough -> Text(
-            "Zu wenig Platz: benötigt ${formatBytes(space.requiredBytes)} (inkl. Reserve), " +
-                "frei nur ${formatBytes(space.freeBytes)}. Bitte Platz schaffen oder ein größeres Medium verwenden.",
-            color = MaterialTheme.colorScheme.error,
+        is SpaceCheck.NotEnough -> Banner(
+            "Zu wenig Platz: benötigt ${formatBytes(space.requiredBytes)} (inkl. Reserve), frei nur " +
+                "${formatBytes(space.freeBytes)}. Bitte Platz schaffen oder ein größeres Medium verwenden.",
+            BannerTone.ERROR,
         )
         is SpaceCheck.Unknown -> Text(
             "Freier Platz unbekannt – benötigt werden ca. ${formatBytes(space.requiredBytes)}.",
             style = MaterialTheme.typography.bodySmall,
         )
     }
-    Button(onClick = onStart, enabled = space !is SpaceCheck.NotEnough) { Text("Backup starten") }
+    Button(onClick = onStart, enabled = space !is SpaceCheck.NotEnough, modifier = Modifier.fillMaxWidth()) {
+        Text("Backup starten")
+    }
 }
 
 @Composable
 private fun ResultView(s: RunSummary, onDone: () -> Unit) {
-    Text(
-        if (s.isComplete) "Backup abgeschlossen" else "Backup unvollständig",
-        color = if (s.isComplete) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
-        style = MaterialTheme.typography.bodyLarge,
+    Banner(
+        if (s.isComplete) "Backup abgeschlossen: ${fileCount(s.copied)} (${formatBytes(s.bytesCopied)}) kopiert und geprüft."
+        else "Backup unvollständig: ${fileCount(s.copied)} kopiert" + (s.abortReason?.let { " – $it" } ?: ""),
+        if (s.isComplete) BannerTone.SUCCESS else BannerTone.WARNING,
     )
-    Text("Kopiert und geprüft: ${fileCount(s.copied)} (${formatBytes(s.bytesCopied)})")
-    if (s.adopted > 0) Text("Bereits vorhanden und übernommen: ${s.adopted}")
-    s.abortReason?.let { Text("Abgebrochen: $it", color = MaterialTheme.colorScheme.error) }
+    if (s.adopted > 0) Text("Bereits vorhanden und übernommen: ${fileCount(s.adopted)}", style = MaterialTheme.typography.bodySmall)
     if (s.failures.isNotEmpty()) {
-        Text("Fehler bei ${fileCount(s.failures.size)}:", color = MaterialTheme.colorScheme.error)
+        Text("Fehler bei ${fileCount(s.failures.size)}:", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)
         s.failures.take(10).forEach { Text("• ${it.name}: ${it.reason}", style = MaterialTheme.typography.bodySmall) }
     }
     Button(onClick = onDone) { Text("OK") }

@@ -1,6 +1,7 @@
 package de.trei.cambackup.storage
 
 import android.content.ContentResolver
+import android.net.Uri
 import androidx.documentfile.provider.DocumentFile
 import java.io.FileOutputStream
 import java.io.IOException
@@ -25,8 +26,12 @@ class SafIo(@PublishedApi internal val resolver: ContentResolver) {
      * Öffnet [file] zum Schreiben und führt [block] aus; danach werden die Daten per fsync
      * auf das Medium geschrieben, bevor die Datei als fertig gilt.
      */
-    inline fun <T> writeSynced(file: DocumentFile, mode: String = "wt", block: (OutputStream) -> T): T {
-        val pfd = resolver.openFileDescriptor(file.uri, mode) ?: throw IOException("${file.name} nicht beschreibbar")
+    inline fun <T> writeSynced(file: DocumentFile, mode: String = "wt", block: (OutputStream) -> T): T =
+        writeSynced(file.uri, file.name ?: "Datei", mode, block)
+
+    /** Wie oben, für beliebige URIs (z. B. MediaStore-Einträge auf dem Smartphone). */
+    inline fun <T> writeSynced(uri: Uri, name: String, mode: String = "wt", block: (OutputStream) -> T): T {
+        val pfd = resolver.openFileDescriptor(uri, mode) ?: throw IOException("$name nicht beschreibbar")
         return pfd.use {
             FileOutputStream(it.fileDescriptor).use { out ->
                 val result = block(out)
