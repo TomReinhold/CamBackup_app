@@ -147,6 +147,7 @@ fun DriveSection(onLibraryChanged: () -> Unit, modifier: Modifier = Modifier, vm
                 },
             )
             FreeUpPanel(folderUri = folder, onFinished = onLibraryChanged)
+            RestorePanel(folderUri = folder, onFinished = onLibraryChanged)
         }
     }
 

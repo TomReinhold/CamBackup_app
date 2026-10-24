@@ -1,42 +1,22 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Vordergrund des App-Icons: Foto (Sonne, Berge) mit grünem „Gesichert“-Abzeichen -->
+<!--
+  Vordergrund des App-Icons, bewusst minimal: ein Foto (Berg und Sonne als Aussparung) vor einem
+  versetzten Rahmen – die gesicherte Kopie. Nur Weiß auf dem einfarbigen Hintergrund.
+-->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- leichter Schatten unter dem Foto -->
-    <path
-        android:fillColor="#33000000"
-        android:pathData="M36,35H66A5,5 0 0 1 71,40V64A5,5 0 0 1 66,69H36A5,5 0 0 1 31,64V40A5,5 0 0 1 36,35Z" />
-    <!-- Foto -->
-    <path
-        android:fillColor="#FFFFFFFF"
-        android:pathData="M35,33H65A5,5 0 0 1 70,38V62A5,5 0 0 1 65,67H35A5,5 0 0 1 30,62V38A5,5 0 0 1 35,33Z" />
-    <!-- Sonne -->
-    <path
-        android:fillColor="#FFFFB300"
-        android:pathData="M36,43a4.5,4.5 0 1,0 9,0a4.5,4.5 0 1,0 -9,0Z" />
-    <!-- Berge -->
-    <path
-        android:fillColor="#FF1E88E5"
-        android:pathData="M33,63.5L45,49.5L52.5,58L57.5,52.5L67,63.5Z" />
-    <path
-        android:fillColor="#FF1565C0"
-        android:pathData="M45,49.5L52.5,58L48.5,63.5L33,63.5Z" />
-    <!-- Abzeichen: weißer Ring, grüner Kreis -->
-    <path
-        android:fillColor="#FFFFFFFF"
-        android:pathData="M53,68a15,15 0 1,0 30,0a15,15 0 1,0 -30,0Z" />
-    <path
-        android:fillColor="#FF2E9E4F"
-        android:pathData="M55.5,68a12.5,12.5 0 1,0 25,0a12.5,12.5 0 1,0 -25,0Z" />
-    <!-- Pfeil in die Ablage -->
+    <!-- Rahmen der Kopie (hinten, versetzt) -->
     <path
         android:fillColor="#00000000"
-        android:strokeColor="#FFFFFFFF"
-        android:strokeWidth="2.8"
-        android:strokeLineCap="round"
-        android:strokeLineJoin="round"
-        android:pathData="M68,60.5V71.5M63.5,67L68,71.5L72.5,67M62.5,75.5H73.5" />
+        android:strokeColor="#B3FFFFFF"
+        android:strokeWidth="3.5"
+        android:pathData="M46,30H70A6,6 0 0 1 76,36V60A6,6 0 0 1 70,66" />
+    <!-- Foto (vorn) mit ausgesparter Sonne und Berg -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:fillType="evenOdd"
+        android:pathData="M38,40H62A6,6 0 0 1 68,46V70A6,6 0 0 1 62,76H38A6,6 0 0 1 32,70V46A6,6 0 0 1 38,40ZM39,49.5a3.5,3.5 0 1,0 7,0a3.5,3.5 0 1,0 -7,0ZM36.5,71L46,58.5L52,65.5L56,61L63.5,71Z" />
 </vector>

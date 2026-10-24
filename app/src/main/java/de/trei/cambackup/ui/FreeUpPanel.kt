@@ -115,6 +115,14 @@ private fun OverviewView(o: FreeUpOverview, dryRun: Boolean, minAgeDays: Int, on
             Text("${fileCount(o.alreadyCompressed)} · ${formatBytes(o.alreadyCompressedSaved)} frei", style = MaterialTheme.typography.bodyMedium)
         }
     }
+    if (o.keptOriginal > 0) {
+        Text(
+            "${fileCount(o.keptOriginal)} " + (if (o.keptOriginal == 1) "wurde" else "wurden") +
+                " zurückgeholt und " + (if (o.keptOriginal == 1) "bleibt" else "bleiben") + " in Originalgröße.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
     if (o.notBackedUp > 0) {
         Text(
             "${fileCount(o.notBackedUp)} noch nicht gesichert – diese werden nicht verändert.",

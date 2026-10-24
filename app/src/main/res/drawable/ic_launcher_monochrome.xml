@@ -1,18 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Einfarbige Variante für „Designte Symbole“ (Android 13+): Formen als Aussparungen -->
+<!-- Einfarbige Variante für „Designte Symbole“ (Android 13+) – gleiche Formen wie der Vordergrund -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- Fotorahmen mit ausgesparter Sonne und Bergen -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FF000000"
+        android:strokeWidth="3.5"
+        android:pathData="M46,30H70A6,6 0 0 1 76,36V60A6,6 0 0 1 70,66" />
     <path
         android:fillColor="#FF000000"
         android:fillType="evenOdd"
-        android:pathData="M35,33H65A5,5 0 0 1 70,38V62A5,5 0 0 1 65,67H35A5,5 0 0 1 30,62V38A5,5 0 0 1 35,33ZM36,43a4.5,4.5 0 1,0 9,0a4.5,4.5 0 1,0 -9,0ZM33,63.5L45,49.5L52.5,58L57.5,52.5L67,63.5Z" />
-    <!-- Abzeichen mit ausgespartem Pfeil -->
-    <path
-        android:fillColor="#FF000000"
-        android:fillType="evenOdd"
-        android:pathData="M55.5,68a12.5,12.5 0 1,0 25,0a12.5,12.5 0 1,0 -25,0ZM66.6,60.5h2.8v7.6l2.1,-2.1 2,2 -5.5,5.5 -5.5,-5.5 2,-2 2.1,2.1ZM62.5,74.1h11v2.8h-11Z" />
+        android:pathData="M38,40H62A6,6 0 0 1 68,46V70A6,6 0 0 1 62,76H38A6,6 0 0 1 32,70V46A6,6 0 0 1 38,40ZM39,49.5a3.5,3.5 0 1,0 7,0a3.5,3.5 0 1,0 -7,0ZM36.5,71L46,58.5L52,65.5L56,61L63.5,71Z" />
 </vector>

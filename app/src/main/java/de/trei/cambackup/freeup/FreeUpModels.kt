@@ -61,7 +61,31 @@ data class FreeUpOverview(
     val alreadyCompressedSaved: Long,
     /** Auf dem Smartphone, aber noch nicht gesichert. */
     val notBackedUp: Int,
+    /** Original bewusst zurückgeholt – wird nicht erneut verkleinert. */
+    val keptOriginal: Int = 0,
 )
+
+/** Eine verkleinerte Datei, deren Original vom Medium zurückgeholt werden kann. */
+data class RestoreCandidate(val item: MediaItem, val entry: IndexEntry) {
+    /** Zusätzlicher Platz, den das Original auf dem Smartphone braucht. */
+    val extraBytes: Long get() = entry.originalSize - item.sizeBytes
+}
+
+/** Verkleinerte Dateien, deren Datei auf dem Smartphone noch genau die verkleinerte Version ist. */
+fun restoreCandidates(items: List<MediaItem>, index: IndexState): List<RestoreCandidate> = items.mapNotNull { item ->
+    index.forPhonePath(item.phonePath)
+        .lastOrNull { it.status == EntryStatus.COMPRESSED && it.compressedSize == item.sizeBytes }
+        ?.let { RestoreCandidate(item, it) }
+}
+
+/** Platzbedarf beim Zurückholen inkl. Reserve, damit das Smartphone nicht vollläuft. */
+fun restoreSpaceNeeded(candidates: List<RestoreCandidate>): Long {
+    val extra = candidates.sumOf { it.extraBytes }
+    return if (extra <= 0) 0 else extra + RESTORE_RESERVE
+}
+
+/** Freier Platz, der auf dem Smartphone nach dem Zurückholen mindestens übrig bleiben soll. */
+const val RESTORE_RESERVE = 500L * 1024 * 1024
 
 /**
  * Teilt die Kamera-Dateien anhand des Index ein. Nur unveränderte, verifiziert gesicherte Originale
@@ -73,6 +97,7 @@ fun overviewFor(items: List<MediaItem>, index: IndexState): FreeUpOverview {
     var compressed = 0
     var compressedSaved = 0L
     var notBackedUp = 0
+    var kept = 0
     for (item in items) {
         val entries = index.forPhonePath(item.phonePath)
         val asCompressed = entries.lastOrNull { it.status == EntryStatus.COMPRESSED && it.compressedSize == item.sizeBytes }
@@ -82,11 +107,12 @@ fun overviewFor(items: List<MediaItem>, index: IndexState): FreeUpOverview {
                 compressed++
                 compressedSaved += asCompressed.originalSize - item.sizeBytes
             }
+            asOriginal != null && asOriginal.keepOriginal -> kept++
             asOriginal != null -> candidates += Candidate(item, asOriginal)
             else -> notBackedUp++
         }
     }
-    return FreeUpOverview(candidates, compressed, compressedSaved, notBackedUp)
+    return FreeUpOverview(candidates, compressed, compressedSaved, notBackedUp, kept)
 }
 
 /** Index-Eintrag nach erfolgreichem Ersetzen. */

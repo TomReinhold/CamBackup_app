@@ -2,6 +2,9 @@ package de.trei.cambackup
 
 import android.net.Uri
 import de.trei.cambackup.freeup.PendingReplacement
+import de.trei.cambackup.freeup.RESTORE_RESERVE
+import de.trei.cambackup.freeup.restoreCandidates
+import de.trei.cambackup.freeup.restoreSpaceNeeded
 import de.trei.cambackup.freeup.asCompressed
 import de.trei.cambackup.freeup.asVerifiedOnly
 import de.trei.cambackup.freeup.overviewFor
@@ -39,6 +42,28 @@ class FreeUpModelsTest {
         assertEquals(1, o.alreadyCompressed)
         assertEquals(70, o.alreadyCompressedSaved)
         assertEquals(2, o.notBackedUp) // c (verändert, neu zu sichern) und d
+    }
+
+    @Test fun keptOriginalsAreNotCompressedAgain() {
+        val index = IndexState(listOf(entry("a.jpg", 100).copy(keepOriginal = true)))
+        val o = overviewFor(listOf(item("a.jpg", 100)), index)
+        assertEquals(0, o.candidates.size)
+        assertEquals(1, o.keptOriginal)
+    }
+
+    @Test fun restoreCandidatesOnlyForUntouchedCompressedFiles() {
+        val index = IndexState(
+            listOf(
+                entry("a.jpg", 100, EntryStatus.COMPRESSED, compressed = 30), // verkleinert, unverändert
+                entry("b.jpg", 100, EntryStatus.COMPRESSED, compressed = 30), // inzwischen bearbeitet
+                entry("c.jpg", 100),                                          // nur gesichert
+            ),
+        )
+        val c = restoreCandidates(listOf(item("a.jpg", 30), item("b.jpg", 45), item("c.jpg", 100)), index)
+        assertEquals(listOf("a.jpg"), c.map { it.item.displayName })
+        assertEquals(70, c.single().extraBytes)
+        assertEquals(70 + RESTORE_RESERVE, restoreSpaceNeeded(c))
+        assertEquals(0, restoreSpaceNeeded(emptyList()))
     }
 
     @Test fun statusTransitions() {

@@ -28,6 +28,8 @@ data class IndexEntry(
     val compressedSha256: String? = null,
     val compressedAt: String? = null,
     val compressionParams: String? = null,
+    /** Original wurde bewusst zurückgeholt – nicht erneut automatisch verkleinern. */
+    val keepOriginal: Boolean = false,
     /**
      * Nur im Journal: markiert einen entfernten Eintrag (Sicherung wurde gelöscht). Das Journal
      * wird nur angehängt, daher wird Entfernen als eigene Zeile vermerkt.
