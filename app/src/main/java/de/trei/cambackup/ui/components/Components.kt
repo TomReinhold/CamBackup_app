@@ -24,7 +24,16 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.outlined.Info
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -77,9 +86,16 @@ fun FeatureCard(
 
 enum class BannerTone { INFO, SUCCESS, WARNING, ERROR }
 
-/** Farbig hinterlegter Hinweis. */
+/**
+ * Farbig hinterlegter Hinweis. Blaue Info-Hinweise sind eingeklappt: sichtbar sind nur ⓘ und
+ * [title]; ein Tipp klappt den ganzen Text auf und wieder zu. Kurze Hinweise ohne Titel stehen direkt da.
+ */
 @Composable
-fun Banner(text: String, tone: BannerTone = BannerTone.INFO, modifier: Modifier = Modifier) {
+fun Banner(text: String, tone: BannerTone = BannerTone.INFO, modifier: Modifier = Modifier, title: String? = null) {
+    if (tone == BannerTone.INFO && (title != null || text.length > SHORT_INFO)) {
+        InfoBanner(title ?: "Hinweis", text, modifier)
+        return
+    }
     val (bg, fg) = when (tone) {
         BannerTone.INFO -> MaterialTheme.colorScheme.secondaryContainer to MaterialTheme.colorScheme.onSecondaryContainer
         BannerTone.SUCCESS -> StatusColors.compressed.copy(alpha = 0.15f) to MaterialTheme.colorScheme.onSurface
@@ -88,6 +104,42 @@ fun Banner(text: String, tone: BannerTone = BannerTone.INFO, modifier: Modifier 
     }
     Surface(modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), color = bg, contentColor = fg) {
         Text(text, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(12.dp))
+    }
+}
+
+/** Info-Hinweise bis zu dieser Länge werden nicht eingeklappt. */
+private const val SHORT_INFO = 45
+
+@Composable
+private fun InfoBanner(title: String, text: String, modifier: Modifier) {
+    // Bleibt beim Scrollen und Drehen erhalten, pro Hinweistext
+    var open by rememberSaveable(text) { mutableStateOf(false) }
+    Surface(
+        modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.secondaryContainer,
+        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+    ) {
+        Column(
+            Modifier
+                .toggleable(value = open, role = Role.Button, onValueChange = { open = it })
+                .padding(horizontal = 12.dp, vertical = 8.dp)
+                .animateContentSize(),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Outlined.Info, null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text(title, style = MaterialTheme.typography.labelLarge, modifier = Modifier.weight(1f))
+                Icon(
+                    if (open) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                    if (open) "Einklappen" else "Ausklappen",
+                    modifier = Modifier.size(20.dp),
+                )
+            }
+            if (open) {
+                Text(text, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(start = 26.dp, top = 4.dp, bottom = 4.dp))
+            }
+        }
     }
 }
 

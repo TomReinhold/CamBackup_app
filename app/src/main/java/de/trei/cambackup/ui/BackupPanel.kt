@@ -148,6 +148,7 @@ fun BackupPanel(folderUri: String, onBackupFinished: () -> Unit, vm: BackupViewM
                 Banner(
                     "Läuft auch im Hintergrund weiter. Speichermedium bitte nicht abziehen – falls doch, bleibt alles " +
                         "bereits Geprüfte gesichert und das Backup lässt sich später fortsetzen.",
+                    title = "Speichermedium bitte nicht abziehen",
                 )
                 OutlinedButton(onClick = vm::cancel) { Text("Abbrechen") }
             }
@@ -181,6 +182,7 @@ private fun PlanView(plan: BackupPlan, space: SpaceCheck, onStart: () -> Unit) {
         Banner(
             "Neue Ordnerstruktur: ${fileCount(plan.toMove.size)} liegen noch in der bisherigen Ablage$from und werden " +
                 "beim Backup auf dem Medium verschoben. Der Inhalt bleibt unverändert, es wird nichts neu kopiert.",
+            title = "Neue Ordnerstruktur: ${fileCount(plan.toMove.size)} werden verschoben",
         )
     }
     if (!plan.hasWork) {

@@ -101,6 +101,7 @@ fun FreeUpPanel(folderUri: String, onFinished: () -> Unit, vm: FreeUpViewModel =
                     if (s.replacing) "Jede Datei wird verkleinert und sofort ersetzt – das Original bleibt auf dem Speichermedium. " +
                         "Speichermedium bitte nicht abziehen."
                     else "Auf dem Smartphone wird dabei nichts verändert. Videos brauchen etwas Zeit.",
+                    title = if (s.replacing) "Speichermedium bitte nicht abziehen" else "Probelauf – es wird nichts verändert",
                 )
                 OutlinedButton(onClick = vm::cancel) { Text("Abbrechen") }
             }
@@ -157,6 +158,7 @@ private fun OverviewView(
         Banner(
             "Probelauf ist aktiv: Es wird nur berechnet, wie viel Platz frei würde – ersetzt wird nichts. " +
                 "Einzelne Dateien kannst du in der Galerie auswählen und „Probe verkleinern“, um das Ergebnis anzusehen.",
+            title = "Probelauf ist aktiv",
         )
     }
     if (probeCount > 0) {

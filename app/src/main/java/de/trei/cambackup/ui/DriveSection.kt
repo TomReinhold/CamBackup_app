@@ -97,7 +97,7 @@ fun DriveSection(onLibraryChanged: () -> Unit, modifier: Modifier = Modifier, vm
                     val volume = s.newVolume
                     when {
                         volume != null -> {
-                            Banner("Neues Speichermedium „${volume.label}“ erkannt. Wähle dort den Backup-Ordner für dieses Smartphone.", BannerTone.INFO)
+                            Banner("Neues Speichermedium „${volume.label}“ erkannt. Wähle dort den Backup-Ordner für dieses Smartphone.", BannerTone.INFO, title = "Neues Speichermedium erkannt")
                             Button(onClick = { pickTree.launch(volume.pickerStart) }, modifier = Modifier.fillMaxWidth()) {
                                 Text("Backup-Ordner auf ${volume.label} wählen")
                             }
