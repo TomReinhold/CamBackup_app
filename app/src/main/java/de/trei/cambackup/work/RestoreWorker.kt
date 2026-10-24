@@ -42,6 +42,7 @@ class RestoreWorker(context: Context, params: WorkerParameters) : CoroutineWorke
     )
 
     override suspend fun doWork(): Result {
+        JobControl.setPaused(JobControl.RESTORE, false)
         val folder = inputData.getString(KEY_FOLDER) ?: return Result.failure()
         val keep = inputData.getBoolean(KEY_KEEP, true)
         runCatching { setForeground(foregroundInfo("Wird gestartet …", null)) }.onFailure { Log.w(TAG, "Vordergrunddienst nicht möglich", it) }

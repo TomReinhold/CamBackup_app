@@ -13,6 +13,9 @@ import de.trei.cambackup.freeup.FreeUpRunner
 import de.trei.cambackup.library.LibraryItem
 import de.trei.cambackup.util.fileCount
 import de.trei.cambackup.work.RestoreWorker
+import de.trei.cambackup.work.JobControl
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -58,10 +61,12 @@ class GalleryActionsViewModel(app: Application, private val saved: SavedStateHan
         if (_trialRunning.value) return
         val media = items.take(MAX_TRIAL).map { it.media }
         _trialRunning.value = true
-        _message.value = "Probe wird erstellt …" + if (items.size > MAX_TRIAL) " (nur die ersten $MAX_TRIAL)" else ""
-        viewModelScope.launch {
+        JobControl.setPaused(JobControl.TRIAL, false)
+        _trialProgress.value = 0 to media.size
+        if (items.size > MAX_TRIAL) _message.value = "Probe nur für die ersten $MAX_TRIAL Dateien"
+        trialJob = viewModelScope.launch {
             _message.value = try {
-                val r = TrialCompressor(getApplication()).run(media)
+                val r = TrialCompressor(getApplication()).run(media) { done, total -> _trialProgress.value = done to total }
                 buildString {
                     if (r.created > 0) {
                         append("${fileCount(r.created)} zur Probe verkleinert: ${formatBytes(r.bytesBefore)} → ${formatBytes(r.bytesAfter)}. ")
@@ -72,12 +77,29 @@ class GalleryActionsViewModel(app: Application, private val saved: SavedStateHan
                     r.skipped.forEach { (reason, n) -> append(" $reason: $n.") }
                     if (r.failures > 0) append(" Fehler bei ${fileCount(r.failures)}.")
                 }
+            } catch (e: CancellationException) {
+                // Bereits erstellte Proben bleiben im Album
+                "Probe abgebrochen"
             } catch (e: Exception) {
                 "Fehler: ${e.message ?: e.javaClass.simpleName}"
             } finally {
                 _trialRunning.value = false
+                _trialProgress.value = null
             }
         }
+    }
+
+    private var trialJob: Job? = null
+    private val _trialProgress = MutableStateFlow<Pair<Int, Int>?>(null)
+    /** Fortschritt der Probe-Verkleinerung (erledigt, gesamt). */
+    val trialProgress: StateFlow<Pair<Int, Int>?> = _trialProgress.asStateFlow()
+    val trialPaused: StateFlow<Boolean> = JobControl.paused(JobControl.TRIAL)
+
+    fun setTrialPaused(paused: Boolean) = JobControl.setPaused(JobControl.TRIAL, paused)
+
+    fun cancelTrial() {
+        JobControl.setPaused(JobControl.TRIAL, false)
+        trialJob?.cancel()
     }
 
     /**

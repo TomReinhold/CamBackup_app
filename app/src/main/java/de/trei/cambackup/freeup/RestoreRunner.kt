@@ -1,5 +1,6 @@
 package de.trei.cambackup.freeup
 
+import de.trei.cambackup.work.JobControl
 import android.content.Context
 import android.net.Uri
 import android.os.Environment
@@ -119,6 +120,7 @@ class RestoreRunner(private val context: Context) {
             val failures = mutableListOf<RunSummary.Failure>()
             var abort: String? = null
             for ((i, c) in candidates.withIndex()) {
+                JobControl.waitWhilePaused(JobControl.RESTORE) { !caller.isActive }
                 if (!caller.isActive) {
                     abort = "Abgebrochen"
                     break

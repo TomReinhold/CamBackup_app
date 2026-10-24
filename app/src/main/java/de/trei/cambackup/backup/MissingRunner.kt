@@ -1,5 +1,6 @@
 package de.trei.cambackup.backup
 
+import de.trei.cambackup.work.JobControl
 import android.content.ContentValues
 import android.content.Context
 import android.provider.MediaStore
@@ -100,6 +101,7 @@ class MissingRunner(private val context: Context) {
             var abort: String? = null
             val todo = decisions.actions.entries.toList()
             for ((i, decision) in todo.withIndex()) {
+                JobControl.waitWhilePaused(JobControl.MISSING) { !caller.isActive }
                 if (!caller.isActive) {
                     abort = "Abgebrochen"
                     break

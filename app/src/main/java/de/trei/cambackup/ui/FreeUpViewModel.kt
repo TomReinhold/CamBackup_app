@@ -19,6 +19,8 @@ import de.trei.cambackup.freeup.FreeUpSummary
 import de.trei.cambackup.freeup.compressTargets
 import de.trei.cambackup.settings.SettingsRepository
 import de.trei.cambackup.work.FreeUpWorker
+import de.trei.cambackup.work.JobControl
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -70,7 +72,11 @@ class FreeUpViewModel(app: Application) : AndroidViewModel(app) {
     fun load(folderUri: String) {
         viewModelScope.launch { _probeCount.value = runCatching { trials.count() }.getOrDefault(0) }
         if (loadJob?.isActive == true) return
-        loadJob = viewModelScope.launch { overview.value = runCatching { runner.overview(folderUri) } }
+        loadJob = viewModelScope.launch {
+            val r = runCatching { runner.overview(folderUri) }
+            // Abgebrochen (cancelLoad): der Zustand „Abgebrochen“ ist schon gesetzt
+            if (r.exceptionOrNull() !is CancellationException) overview.value = r
+        }
     }
 
     fun deleteProbes() {
@@ -104,7 +110,19 @@ class FreeUpViewModel(app: Application) : AndroidViewModel(app) {
         FreeUpWorker.compress(getApplication(), folderUri, TAG_COMPRESS)
     }
 
-    fun cancel() = FreeUpWorker.cancel(getApplication())
+    fun cancel() {
+        JobControl.setPaused(JobControl.FREE_UP, false)
+        FreeUpWorker.cancel(getApplication())
+    }
+
+    val paused: StateFlow<Boolean> = JobControl.paused(JobControl.FREE_UP)
+    fun setPaused(paused: Boolean) = JobControl.setPaused(JobControl.FREE_UP, paused)
+
+    /** Laden des Überblicks abbrechen. */
+    fun cancelLoad() {
+        loadJob?.cancel()
+        overview.value = Result.failure(Exception("Abgebrochen"))
+    }
 
     /** Ergebnis des letzten Laufs – steht über dem Überblick, bis die App verlassen wird. */
     val result: StateFlow<FreeUpSummary?> = store.summary

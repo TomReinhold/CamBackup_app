@@ -32,6 +32,7 @@ import de.trei.cambackup.freeup.FreeUpSummary
 import de.trei.cambackup.ui.components.Banner
 import de.trei.cambackup.ui.components.BannerTone
 import de.trei.cambackup.ui.components.FeatureCard
+import de.trei.cambackup.ui.components.JobControls
 import de.trei.cambackup.util.fileCount
 import de.trei.cambackup.util.formatBytes
 
@@ -40,6 +41,7 @@ import de.trei.cambackup.util.formatBytes
 fun FreeUpPanel(folderUri: String, onFinished: () -> Unit, vm: FreeUpViewModel = viewModel()) {
     val state by vm.state.collectAsStateWithLifecycle()
     val probeCount by vm.probeCount.collectAsStateWithLifecycle()
+    val paused by vm.paused.collectAsStateWithLifecycle()
 
     val result by vm.result.collectAsStateWithLifecycle()
 
@@ -73,7 +75,10 @@ fun FreeUpPanel(folderUri: String, onFinished: () -> Unit, vm: FreeUpViewModel =
     ) {
         if (state !is FreeUpState.Working) result?.let { SummaryView(it) }
         when (val s = state) {
-            FreeUpState.Loading -> LinearProgressIndicator(Modifier.fillMaxWidth())
+            FreeUpState.Loading -> {
+                LinearProgressIndicator(Modifier.fillMaxWidth())
+                JobControls(paused = false, onPause = null, onCancel = vm::cancelLoad)
+            }
 
             is FreeUpState.Overview -> OverviewView(
                 o = s.overview,
@@ -95,7 +100,7 @@ fun FreeUpPanel(folderUri: String, onFinished: () -> Unit, vm: FreeUpViewModel =
             is FreeUpState.Working -> {
                 val p = s.progress
                 Text(
-                    when {
+                    (if (paused) "Pausiert – " else "") + when {
                         p == null -> if (s.replacing) "Verkleinern wird gestartet …" else "Probelauf wird gestartet …"
                         s.replacing -> "Verkleinere ${p.done + 1} von ${p.total}"
                         else -> "Probelauf: prüfe ${p.done + 1} von ${p.total}"
@@ -112,7 +117,7 @@ fun FreeUpPanel(folderUri: String, onFinished: () -> Unit, vm: FreeUpViewModel =
                     else "Auf dem Smartphone wird dabei nichts verändert. Videos brauchen etwas Zeit.",
                     title = if (s.replacing) "Speichermedium bitte nicht abziehen" else "Probelauf – es wird nichts verändert",
                 )
-                OutlinedButton(onClick = vm::cancel) { Text("Abbrechen") }
+                JobControls(paused, vm::setPaused, vm::cancel)
             }
 
             is FreeUpState.Error -> {

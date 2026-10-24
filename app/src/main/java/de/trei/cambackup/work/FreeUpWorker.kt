@@ -46,6 +46,7 @@ class FreeUpWorker(context: Context, params: WorkerParameters) : CoroutineWorker
     )
 
     override suspend fun doWork(): Result {
+        JobControl.setPaused(JobControl.FREE_UP, false)
         runCatching { setForeground(foregroundInfo(null)) }.onFailure { Log.w(TAG, "Vordergrunddienst nicht möglich", it) }
         var lastPublish = 0L
         val publish = { p: FreeUpProgress ->

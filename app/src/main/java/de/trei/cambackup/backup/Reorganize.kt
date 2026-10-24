@@ -1,5 +1,6 @@
 package de.trei.cambackup.backup
 
+import de.trei.cambackup.work.JobControl
 import android.content.Context
 import android.provider.DocumentsContract
 import androidx.documentfile.provider.DocumentFile
@@ -82,6 +83,7 @@ class Relocator(private val context: Context) {
         var abort: String? = null
         var failedInRow = 0
         for ((i, m) in moves.withIndex()) {
+            JobControl.waitWhilePaused(JobControl.BACKUP) { abortReason() != null }
             abortReason()?.let { abort = it }
             if (abort != null) break
             onProgress(i, moves.size)

@@ -1,5 +1,6 @@
 package de.trei.cambackup.backup
 
+import de.trei.cambackup.work.JobControl
 import android.content.ContentResolver
 import android.content.Context
 import android.provider.DocumentsContract
@@ -86,6 +87,7 @@ class BackupEngine(private val context: Context) {
         var failedInRow = 0
 
         for ((i, item) in plan.toCopy.withIndex()) {
+            JobControl.waitWhilePaused(JobControl.BACKUP) { abortReason() != null }
             val report = { bytes: Long ->
                 // Wird während des Kopierens laufend aufgerufen – so greift ein Abbruch auch bei großen Videos zügig
                 abortReason()?.let { throw Aborted(it) }

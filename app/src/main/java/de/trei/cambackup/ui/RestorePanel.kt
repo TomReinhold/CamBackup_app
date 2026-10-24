@@ -46,8 +46,10 @@ import de.trei.cambackup.freeup.RestoreSummary
 import de.trei.cambackup.ui.components.Banner
 import de.trei.cambackup.ui.components.BannerTone
 import de.trei.cambackup.ui.components.FeatureCard
+import de.trei.cambackup.ui.components.JobControls
 import de.trei.cambackup.util.fileCount
 import de.trei.cambackup.util.formatBytes
+import de.trei.cambackup.work.JobControl
 import de.trei.cambackup.work.RestoreWorker
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -102,7 +104,13 @@ class RestoreViewModel(app: Application) : AndroidViewModel(app) {
         RestoreWorker.start(getApplication(), folderUri, keepOriginal)
     }
 
-    fun cancel() = RestoreWorker.cancel(getApplication())
+    fun cancel() {
+        JobControl.setPaused(JobControl.RESTORE, false)
+        RestoreWorker.cancel(getApplication())
+    }
+
+    val paused: StateFlow<Boolean> = JobControl.paused(JobControl.RESTORE)
+    fun setPaused(paused: Boolean) = JobControl.setPaused(JobControl.RESTORE, paused)
 
     /** Ergebnis des letzten Laufs – steht über dem Überblick, bis die App verlassen wird. */
     val result: StateFlow<RestoreSummary?> = store.summary
@@ -121,6 +129,7 @@ class RestoreViewModel(app: Application) : AndroidViewModel(app) {
 @Composable
 fun RestorePanel(folderUri: String, onFinished: () -> Unit, vm: RestoreViewModel = viewModel()) {
     val state by vm.state.collectAsStateWithLifecycle()
+    val paused by vm.paused.collectAsStateWithLifecycle()
     var confirm by rememberSaveable { mutableStateOf(false) }
     var keepOriginal by rememberSaveable { mutableStateOf(true) }
 
@@ -212,11 +221,14 @@ fun RestorePanel(folderUri: String, onFinished: () -> Unit, vm: RestoreViewModel
             }
 
             is RestoreState.Running -> {
-                Text(if (s.total > 0) "Hole Original ${minOf(s.done + 1, s.total)} von ${s.total} zurück …" else "Wird gestartet …")
+                Text(
+                    (if (paused) "Pausiert – " else "") +
+                        if (s.total > 0) "Original ${minOf(s.done + 1, s.total)} von ${s.total}" else "Wird gestartet …",
+                )
                 if (s.total > 0) LinearProgressIndicator(progress = { s.done.toFloat() / s.total }, modifier = Modifier.fillMaxWidth())
                 else LinearProgressIndicator(Modifier.fillMaxWidth())
                 Banner("Speichermedium bitte nicht abziehen.")
-                OutlinedButton(onClick = vm::cancel) { Text("Abbrechen") }
+                JobControls(paused, vm::setPaused, vm::cancel)
             }
 
             is RestoreState.Error -> {

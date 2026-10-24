@@ -35,6 +35,7 @@ import de.trei.cambackup.backup.SpaceCheck
 import de.trei.cambackup.ui.components.Banner
 import de.trei.cambackup.ui.components.BannerTone
 import de.trei.cambackup.ui.components.FeatureCard
+import de.trei.cambackup.ui.components.JobControls
 import de.trei.cambackup.ui.settings.layoutLabel
 import de.trei.cambackup.util.fileCount
 import de.trei.cambackup.util.formatBytes
@@ -48,6 +49,8 @@ fun BackupPanel(folderUri: String, onBackupFinished: () -> Unit, vm: BackupViewM
 
     val result by vm.result.collectAsStateWithLifecycle()
     val missingResult by vm.missingResult.collectAsStateWithLifecycle()
+    val backupPaused by vm.backupPaused.collectAsStateWithLifecycle()
+    val missingPaused by vm.missingPaused.collectAsStateWithLifecycle()
 
     LaunchedEffect(folderUri) { vm.prepareIfIdle(folderUri) }
     // Nach Ende eines Laufs sofort neu planen und einlesen (Status in Übersicht und Galerie)
@@ -84,6 +87,13 @@ fun BackupPanel(folderUri: String, onBackupFinished: () -> Unit, vm: BackupViewM
             BackupState.Preparing -> {
                 Text("Vergleiche Medienordner mit dem Speichermedium …", style = MaterialTheme.typography.bodyMedium)
                 LinearProgressIndicator(Modifier.fillMaxWidth())
+                // Dauert nur Sekunden – Pausieren lohnt nicht, Abbrechen schon
+                JobControls(paused = false, onPause = null, onCancel = vm::cancelPrepare)
+            }
+
+            BackupState.Cancelled -> {
+                Text("Vergleich abgebrochen.", style = MaterialTheme.typography.bodyMedium)
+                Button(onClick = { vm.prepare(folderUri) }) { Text("Erneut prüfen") }
             }
 
             is BackupState.Ready -> {
@@ -112,18 +122,25 @@ fun BackupPanel(folderUri: String, onBackupFinished: () -> Unit, vm: BackupViewM
 
             is BackupState.ApplyingMissing -> {
                 Text(
-                    if (s.total > 0) "Bearbeite gelöschte Dateien: ${minOf(s.done + 1, s.total)} von ${s.total}"
-                    else "Gelöschte Dateien werden bearbeitet …",
+                    when {
+                        missingPaused -> "Pausiert – gelöschte Dateien: ${minOf(s.done + 1, s.total)} von ${s.total}"
+                        s.total > 0 -> "Bearbeite gelöschte Dateien: ${minOf(s.done + 1, s.total)} von ${s.total}"
+                        else -> "Gelöschte Dateien werden bearbeitet …"
+                    },
                 )
                 if (s.total > 0) {
                     LinearProgressIndicator(progress = { s.done.toFloat() / s.total }, modifier = Modifier.fillMaxWidth())
                 } else {
                     LinearProgressIndicator(Modifier.fillMaxWidth())
                 }
+                JobControls(missingPaused, vm::setMissingPaused, vm::cancelMissing)
             }
 
             is BackupState.Running -> {
                 val p = s.progress
+                if (backupPaused) {
+                    Text("Pausiert", style = MaterialTheme.typography.titleSmall)
+                }
                 if (p != null && p.moving) {
                     Text("Neue Ordnerstruktur: ${minOf(p.fileIndex + 1, p.fileCount)} von ${p.fileCount} Dateien verschoben")
                     LinearProgressIndicator(
@@ -155,7 +172,7 @@ fun BackupPanel(folderUri: String, onBackupFinished: () -> Unit, vm: BackupViewM
                         "bereits Geprüfte gesichert und das Backup lässt sich später fortsetzen.",
                     title = "Speichermedium bitte nicht abziehen",
                 )
-                OutlinedButton(onClick = vm::cancel) { Text("Abbrechen") }
+                JobControls(backupPaused, vm::setBackupPaused, vm::cancel)
             }
 
             is BackupState.Error -> {

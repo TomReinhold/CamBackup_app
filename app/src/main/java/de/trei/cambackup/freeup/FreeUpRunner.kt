@@ -1,5 +1,6 @@
 package de.trei.cambackup.freeup
 
+import de.trei.cambackup.work.JobControl
 import android.content.Context
 import android.net.Uri
 import androidx.documentfile.provider.DocumentFile
@@ -88,6 +89,7 @@ class FreeUpRunner(private val context: Context) {
         var lastShown = 0L
 
         for ((i, c) in candidates.withIndex()) {
+            JobControl.waitWhilePaused(JobControl.FREE_UP) { !caller.isActive }
             if (!caller.isActive) {
                 abort = "Abgebrochen"
                 break

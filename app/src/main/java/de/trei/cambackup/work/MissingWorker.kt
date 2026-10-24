@@ -43,6 +43,7 @@ class MissingWorker(context: Context, params: WorkerParameters) : CoroutineWorke
     )
 
     override suspend fun doWork(): Result {
+        JobControl.setPaused(JobControl.MISSING, false)
         val decisions = store.decisions() ?: return Result.failure()
         runCatching { setForeground(foregroundInfo("Wird gestartet …", null)) }.onFailure { Log.w(TAG, "Vordergrunddienst nicht möglich", it) }
         var last = 0L

@@ -19,6 +19,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -140,6 +142,17 @@ private fun InfoBanner(title: String, text: String, modifier: Modifier) {
                 Text(text, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(start = 26.dp, top = 4.dp, bottom = 4.dp))
             }
         }
+    }
+}
+
+/** Pausieren/Fortsetzen und Abbrechen unter einem Fortschrittsbalken; ohne [onPause] nur Abbrechen. */
+@Composable
+fun JobControls(paused: Boolean, onPause: ((Boolean) -> Unit)?, onCancel: () -> Unit) {
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        onPause?.let { toggle ->
+            FilledTonalButton(onClick = { toggle(!paused) }) { Text(if (paused) "Fortsetzen" else "Pausieren") }
+        }
+        OutlinedButton(onClick = onCancel) { Text("Abbrechen") }
     }
 }
 

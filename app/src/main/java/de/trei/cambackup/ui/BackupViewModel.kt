@@ -18,7 +18,9 @@ import de.trei.cambackup.backup.MissingSummary
 import de.trei.cambackup.backup.RunSummary
 import de.trei.cambackup.backup.SpaceCheck
 import de.trei.cambackup.work.BackupWorker
+import de.trei.cambackup.work.JobControl
 import de.trei.cambackup.work.MissingWorker
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -30,6 +32,8 @@ import kotlinx.coroutines.launch
 
 sealed interface BackupState {
     data object Preparing : BackupState
+    /** Vergleich vom Nutzer abgebrochen. */
+    data object Cancelled : BackupState
     data class Ready(
         val plan: BackupPlan,
         val space: SpaceCheck,
@@ -103,6 +107,8 @@ class BackupViewModel(app: Application) : AndroidViewModel(app) {
             planState.value = try {
                 val p = runner.prepare(folderUri)
                 BackupState.Ready(p.plan, p.space, p.missing, p.missingUris)
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 BackupState.Error(e.message ?: e.javaClass.simpleName)
             }
@@ -120,7 +126,27 @@ class BackupViewModel(app: Application) : AndroidViewModel(app) {
         BackupWorker.start(getApplication(), folderUri)
     }
 
-    fun cancel() = BackupWorker.cancel(getApplication())
+    fun cancel() {
+        JobControl.setPaused(JobControl.BACKUP, false)
+        BackupWorker.cancel(getApplication())
+    }
+
+    val backupPaused: StateFlow<Boolean> = JobControl.paused(JobControl.BACKUP)
+    val missingPaused: StateFlow<Boolean> = JobControl.paused(JobControl.MISSING)
+
+    fun setBackupPaused(paused: Boolean) = JobControl.setPaused(JobControl.BACKUP, paused)
+    fun setMissingPaused(paused: Boolean) = JobControl.setPaused(JobControl.MISSING, paused)
+
+    fun cancelMissing() {
+        JobControl.setPaused(JobControl.MISSING, false)
+        WorkManager.getInstance(getApplication()).cancelUniqueWork(MissingWorker.UNIQUE_NAME)
+    }
+
+    /** Vergleich von Medienordnern und Speichermedium abbrechen. */
+    fun cancelPrepare() {
+        prepareJob?.cancel()
+        planState.value = BackupState.Cancelled
+    }
 
     /** Entscheidungen zu gelöschten Dateien umsetzen (Pfade ohne Entscheidung bleiben unberührt). */
     fun applyMissing(folderUri: String, actions: Map<String, MissingAction>) {

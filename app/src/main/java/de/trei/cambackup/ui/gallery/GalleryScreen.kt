@@ -43,6 +43,7 @@ import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
@@ -76,6 +77,7 @@ import de.trei.cambackup.library.dayLabel
 import de.trei.cambackup.library.formatDuration
 import de.trei.cambackup.library.groupByDay
 import de.trei.cambackup.ui.LibraryGate
+import de.trei.cambackup.ui.components.JobControls
 import de.trei.cambackup.ui.components.StatusColors
 import de.trei.cambackup.util.fileCount
 import de.trei.cambackup.util.formatBytes
@@ -115,6 +117,8 @@ fun GalleryScreen(
     val context = LocalContext.current
     val message by actions.message.collectAsStateWithLifecycle()
     val trialRunning by actions.trialRunning.collectAsStateWithLifecycle()
+    val trialProgress by actions.trialProgress.collectAsStateWithLifecycle()
+    val trialPaused by actions.trialPaused.collectAsStateWithLifecycle()
     LaunchedEffect(message) {
         message?.let {
             Toast.makeText(context, it, Toast.LENGTH_LONG).show()
@@ -154,7 +158,7 @@ fun GalleryScreen(
                 contentPadding = PaddingValues(
                     top = contentPadding.calculateTopPadding(),
                     // Unter der Auswahlleiste bleibt das Raster erreichbar
-                    bottom = contentPadding.calculateBottomPadding() + if (selecting) 160.dp else 8.dp,
+                    bottom = contentPadding.calculateBottomPadding() + if (selecting || trialProgress != null) 160.dp else 8.dp,
                 ),
                 horizontalArrangement = Arrangement.spacedBy(2.dp),
                 verticalArrangement = Arrangement.spacedBy(2.dp),
@@ -206,6 +210,7 @@ fun GalleryScreen(
                 }
             }
 
+            trialProgress?.takeIf { !selecting }?.let { (done, total) ->                TrialBar(                    done = done,                    total = total,                    paused = trialPaused,                    onPause = actions::setTrialPaused,                    onCancel = actions::cancelTrial,                    modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = contentPadding.calculateBottomPadding()),                )            }
             if (selecting) {
                 SelectionBar(
                     selection = selection,
@@ -393,6 +398,21 @@ fun StatusBadge(status: MediaStatus, modifier: Modifier = Modifier) {
             contentAlignment = Alignment.Center,
         ) {
             Icon(painterResource(R.drawable.ic_compress), "Verkleinert", tint = Color.White, modifier = Modifier.size(14.dp))
+        }
+    }
+}
+
+/** Fortschritt der Probe-Verkleinerung mit Pausieren und Abbrechen. */
+@Composable
+private fun TrialBar(done: Int, total: Int, paused: Boolean, onPause: (Boolean) -> Unit, onCancel: () -> Unit, modifier: Modifier) {
+    Surface(modifier.fillMaxWidth(), tonalElevation = 3.dp, shadowElevation = 6.dp) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(
+                (if (paused) "Pausiert – " else "") + "Probe: ${minOf(done + 1, total)} von $total",
+                style = MaterialTheme.typography.titleSmall,
+            )
+            LinearProgressIndicator(progress = { if (total > 0) done.toFloat() / total else 0f }, modifier = Modifier.fillMaxWidth())
+            JobControls(paused, onPause, onCancel)
         }
     }
 }

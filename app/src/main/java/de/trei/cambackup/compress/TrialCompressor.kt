@@ -1,10 +1,12 @@
 package de.trei.cambackup.compress
 
+import de.trei.cambackup.work.JobControl
 import android.content.ContentValues
 import android.content.Context
 import android.provider.MediaStore
 import de.trei.cambackup.media.MediaItem
 import de.trei.cambackup.settings.SettingsRepository
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.IOException
@@ -40,6 +42,7 @@ class TrialCompressor(private val context: Context) {
         var failures = 0
         val skipped = linkedMapOf<String, Int>()
         for ((i, item) in items.withIndex()) {
+            JobControl.waitWhilePaused(JobControl.TRIAL)
             onProgress(i, items.size)
             try {
                 when (val r = if (item.isVideo) videos.shrink(item, s, now) else images.shrink(item, s, now)) {
@@ -53,6 +56,8 @@ class TrialCompressor(private val context: Context) {
                         r.file.delete()
                     }
                 }
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 failures++
             }

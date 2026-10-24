@@ -48,6 +48,7 @@ class BackupWorker(context: Context, params: WorkerParameters) : CoroutineWorker
     )
 
     override suspend fun doWork(): Result {
+        JobControl.setPaused(JobControl.BACKUP, false)
         val folder = inputData.getString(KEY_FOLDER) ?: return Result.failure()
         try {
             setForeground(foregroundInfo(null))
