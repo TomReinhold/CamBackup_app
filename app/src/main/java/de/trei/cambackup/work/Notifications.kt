@@ -103,13 +103,13 @@ object Notifications {
                 when {
                     s.abortReason != null -> "Speicher freigeben: abgebrochen"
                     s.replacing -> "Speicher freigegeben"
-                    else -> "Verkleinerung vorbereitet"
+                    else -> "Probelauf abgeschlossen"
                 },
             )
             .setContentText(
                 buildString {
                     if (s.replacing) append("${fileCount(s.done)} ersetzt, ${formatBytes(s.bytesSaved)} frei")
-                    else append("${fileCount(s.done)} bereit, spart ${formatBytes(s.bytesSaved)}")
+                    else append("${fileCount(s.done)} ließen sich verkleinern, spart ${formatBytes(s.bytesSaved)}")
                     if (s.failures.isNotEmpty()) append(", ${s.failures.size} Fehler")
                     s.abortReason?.let { append(" – $it") }
                 },

@@ -23,7 +23,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.sync.withLock
 import java.time.Instant
 
-/** Bereitet die Verkleinerung vor bzw. ersetzt die Dateien – im Vordergrunddienst, da Videos lange dauern. */
+/** Verkleinert und ersetzt die Dateien bzw. rechnet den Probelauf – im Vordergrunddienst, da Videos lange dauern. */
 class FreeUpWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
 
     private val runner = FreeUpRunner(context)
@@ -37,8 +37,8 @@ class FreeUpWorker(context: Context, params: WorkerParameters) : CoroutineWorker
         Notifications.ID_PROGRESS,
         Notifications.simpleProgress(
             applicationContext,
-            title = if (replacing) "Dateien werden ersetzt" else "Verkleinerung wird vorbereitet",
-            text = p?.let { "${it.done + 1} von ${it.total}: ${it.currentName}" } ?: "Wird gestartet …",
+            title = if (replacing) "Dateien werden verkleinert" else "Probelauf: Ersparnis wird berechnet",
+            text = p?.let { "${it.done + 1} von ${it.total}" } ?: "Wird gestartet …",
             percent = p?.let { if (it.total > 0) it.done * 100 / it.total else 0 },
             cancelIntent = WorkManager.getInstance(applicationContext).createCancelPendingIntent(id),
         ),
@@ -58,7 +58,7 @@ class FreeUpWorker(context: Context, params: WorkerParameters) : CoroutineWorker
         }
         val summary = try {
             BackupRunner.lock.withLock {
-                if (replacing) runner.replace(publish) else runner.prepare(inputData.getString(KEY_FOLDER)!!, publish)
+                runner.run(inputData.getString(KEY_FOLDER)!!, replacing, publish)
             }
         } catch (e: CancellationException) {
             throw e
@@ -80,10 +80,12 @@ class FreeUpWorker(context: Context, params: WorkerParameters) : CoroutineWorker
         private const val KEY_TOTAL = "total"
         private const val KEY_NAME = "name"
 
-        fun prepare(context: Context, folderUri: String, tag: String) = enqueue(context, workDataOf(KEY_FOLDER to folderUri), tag)
+        /** Probelauf: nur berechnen, wie viel Platz frei würde. */
+        fun dryRun(context: Context, folderUri: String, tag: String) = enqueue(context, workDataOf(KEY_FOLDER to folderUri), tag)
 
         /** Nur aufrufen, nachdem der Nutzer dem Schreiben per createWriteRequest zugestimmt hat. */
-        fun replace(context: Context, tag: String) = enqueue(context, workDataOf(KEY_REPLACE to true), tag)
+        fun compress(context: Context, folderUri: String, tag: String) =
+            enqueue(context, workDataOf(KEY_FOLDER to folderUri, KEY_REPLACE to true), tag)
 
         fun cancel(context: Context) {
             WorkManager.getInstance(context).cancelUniqueWork(UNIQUE_NAME)

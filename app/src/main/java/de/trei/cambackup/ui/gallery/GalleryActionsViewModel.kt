@@ -7,6 +7,8 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
 import de.trei.cambackup.backup.BackupRunner
+import de.trei.cambackup.compress.TrialCompressor
+import de.trei.cambackup.util.formatBytes
 import de.trei.cambackup.freeup.FreeUpRunner
 import de.trei.cambackup.library.LibraryItem
 import de.trei.cambackup.util.fileCount
@@ -47,6 +49,37 @@ class GalleryActionsViewModel(app: Application, private val saved: SavedStateHan
         }
     }
 
+    private val _trialRunning = MutableStateFlow(false)
+    /** Läuft gerade eine Probe-Verkleinerung? */
+    val trialRunning: StateFlow<Boolean> = _trialRunning.asStateFlow()
+
+    /** Verkleinert [items] zur Probe in das Album „CamBackup Probe“ – die Originale bleiben unverändert. */
+    fun trial(items: List<LibraryItem>) {
+        if (_trialRunning.value) return
+        val media = items.take(MAX_TRIAL).map { it.media }
+        _trialRunning.value = true
+        _message.value = "Probe wird erstellt …" + if (items.size > MAX_TRIAL) " (nur die ersten $MAX_TRIAL)" else ""
+        viewModelScope.launch {
+            _message.value = try {
+                val r = TrialCompressor(getApplication()).run(media)
+                buildString {
+                    if (r.created > 0) {
+                        append("${fileCount(r.created)} zur Probe verkleinert: ${formatBytes(r.bytesBefore)} → ${formatBytes(r.bytesAfter)}. ")
+                        append("Zum Vergleichen im Album „${TrialCompressor.ALBUM}“ der Galerie-App.")
+                    } else {
+                        append("Keine Probe erstellt.")
+                    }
+                    r.skipped.forEach { (reason, n) -> append(" $reason: $n.") }
+                    if (r.failures > 0) append(" Fehler bei ${fileCount(r.failures)}.")
+                }
+            } catch (e: Exception) {
+                "Fehler: ${e.message ?: e.javaClass.simpleName}"
+            } finally {
+                _trialRunning.value = false
+            }
+        }
+    }
+
     /**
      * System-Dialog, in dem der Nutzer dem Ändern genau dieser Dateien zustimmt. Die Auswahl übersteht
      * im SavedStateHandle auch ein Beenden der App, während der Dialog offen ist.
@@ -69,5 +102,6 @@ class GalleryActionsViewModel(app: Application, private val saved: SavedStateHan
         const val KEY_FOLDER = "restore_folder"
         const val KEY_IDS = "restore_ids"
         const val KEY_KEEP = "restore_keep"
+        const val MAX_TRIAL = 30
     }
 }

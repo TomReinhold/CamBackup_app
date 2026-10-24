@@ -1,10 +1,10 @@
 package de.trei.cambackup.ui
 
 import android.app.Activity
+import android.app.PendingIntent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.Button
@@ -12,13 +12,16 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
+import androidx.compose.material3.TextButton
+import de.trei.cambackup.compress.TrialCompressor
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -26,27 +29,33 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import de.trei.cambackup.R
 import de.trei.cambackup.freeup.FreeUpOverview
 import de.trei.cambackup.freeup.FreeUpSummary
-import de.trei.cambackup.freeup.PendingBatch
 import de.trei.cambackup.ui.components.Banner
 import de.trei.cambackup.ui.components.BannerTone
 import de.trei.cambackup.ui.components.FeatureCard
 import de.trei.cambackup.util.fileCount
 import de.trei.cambackup.util.formatBytes
 
-/** Speicher freigeben: vorbereiten, prüfen, nach Zustimmung ersetzen. */
+/** Speicher freigeben: nach Zustimmung verkleinern und sofort ersetzen – oder im Probelauf nur rechnen. */
 @Composable
 fun FreeUpPanel(folderUri: String, onFinished: () -> Unit, vm: FreeUpViewModel = viewModel()) {
     val state by vm.state.collectAsStateWithLifecycle()
+    val probeCount by vm.probeCount.collectAsStateWithLifecycle()
 
     LaunchedEffect(folderUri) { vm.load(folderUri) }
-    // Nach Ende eines Laufs sofort neu einlesen (Größen/Status in Übersicht und Fotos)
+    // Nach Ende eines Laufs sofort neu einlesen (Größen/Status in Übersicht und Galerie)
     val finished = state is FreeUpState.Finished
     LaunchedEffect(finished) { if (finished) onFinished() }
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { vm.load(folderUri) }
 
-    // System-Dialog „Darf CamBackup diese Dateien ändern?“ – erst danach wird ersetzt
+    // System-Dialoge „Darf CamBackup diese Dateien ändern?“ – nacheinander, erst danach wird verkleinert
+    var pending by remember { mutableStateOf(emptyList<PendingIntent>()) }
     val writeRequest = rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
-        if (result.resultCode == Activity.RESULT_OK) vm.replaceApproved()
+        val rest = pending.drop(1)
+        pending = if (result.resultCode == Activity.RESULT_OK) rest else emptyList()
+        if (result.resultCode == Activity.RESULT_OK && rest.isEmpty()) vm.compress(folderUri)
+    }
+    LaunchedEffect(pending) {
+        pending.firstOrNull()?.let { writeRequest.launch(IntentSenderRequest.Builder(it.intentSender).build()) }
     }
 
     FeatureCard(
@@ -57,18 +66,31 @@ fun FreeUpPanel(folderUri: String, onFinished: () -> Unit, vm: FreeUpViewModel =
         when (val s = state) {
             FreeUpState.Loading -> LinearProgressIndicator(Modifier.fillMaxWidth())
 
-            is FreeUpState.Overview -> OverviewView(s.overview, s.dryRun, s.minAgeDays) { vm.prepare(folderUri) }
+            is FreeUpState.Overview -> OverviewView(
+                o = s.overview,
+                dryRun = s.dryRun,
+                minAgeDays = s.minAgeDays,
+                probeCount = probeCount,
+                onDeleteProbes = vm::deleteProbes,
+                onStart = {
+                    if (s.dryRun) {
+                        vm.dryRun(folderUri)
+                    } else {
+                        val requests = vm.writeRequests(s.overview, s.minAgeDays)
+                        // Zustimmung schon vorhanden (z. B. nach einem Abbruch): gleich los
+                        if (requests.isEmpty()) vm.compress(folderUri) else pending = requests
+                    }
+                },
+            )
 
             is FreeUpState.Working -> {
                 val p = s.progress
                 Text(
                     when {
-                        p == null -> if (s.replacing) "Ersetzen wird gestartet …" else "Vorbereitung wird gestartet …"
-                        s.replacing -> "Ersetze ${p.done + 1} von ${p.total}: ${p.currentName}"
-                        else -> "Prüfe und verkleinere ${p.done + 1} von ${p.total}: ${p.currentName}"
+                        p == null -> if (s.replacing) "Verkleinern wird gestartet …" else "Probelauf wird gestartet …"
+                        s.replacing -> "Verkleinere ${p.done + 1} von ${p.total}"
+                        else -> "Probelauf: prüfe ${p.done + 1} von ${p.total}"
                     },
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
                 )
                 if (p == null || p.total == 0) {
                     LinearProgressIndicator(Modifier.fillMaxWidth())
@@ -76,18 +98,12 @@ fun FreeUpPanel(folderUri: String, onFinished: () -> Unit, vm: FreeUpViewModel =
                     LinearProgressIndicator(progress = { p.done.toFloat() / p.total }, modifier = Modifier.fillMaxWidth())
                 }
                 Banner(
-                    if (s.replacing) "Speichermedium bitte nicht abziehen."
-                    else "Auf dem Smartphone wird dabei noch nichts verändert. Videos brauchen etwas Zeit.",
+                    if (s.replacing) "Jede Datei wird verkleinert und sofort ersetzt – das Original bleibt auf dem Speichermedium. " +
+                        "Speichermedium bitte nicht abziehen."
+                    else "Auf dem Smartphone wird dabei nichts verändert. Videos brauchen etwas Zeit.",
                 )
                 OutlinedButton(onClick = vm::cancel) { Text("Abbrechen") }
             }
-
-            is FreeUpState.Ready -> ReadyView(
-                batch = s.batch,
-                dryRun = s.dryRun,
-                onReplace = { writeRequest.launch(IntentSenderRequest.Builder(vm.writeRequest(s.batch).intentSender).build()) },
-                onDiscard = { vm.discard(folderUri) },
-            )
 
             is FreeUpState.Finished -> SummaryView(s.summary) {
                 vm.acknowledge(folderUri)
@@ -103,7 +119,14 @@ fun FreeUpPanel(folderUri: String, onFinished: () -> Unit, vm: FreeUpViewModel =
 }
 
 @Composable
-private fun OverviewView(o: FreeUpOverview, dryRun: Boolean, minAgeDays: Int, onPrepare: () -> Unit) {
+private fun OverviewView(
+    o: FreeUpOverview,
+    dryRun: Boolean,
+    minAgeDays: Int,
+    probeCount: Int,
+    onDeleteProbes: () -> Unit,
+    onStart: () -> Unit,
+) {
     val candidateBytes = o.candidates.sumOf { it.item.sizeBytes }
     Row {
         Text("Gesichert, noch im Original", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
@@ -131,7 +154,21 @@ private fun OverviewView(o: FreeUpOverview, dryRun: Boolean, minAgeDays: Int, on
         )
     }
     if (dryRun) {
-        Banner("Probelauf ist aktiv: Du kannst die Verkleinerung vorbereiten und ansehen, ersetzt wird nichts.")
+        Banner(
+            "Probelauf ist aktiv: Es wird nur berechnet, wie viel Platz frei würde – ersetzt wird nichts. " +
+                "Einzelne Dateien kannst du in der Galerie auswählen und „Probe verkleinern“, um das Ergebnis anzusehen.",
+        )
+    }
+    if (probeCount > 0) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                "${fileCount(probeCount)} zur Probe im Album „${TrialCompressor.ALBUM}“",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.weight(1f),
+            )
+            TextButton(onClick = onDeleteProbes) { Text("Löschen") }
+        }
     }
     if (o.candidates.isEmpty()) {
         Text("Nichts zu verkleinern.", style = MaterialTheme.typography.bodyMedium)
@@ -146,33 +183,15 @@ private fun OverviewView(o: FreeUpOverview, dryRun: Boolean, minAgeDays: Int, on
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
-    Button(onClick = onPrepare, modifier = Modifier.fillMaxWidth()) { Text("Verkleinerung vorbereiten") }
-}
-
-@Composable
-private fun ReadyView(batch: PendingBatch, dryRun: Boolean, onReplace: () -> Unit, onDiscard: () -> Unit) {
-    val before = batch.items.sumOf { it.originalSize }
-    val after = batch.items.sumOf { it.newSize }
-    Banner("${fileCount(batch.items.size)} bereit: ${formatBytes(before)} → ${formatBytes(after)} – spart ${formatBytes(before - after)}", BannerTone.SUCCESS)
-    batch.items.take(5).forEach { p ->
-        Row {
-            Text(p.displayName, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-            Text("${formatBytes(p.originalSize)} → ${formatBytes(p.newSize)}", style = MaterialTheme.typography.bodySmall)
-        }
-    }
-    if (batch.items.size > 5) Text("… und ${batch.items.size - 5} weitere", style = MaterialTheme.typography.bodySmall)
-    if (dryRun) {
-        Banner("Probelauf aktiv – zum Ersetzen in den Einstellungen ausschalten.", BannerTone.WARNING)
-    } else {
+    if (!dryRun) {
         Text(
             "Die Originale bleiben auf dem Speichermedium. Android fragt gleich, ob CamBackup die Dateien ändern darf.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Button(onClick = onReplace, enabled = !dryRun) { Text("Jetzt ersetzen") }
-        TextButton(onClick = onDiscard) { Text("Verwerfen") }
+    Button(onClick = onStart, modifier = Modifier.fillMaxWidth()) {
+        Text(if (dryRun) "Probelauf: Ersparnis berechnen" else "Jetzt verkleinern")
     }
 }
 
@@ -181,8 +200,8 @@ private fun SummaryView(s: FreeUpSummary, onDone: () -> Unit) {
     val ok = s.abortReason == null && s.failures.isEmpty()
     Banner(
         when {
-            s.replacing -> "${fileCount(s.done)} ersetzt – ${formatBytes(s.bytesSaved)} frei geworden"
-            else -> "${fileCount(s.done)} vorbereitet – spart ${formatBytes(s.bytesSaved)}"
+            s.replacing -> "${fileCount(s.done)} verkleinert – ${formatBytes(s.bytesSaved)} frei geworden"
+            else -> "Probelauf: ${fileCount(s.done)} ließen sich verkleinern – spart ${formatBytes(s.bytesSaved)}. Auf dem Smartphone wurde nichts verändert."
         } + (s.abortReason?.let { " · $it" } ?: ""),
         if (ok) BannerTone.SUCCESS else BannerTone.WARNING,
     )

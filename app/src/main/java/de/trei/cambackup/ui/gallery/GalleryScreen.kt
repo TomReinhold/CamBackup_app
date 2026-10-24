@@ -44,6 +44,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -113,6 +114,7 @@ fun GalleryScreen(
 
     val context = LocalContext.current
     val message by actions.message.collectAsStateWithLifecycle()
+    val trialRunning by actions.trialRunning.collectAsStateWithLifecycle()
     LaunchedEffect(message) {
         message?.let {
             Toast.makeText(context, it, Toast.LENGTH_LONG).show()
@@ -214,6 +216,11 @@ fun GalleryScreen(
                         folderUri?.let { actions.setKeepOriginal(it, items, keep) }
                         selected = emptyList()
                     },
+                    onTrial = {
+                        actions.trial(it)
+                        selected = emptyList()
+                    },
+                    trialRunning = trialRunning,
                     modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = contentPadding.calculateBottomPadding()),
                 )
             }
@@ -249,6 +256,8 @@ private fun SelectionBar(
     onClear: () -> Unit,
     onRestore: (List<LibraryItem>) -> Unit,
     onKeep: (List<LibraryItem>, Boolean) -> Unit,
+    onTrial: (List<LibraryItem>) -> Unit,
+    trialRunning: Boolean,
     modifier: Modifier,
 ) {
     val compressed = selection.filter { it.status == MediaStatus.COMPRESSED }
@@ -260,36 +269,35 @@ private fun SelectionBar(
                 IconButton(onClick = onClear) { Icon(Icons.Default.Close, "Auswahl aufheben") }
                 Text("${selection.size} ausgewählt", style = MaterialTheme.typography.titleMedium)
             }
-            if (!actionsEnabled) {
+            // Probe geht immer (auch ohne Medium): das Original bleibt unverändert
+            val trialable = selection.filter { it.status != MediaStatus.COMPRESSED }
+            FlowRow(
+                Modifier.padding(start = 12.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                if (actionsEnabled && compressed.isNotEmpty()) {
+                    FilledTonalButton(onClick = { onRestore(compressed) }) { Text("Original zurückholen (${compressed.size})") }
+                }
+                if (actionsEnabled && excludable.isNotEmpty()) {
+                    FilledTonalButton(onClick = { onKeep(excludable, true) }) { Text("Nicht verkleinern (${excludable.size})") }
+                }
+                if (actionsEnabled && excluded.isNotEmpty()) {
+                    FilledTonalButton(onClick = { onKeep(excluded, false) }) { Text("Verkleinern erlauben (${excluded.size})") }
+                }
+                if (trialable.isNotEmpty()) {
+                    OutlinedButton(onClick = { onTrial(trialable) }, enabled = !trialRunning) {
+                        Text(if (trialRunning) "Probe läuft …" else "Probe verkleinern (${trialable.size})")
+                    }
+                }
+            }
+            if (!actionsEnabled && (compressed.isNotEmpty() || excludable.isNotEmpty() || excluded.isNotEmpty())) {
                 Text(
                     "Speichermedium verbinden, um Originale zurückzuholen oder Dateien auszuschließen.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(start = 12.dp),
+                    modifier = Modifier.padding(start = 12.dp, top = 4.dp),
                 )
-            } else if (compressed.isEmpty() && excludable.isEmpty() && excluded.isEmpty()) {
-                Text(
-                    "Für die Auswahl gibt es nichts zu tun – sie ist noch nicht gesichert.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(start = 12.dp),
-                )
-            } else {
-                FlowRow(
-                    Modifier.padding(start = 12.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
-                ) {
-                    if (compressed.isNotEmpty()) {
-                        FilledTonalButton(onClick = { onRestore(compressed) }) { Text("Original zurückholen (${compressed.size})") }
-                    }
-                    if (excludable.isNotEmpty()) {
-                        FilledTonalButton(onClick = { onKeep(excludable, true) }) { Text("Nicht verkleinern (${excludable.size})") }
-                    }
-                    if (excluded.isNotEmpty()) {
-                        FilledTonalButton(onClick = { onKeep(excluded, false) }) { Text("Verkleinern erlauben (${excluded.size})") }
-                    }
-                }
             }
         }
     }

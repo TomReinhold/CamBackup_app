@@ -2,35 +2,37 @@ package de.trei.cambackup.ui
 
 import android.app.Application
 import android.app.PendingIntent
-import android.net.Uri
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Process
 import android.provider.MediaStore
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
+import de.trei.cambackup.compress.TrialCompressor
 import de.trei.cambackup.freeup.FreeUpOverview
 import de.trei.cambackup.freeup.FreeUpProgress
 import de.trei.cambackup.freeup.FreeUpRunner
 import de.trei.cambackup.freeup.FreeUpStore
 import de.trei.cambackup.freeup.FreeUpSummary
-import de.trei.cambackup.freeup.PendingBatch
+import de.trei.cambackup.freeup.compressTargets
 import de.trei.cambackup.settings.SettingsRepository
 import de.trei.cambackup.work.FreeUpWorker
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import java.io.File
 
 sealed interface FreeUpState {
     data object Loading : FreeUpState
     data class Overview(val overview: FreeUpOverview, val dryRun: Boolean, val minAgeDays: Int) : FreeUpState
     data class Working(val progress: FreeUpProgress?, val replacing: Boolean) : FreeUpState
-    data class Ready(val batch: PendingBatch, val dryRun: Boolean) : FreeUpState
     data class Finished(val summary: FreeUpSummary) : FreeUpState
     data class Error(val message: String) : FreeUpState
 }
@@ -47,14 +49,13 @@ class FreeUpViewModel(app: Application) : AndroidViewModel(app) {
         .getWorkInfosForUniqueWorkFlow(FreeUpWorker.UNIQUE_NAME)
         .map { infos -> infos.firstOrNull { !it.state.isFinished } }
 
-    val state: StateFlow<FreeUpState> = combine(work, store.summary, store.batch, overview, settings) { running, summary, batch, ov, s ->
+    val state: StateFlow<FreeUpState> = combine(work, store.summary, overview, settings) { running, summary, ov, s ->
         when {
             running != null -> FreeUpState.Working(
                 running.takeIf { it.state == WorkInfo.State.RUNNING }?.let { FreeUpWorker.progressOf(it.progress) },
-                replacing = TAG_REPLACE in running.tags,
+                replacing = TAG_COMPRESS in running.tags,
             )
             summary != null -> FreeUpState.Finished(summary)
-            batch != null -> FreeUpState.Ready(batch, s.dryRun)
             ov == null -> FreeUpState.Loading
             else -> ov.fold(
                 onSuccess = { FreeUpState.Overview(it, s.dryRun, s.minAgeDays) },
@@ -63,27 +64,43 @@ class FreeUpViewModel(app: Application) : AndroidViewModel(app) {
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), FreeUpState.Loading)
 
+    private val trials = TrialCompressor(app)
+    private val _probeCount = MutableStateFlow(0)
+    /** Probe-Dateien im Album „CamBackup Probe“. */
+    val probeCount: StateFlow<Int> = _probeCount.asStateFlow()
+
     fun load(folderUri: String) {
+        viewModelScope.launch { _probeCount.value = runCatching { trials.count() }.getOrDefault(0) }
         if (loadJob?.isActive == true) return
         loadJob = viewModelScope.launch { overview.value = runCatching { runner.overview(folderUri) } }
     }
 
-    fun prepare(folderUri: String) = FreeUpWorker.prepare(getApplication(), folderUri, TAG_PREPARE)
+    fun deleteProbes() {
+        viewModelScope.launch {
+            runCatching { trials.deleteAll() }
+            _probeCount.value = runCatching { trials.count() }.getOrDefault(0)
+        }
+    }
 
-    /** System-Dialog, in dem der Nutzer dem Ändern der Dateien zustimmt. */
-    fun writeRequest(batch: PendingBatch): PendingIntent =
-        MediaStore.createWriteRequest(getApplication<Application>().contentResolver, batch.items.map { Uri.parse(it.uri) })
+    /** Probelauf: berechnet die Ersparnis, auf dem Smartphone ändert sich nichts. */
+    fun dryRun(folderUri: String) = FreeUpWorker.dryRun(getApplication(), folderUri, TAG_DRY_RUN)
 
-    fun replaceApproved() = FreeUpWorker.replace(getApplication(), TAG_REPLACE)
+    /**
+     * System-Dialoge, in denen der Nutzer dem Ändern der Dateien zustimmt – nur für Dateien, für die
+     * es noch keine Zustimmung gibt, und in Portionen (sehr lange Listen passen nicht in einen Dialog).
+     */
+    fun writeRequests(o: FreeUpOverview, minAgeDays: Int): List<PendingIntent> {
+        val app = getApplication<Application>()
+        val uris = compressTargets(o.candidates, minAgeDays, System.currentTimeMillis())
+            .map { it.item.uri }
+            .filter { app.checkUriPermission(it, Process.myPid(), Process.myUid(), Intent.FLAG_GRANT_WRITE_URI_PERMISSION) != PackageManager.PERMISSION_GRANTED }
+        return uris.chunked(WRITE_REQUEST_CHUNK).map { MediaStore.createWriteRequest(app.contentResolver, it) }
+    }
+
+    /** Nach Zustimmung im System-Dialog: verkleinern und sofort ersetzen. */
+    fun compress(folderUri: String) = FreeUpWorker.compress(getApplication(), folderUri, TAG_COMPRESS)
 
     fun cancel() = FreeUpWorker.cancel(getApplication())
-
-    /** Vorbereitete Dateien verwerfen (z. B. im Probelauf). */
-    fun discard(folderUri: String) {
-        store.batch.value?.items?.forEach { File(it.newFile).delete() }
-        store.saveBatch(null)
-        load(folderUri)
-    }
 
     fun acknowledge(folderUri: String) {
         store.saveSummary(null)
@@ -92,6 +109,8 @@ class FreeUpViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     private companion object {
-        const val TAG_PREPARE = "freeup-prepare"
-        const val TAG_REPLACE = "freeup-replace"    }
+        const val TAG_DRY_RUN = "freeup-dryrun"
+        const val TAG_COMPRESS = "freeup-compress"
+        const val WRITE_REQUEST_CHUNK = 500
+    }
 }

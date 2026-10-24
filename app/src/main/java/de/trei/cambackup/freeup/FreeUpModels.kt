@@ -7,7 +7,7 @@ import de.trei.cambackup.index.IndexState
 import de.trei.cambackup.media.MediaItem
 import kotlinx.serialization.Serializable
 
-/** Eine vorbereitete Ersetzung: verkleinerte Datei im Cache, Original geprüft gesichert. */
+/** Eine anstehende Ersetzung: verkleinerte Datei im Cache, Original geprüft gesichert. */
 @Serializable
 data class PendingReplacement(
     val mediaId: Long,
@@ -24,20 +24,12 @@ data class PendingReplacement(
     val params: String,
 )
 
-@Serializable
-data class PendingBatch(
-    val deviceFolder: String,
-    val createdAt: String,
-    val items: List<PendingReplacement>,
-) {
-    val bytesSaved: Long get() = items.sumOf { it.originalSize - it.newSize }
-}
-/** Ergebnis von Vorbereitung bzw. Ersetzen. */
+/** Ergebnis eines Laufs (Probelauf oder Verkleinern). */
 @Serializable
 data class FreeUpSummary(
     val finishedAt: String,
     val replacing: Boolean,
-    /** Vorbereitet (beim Vorbereiten) bzw. ersetzt (beim Ersetzen). */
+    /** Verkleinerbar (Probelauf) bzw. verkleinert und ersetzt. */
     val done: Int,
     val bytesSaved: Long,
     /** Anzahl übersprungener Dateien je Grund (Klartext). */
@@ -77,6 +69,12 @@ fun restoreCandidates(items: List<MediaItem>, index: IndexState): List<RestoreCa
         ?.let { RestoreCandidate(item, it) }
 }
 
+/** Kandidaten, die alt genug zum Verkleinern sind – nur für diese wird die Zustimmung eingeholt. */
+fun compressTargets(candidates: List<Candidate>, minAgeDays: Int, nowMillis: Long): List<Candidate> {
+    val cutoff = nowMillis - minAgeDays * 24L * 60 * 60 * 1000
+    return candidates.filter { it.item.dateTakenMillis <= cutoff }
+}
+
 /** Platzbedarf beim Zurückholen inkl. Reserve, damit das Smartphone nicht vollläuft. */
 fun restoreSpaceNeeded(candidates: List<RestoreCandidate>): Long {
     val extra = candidates.sumOf { it.extraBytes }
@@ -86,7 +84,7 @@ fun restoreSpaceNeeded(candidates: List<RestoreCandidate>): Long {
 /** Freier Platz, der auf dem Smartphone nach dem Zurückholen mindestens übrig bleiben soll. */
 const val RESTORE_RESERVE = 500L * 1024 * 1024
 
-/** Freier Platz, der beim Vorbereiten (verkleinerte Kopien im Cache) mindestens übrig bleiben soll. */
+/** Freier Platz, der beim Verkleinern (verkleinerte Kopie im Cache) mindestens übrig bleiben soll. */
 const val PREPARE_RESERVE = 3L * 1024 * 1024 * 1024
 
 /** Passt die verkleinerte Kopie noch in den Cache? Sie ist höchstens so groß wie das Original. */

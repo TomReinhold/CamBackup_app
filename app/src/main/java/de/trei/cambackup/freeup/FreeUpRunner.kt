@@ -33,11 +33,10 @@ import java.time.Instant
 data class FreeUpProgress(val done: Int, val total: Int, val currentName: String, val replacing: Boolean)
 
 /**
- * Speicher freigeben in zwei Schritten:
- * 1. [prepare]: für jedes gesicherte, unveränderte Original (SHA-256 geprüft) eine verkleinerte
- *    Version im Cache erzeugen. Auf dem Smartphone ändert sich dabei nichts.
- * 2. [replace]: nach Zustimmung des Nutzers (System-Dialog) die Originale auf dem Smartphone durch
- *    die verkleinerten Versionen ersetzen – nur bei angeschlossenem Medium und ausgeschaltetem Probelauf.
+ * Speicher freigeben: für jedes gesicherte, unveränderte Original (SHA-256 geprüft) eine verkleinerte
+ * Version erzeugen und – nach Zustimmung des Nutzers per System-Dialog – sofort an Stelle des
+ * Originals auf dem Smartphone schreiben. Im Probelauf wird nur gerechnet, nichts ersetzt.
+ * Es liegt immer höchstens eine verkleinerte Kopie im Cache.
  */
 class FreeUpRunner(private val context: Context) {
 
@@ -48,7 +47,6 @@ class FreeUpRunner(private val context: Context) {
     private val settings = SettingsRepository(context)
     private val images = ImageShrinker(context)
     private val videos = VideoShrinker(context)
-    private val store = FreeUpStore.get(context)
 
     private class Opened(val deviceDir: DocumentFile, val index: BackupIndex)
 
@@ -65,23 +63,29 @@ class FreeUpRunner(private val context: Context) {
         return overviewFor(scanner.scan(settings.current().mediaFolders), opened.index.state)
     }
 
-    suspend fun prepare(folderName: String, onProgress: (FreeUpProgress) -> Unit): FreeUpSummary {
+    /**
+     * Verkleinert alle Kandidaten. [replace] = false bzw. Probelauf: nur berechnen, wie viel frei würde.
+     * Ersetzen setzt voraus, dass der Nutzer per MediaStore.createWriteRequest zugestimmt hat; fehlt die
+     * Zustimmung für eine Datei, bleibt deren Original unverändert.
+     */
+    suspend fun run(folderName: String, replace: Boolean, onProgress: (FreeUpProgress) -> Unit): FreeUpSummary {
         val s = settings.current()
+        val doReplace = replace && !s.dryRun
         val caller = currentCoroutineContext()
         val opened = open(folderName)
-        val candidates = overviewFor(scanner.scan(settings.current().mediaFolders), opened.index.state).candidates
+        val candidates = overviewFor(scanner.scan(s.mediaFolders), opened.index.state).candidates
         val dirs = DirCache(opened.deviceDir)
+        val cache = IndexCache.get(context)
         val now = System.currentTimeMillis()
-
-        // Alte Vorbereitung verwerfen
-        store.saveBatch(null)
         images.clearCache()
 
-        val pending = mutableListOf<PendingReplacement>()
+        var done = 0
+        var saved = 0L
         val skipped = linkedMapOf<String, Int>()
         val failures = mutableListOf<FreeUpSummary.Failure>()
         fun skip(reason: String) { skipped[reason] = (skipped[reason] ?: 0) + 1 }
         var abort: String? = null
+        var lastShown = 0L
 
         for ((i, c) in candidates.withIndex()) {
             if (!caller.isActive) {
@@ -89,19 +93,23 @@ class FreeUpRunner(private val context: Context) {
                 break
             }
             val item = c.item
-            onProgress(FreeUpProgress(i, candidates.size, item.displayName, replacing = false))
+            onProgress(FreeUpProgress(i, candidates.size, item.displayName, replacing = doReplace))
             val pre = if (item.isVideo) precheckVideo(item, s, now) else precheckImage(item, s, now)
             if (pre != null) {
                 skip(pre.text)
                 continue
             }
-            // Die Kopien liegen bis zum Ersetzen im Cache – das Smartphone darf dabei nicht volllaufen
             if (!prepareSpaceOk(context.cacheDir.usableSpace, item.sizeBytes)) {
-                abort = "Zu wenig Platz auf dem Smartphone – bitte erst die vorbereiteten Dateien ersetzen, dann weiter vorbereiten"
+                abort = "Zu wenig Platz auf dem Smartphone für die verkleinerte Kopie"
                 break
             }
+            var file: File? = null
             try {
                 if (!backupPresent(dirs, c.entry)) {
+                    if (!opened.deviceDir.exists()) {
+                        abort = "Speichermedium wurde getrennt"
+                        break
+                    }
                     failures += FreeUpSummary.Failure(item.displayName, "Sicherung auf dem Medium fehlt oder ist unvollständig")
                     continue
                 }
@@ -112,89 +120,64 @@ class FreeUpRunner(private val context: Context) {
                 }
                 when (val r = if (item.isVideo) videos.shrink(item, s, now) else images.shrink(item, s, now)) {
                     is ShrinkResult.Skipped -> skip(r.reason.text)
-                    is ShrinkResult.Ready -> pending += PendingReplacement(
-                        mediaId = item.id,
-                        uri = item.uri.toString(),
-                        displayName = item.displayName,
-                        phonePath = c.entry.phonePath,
-                        isVideo = item.isVideo,
-                        backupPath = c.entry.backupPath,
-                        originalSize = r.originalBytes,
-                        originalSha256 = c.entry.originalSha256,
-                        newFile = r.file.path,
-                        newSize = r.newBytes,
-                        newSha256 = r.sha256,
-                        params = r.params,
-                    )
+                    is ShrinkResult.Ready -> {
+                        file = r.file
+                        val p = PendingReplacement(
+                            mediaId = item.id,
+                            uri = item.uri.toString(),
+                            displayName = item.displayName,
+                            phonePath = c.entry.phonePath,
+                            isVideo = item.isVideo,
+                            backupPath = c.entry.backupPath,
+                            originalSize = r.originalBytes,
+                            originalSha256 = c.entry.originalSha256,
+                            newFile = r.file.path,
+                            newSize = r.newBytes,
+                            newSha256 = r.sha256,
+                            params = r.params,
+                        )
+                        // Eine angefangene Datei wird immer zu Ende ersetzt (oder zurückgespielt)
+                        if (doReplace) withContext(NonCancellable) { replaceOne(p, opened.index, dirs) }
+                        done++
+                        saved += p.originalSize - p.newSize
+                    }
                 }
             } catch (e: CancellationException) {
                 abort = "Abgebrochen"
                 break
             } catch (e: Exception) {
-                failures += FreeUpSummary.Failure(item.displayName, e.message ?: e.javaClass.simpleName)
-            }
-        }
-
-        val batch = PendingBatch(folderName, Instant.now().toString(), pending)
-        store.saveBatch(batch.takeIf { pending.isNotEmpty() })
-        return FreeUpSummary(Instant.now().toString(), false, pending.size, batch.bytesSaved, skipped, failures, abort)
-    }
-
-    /**
-     * Ersetzt die vorbereiteten Dateien. Setzt voraus, dass der Nutzer per MediaStore.createWriteRequest
-     * zugestimmt hat. Läuft bis zum Ende der aktuellen Datei auch bei Abbruch weiter (NonCancellable).
-     */
-    suspend fun replace(onProgress: (FreeUpProgress) -> Unit): FreeUpSummary {
-        val batch = store.batch.value ?: return summary(0, 0, emptyList(), "Nichts vorbereitet")
-        if (settings.current().dryRun) return summary(0, 0, emptyList(), "Probelauf ist aktiv – es wurde nichts ersetzt")
-        val caller = currentCoroutineContext()
-        val opened = open(batch.deviceFolder)
-        val dirs = DirCache(opened.deviceDir)
-
-        return withContext(NonCancellable + Dispatchers.IO) {
-            var replaced = 0
-            var saved = 0L
-            val failures = mutableListOf<FreeUpSummary.Failure>()
-            var abort: String? = null
-            var processed = 0
-            for ((i, p) in batch.items.withIndex()) {
-                if (!caller.isActive) {
-                    abort = "Abgebrochen"
+                if (!opened.deviceDir.exists()) {
+                    abort = "Speichermedium wurde getrennt"
+                    failures += FreeUpSummary.Failure(item.displayName, e.message ?: "Fehler")
                     break
                 }
-                processed = i + 1
-                onProgress(FreeUpProgress(i, batch.items.size, p.displayName, replacing = true))
-                try {
-                    replaceOne(p, opened.index, dirs)
-                    replaced++
-                    saved += p.originalSize - p.newSize
-                } catch (e: Exception) {
-                    if (!opened.deviceDir.exists()) {
-                        abort = "Speichermedium wurde getrennt"
-                        failures += FreeUpSummary.Failure(p.displayName, e.message ?: "Fehler")
-                        break
-                    }
-                    failures += FreeUpSummary.Failure(p.displayName, e.message ?: e.javaClass.simpleName)
-                } finally {
-                    File(p.newFile).delete()
-                }
+                failures += FreeUpSummary.Failure(item.displayName, e.message ?: e.javaClass.simpleName)
+            } finally {
+                file?.delete()
             }
-            if (opened.deviceDir.exists()) {
-                opened.index.compact()
-                appendLog(opened.deviceDir, replaced, saved, failures, abort)
+            // Übersicht und Galerie zeigen den Fortschritt live
+            if (doReplace && System.currentTimeMillis() - lastShown >= LIVE_INTERVAL_MS) {
+                lastShown = System.currentTimeMillis()
+                cache.show(opened.index.state)
             }
-            IndexCache.get(context).update(opened.index.state)
-            // Nicht bearbeitete Dateien bleiben vorbereitet (z. B. nach Abbruch)
-            val rest = batch.items.drop(processed)
-            store.saveBatch(batch.copy(items = rest).takeIf { rest.isNotEmpty() })
-            if (rest.isEmpty()) images.clearCache()
-            summary(replaced, saved, failures, abort)
         }
+
+        if (doReplace) {
+            withContext(NonCancellable + Dispatchers.IO) {
+                if (opened.deviceDir.exists()) {
+                    opened.index.compact()
+                    appendLog(opened.deviceDir, done, saved, failures, abort)
+                }
+                cache.update(opened.index.state)
+            }
+        }
+        images.clearCache()
+        return FreeUpSummary(Instant.now().toString(), doReplace, done, saved, skipped, failures, abort)
     }
 
     /**
      * Schließt gesicherte Originale vom Verkleinern aus ([keep] = true) bzw. gibt sie wieder frei.
-     * Bereits vorbereitete Versionen dieser Dateien werden verworfen. Liefert die Zahl der Änderungen.
+     * Liefert die Zahl der Änderungen.
      */
     suspend fun setKeepOriginal(folderUri: String, backupPaths: Set<String>, keep: Boolean): Int {
         val opened = open(folderUri)
@@ -207,29 +190,20 @@ class FreeUpRunner(private val context: Context) {
             val text = if (keep) "vom Verkleinern ausgeschlossen" else "wieder zum Verkleinern freigegeben"
             metadata?.let { runCatching { io.appendText(it, "backup_log.txt", "${Instant.now()}  ${changes.size} $text\n") } }
             IndexCache.get(context).update(opened.index.state)
-            if (keep) {
-                val paths = changes.map { it.phonePath }.toSet()
-                store.batch.value?.let { batch ->
-                    val (drop, rest) = batch.items.partition { it.phonePath in paths }
-                    drop.forEach { File(it.newFile).delete() }
-                    store.saveBatch(batch.copy(items = rest).takeIf { rest.isNotEmpty() })
-                }
-            }
         }
         return changes.size
     }
 
     private suspend fun replaceOne(p: PendingReplacement, index: BackupIndex, dirs: DirCache) {
         val uri = Uri.parse(p.uri)
-        // Über die Prüfsumme statt den Pfad: die Sicherung kann seit der Vorbereitung umsortiert worden sein
         val entry = index.state.forPhonePath(p.phonePath).lastOrNull { it.originalSha256 == p.originalSha256 }
             ?: throw IOException("Kein Index-Eintrag")
         val backup = backupFile(dirs, entry) ?: throw IOException("Sicherung auf dem Medium fehlt")
         if (backup.length() != entry.originalSize) throw IOException("Sicherung auf dem Medium unvollständig")
         val currentSize = resolver.openAssetFileDescriptor(originalUri(uri), "r")?.use { it.length } ?: -1
-        if (currentSize != p.originalSize) throw IOException("Datei wurde seit der Vorbereitung verändert")
+        if (currentSize != p.originalSize) throw IOException("Datei wurde während des Verkleinerns verändert")
         val newFile = File(p.newFile)
-        if (!newFile.exists() || newFile.length() != p.newSize) throw IOException("Vorbereitete Datei fehlt")
+        if (!newFile.exists() || newFile.length() != p.newSize) throw IOException("Verkleinerte Datei fehlt")
 
         // Erst den Index (Absicht) schreiben, dann ersetzen: so wird eine verkleinerte Datei
         // nach einem Abbruch nie als neues „Original“ gesichert.
@@ -283,6 +257,7 @@ class FreeUpRunner(private val context: Context) {
     private fun backupPresent(dirs: DirCache, entry: IndexEntry): Boolean =
         backupFile(dirs, entry)?.length() == entry.originalSize
 
-    private fun summary(done: Int, saved: Long, failures: List<FreeUpSummary.Failure>, abort: String?) =
-        FreeUpSummary(Instant.now().toString(), true, done, saved, emptyMap(), failures, abort)
+    private companion object {
+        const val LIVE_INTERVAL_MS = 2_000L
+    }
 }
