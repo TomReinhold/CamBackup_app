@@ -141,7 +141,7 @@ private fun DayHeader(label: String, items: List<LibraryItem>) {
     Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
         Text(label, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
         if (allSafe) {
-            Icon(painterResource(R.drawable.ic_cloud_done), "Alle gesichert", tint = StatusColors.backedUp(), modifier = Modifier.size(18.dp))
+            Icon(painterResource(R.drawable.ic_drive_done), "Alle gesichert", tint = StatusColors.backedUp(), modifier = Modifier.size(18.dp))
         }
     }
 }
@@ -172,7 +172,7 @@ fun StatusBadge(status: MediaStatus, modifier: Modifier = Modifier) {
     when (status) {
         MediaStatus.NOT_BACKED_UP, MediaStatus.UNKNOWN -> Unit
         MediaStatus.BACKED_UP -> Icon(
-            painterResource(R.drawable.ic_cloud_done), "Gesichert", tint = Color.White, modifier = modifier.size(18.dp),
+            painterResource(R.drawable.ic_drive_done), "Gesichert", tint = Color.White, modifier = modifier.size(18.dp),
         )
         MediaStatus.COMPRESSED -> Box(
             modifier.size(22.dp).clip(CircleShape).background(StatusColors.compressed),

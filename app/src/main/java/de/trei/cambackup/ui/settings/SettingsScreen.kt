@@ -185,7 +185,7 @@ private fun SettingsHome(
         ) { open(SettingsPage.FOLDERS) }
         NavItem(
             R.drawable.ic_usb, "Ablage auf dem Medium",
-            (if (s.folderLayout == FolderLayout.YEAR_MONTH) "Nach Jahr und Monat" else "Ohne Unterordner") +
+            layoutLabel(s.folderLayout) +
                 if (s.separateFolders) " · je Medienordner" else "",
         ) { open(SettingsPage.STORAGE) }
     }
@@ -677,15 +677,65 @@ private fun StorageSettings(s: CompressionSettings, update: Update) {
             label = "Unterordner",
             options = FolderLayout.entries,
             selected = s.folderLayout,
-            optionLabel = { if (it == FolderLayout.YEAR_MONTH) "Jahr / Monat" else "Keine" },
+            optionLabel = ::layoutShort,
             onSelect = { v -> update { it.copy(folderLayout = v) } },
-            hint = if (s.folderLayout == FolderLayout.YEAR_MONTH) "z. B. „2026/10/IMG_1234.jpg“ – gilt für neu gesicherte Dateien"
-            else "Alle Dateien direkt im Backup-Ordner – gilt für neu gesicherte Dateien",
+            hint = "Gilt für neu gesicherte Dateien – bereits gesicherte bleiben, wo sie sind.",
         )
+        FolderPreview(s.folderLayout, s.separateFolders)
         Hint(
             "Bei mehreren Medienordnern bekommt jeder zusätzlich einen eigenen Unterordner (z. B. „Pictures/Screenshots“). " +
                 "Den Backup-Ordner selbst wählst du in der Übersicht unter „Speichermedium“.",
         )
+    }
+}
+
+private fun layoutShort(layout: FolderLayout) = when (layout) {
+    FolderLayout.FLAT -> "Keine"
+    FolderLayout.YEAR -> "Jahr"
+    FolderLayout.YEAR_MONTH -> "Jahr / Monat"
+}
+
+private fun layoutLabel(layout: FolderLayout) = when (layout) {
+    FolderLayout.FLAT -> "Ohne Unterordner"
+    FolderLayout.YEAR -> "Nach Jahr"
+    FolderLayout.YEAR_MONTH -> "Nach Jahr und Monat"
+}
+
+/** Beispielhafte Ordnerstruktur auf dem Medium für die gewählte Ablage. */
+@Composable
+private fun FolderPreview(layout: FolderLayout, separateFolders: Boolean) {
+    // (Einrückungstiefe, Name, ist Ordner)
+    val lines = buildList {
+        add(Triple(0, "Backup-Ordner", true))
+        var depth = 1
+        if (separateFolders) add(Triple(depth++, "DCIM/Camera", true))
+        when (layout) {
+            FolderLayout.FLAT -> {}
+            FolderLayout.YEAR -> add(Triple(depth++, "2026", true))
+            FolderLayout.YEAR_MONTH -> {
+                add(Triple(depth++, "2026", true))
+                add(Triple(depth++, "10", true))
+            }
+        }
+        add(Triple(depth, "20261024_101500.jpg", false))
+        add(Triple(depth, "20261024_183012.mp4", false))
+        add(Triple(1, "Metadata", true))
+    }
+    Surface(shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.surfaceContainerHighest, modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            lines.forEach { (depth, name, isFolder) ->
+                Row(Modifier.padding(start = (depth * 18).dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        painterResource(if (isFolder) R.drawable.ic_folder else R.drawable.ic_image),
+                        null,
+                        tint = if (isFolder) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(16.dp),
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(name, style = MaterialTheme.typography.bodySmall)
+                }
+            }
+        }
     }
 }
 

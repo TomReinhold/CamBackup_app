@@ -83,5 +83,7 @@ class MissingFilesTest {
         assertEquals("DCIM/Camera/2026/10", backupDirFor("DCIM/Camera/", t, FolderLayout.YEAR_MONTH, separateFolders = true, zone))
         assertEquals("Pictures/Screenshots", backupDirFor("Pictures/Screenshots/", t, FolderLayout.FLAT, separateFolders = true, zone))
         assertEquals("", backupDirFor("DCIM/Camera/", t, FolderLayout.FLAT, separateFolders = false, zone))
+        assertEquals("2026", backupDirFor("DCIM/Camera/", t, FolderLayout.YEAR, separateFolders = false, zone))
+        assertEquals("Pictures/Screenshots/2026", backupDirFor("Pictures/Screenshots/", t, FolderLayout.YEAR, separateFolders = true, zone))
     }
 }

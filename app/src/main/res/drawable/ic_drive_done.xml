@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Speicherkarte mit Häkchen: „auf dem Speichermedium gesichert“ (Kontakte und Häkchen ausgespart) -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FF000000"
+        android:fillType="evenOdd"
+        android:pathData="M10,2H18A2,2 0 0 1 20,4V20A2,2 0 0 1 18,22H6A2,2 0 0 1 4,20V8ZM10.5,4.5h1.5v3h-1.5ZM13.25,4.5h1.5v3h-1.5ZM16,4.5h1.5v3H16ZM10.6,18.2L7.2,14.8L8.6,13.4L10.6,15.4L15.4,10.6L16.8,12Z" />
+</vector>

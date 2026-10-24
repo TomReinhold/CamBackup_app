@@ -90,7 +90,11 @@ fun backupDirFor(
     zone: ZoneId = ZoneId.systemDefault(),
 ): String {
     val folder = if (separateFolders) relativePath.trim('/') else ""
-    val date = if (layout == FolderLayout.FLAT) "" else backupSubPath(dateTakenMillis, zone)
+    val date = when (layout) {
+        FolderLayout.FLAT -> ""
+        FolderLayout.YEAR -> backupSubPath(dateTakenMillis, zone).substringBefore('/')
+        FolderLayout.YEAR_MONTH -> backupSubPath(dateTakenMillis, zone)
+    }
     return listOf(folder, date).filter { it.isNotEmpty() }.joinToString("/")
 }
 

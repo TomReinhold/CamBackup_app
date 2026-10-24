@@ -6,10 +6,12 @@ enum class VideoCodec(val label: String) {
 }
 
 enum class FolderLayout {
-    /** Unterordner nach Aufnahmedatum, z. B. "2026/01". */
-    YEAR_MONTH,
     /** Alle Dateien direkt im Geräteordner. */
     FLAT,
+    /** Unterordner nach Aufnahmejahr, z. B. "2026". */
+    YEAR,
+    /** Unterordner nach Aufnahmejahr und -monat, z. B. "2026/01". */
+    YEAR_MONTH,
 }
 
 /** Einstellungen für das Verkleinern auf dem Smartphone und die Ablage auf dem Medium. */
