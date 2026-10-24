@@ -17,6 +17,7 @@ import androidx.work.WorkerParameters
 import androidx.work.workDataOf
 import de.trei.cambackup.backup.BackupProgress
 import de.trei.cambackup.backup.BackupRunner
+import de.trei.cambackup.backup.BackupSession
 import de.trei.cambackup.backup.EtaEstimator
 import de.trei.cambackup.backup.LastRunStore
 import de.trei.cambackup.backup.RunSummary
@@ -35,6 +36,7 @@ class BackupWorker(context: Context, params: WorkerParameters) : CoroutineWorker
 
     private val runner = BackupRunner(context)
     private val lastRun = LastRunStore(context)
+    private val session = BackupSession(context)
     private val notifications = context.getSystemService(NotificationManager::class.java)
 
     override suspend fun getForegroundInfo(): ForegroundInfo = foregroundInfo(null)
@@ -57,6 +59,8 @@ class BackupWorker(context: Context, params: WorkerParameters) : CoroutineWorker
         val summary = try {
             BackupRunner.lock.withLock {
                 val prepared = runner.prepare(folder)
+                // Fortgesetztes Backup: Fortschritt zählt ab dem ersten, unterbrochenen Lauf weiter
+                val offset = session.begin(prepared.index.state)
                 var lastPublish = 0L
                 val eta = EtaEstimator()
                 EjectWatcher(applicationContext, DriveRepository(applicationContext).volumeIdOf(Uri.parse(folder))).use { eject ->
@@ -68,7 +72,8 @@ class BackupWorker(context: Context, params: WorkerParameters) : CoroutineWorker
                             else -> null
                         }
                     }
-                    runner.execute(prepared, abortReason) { p ->
+                    runner.execute(prepared, abortReason) { run ->
+                        val p = offset.apply(run)
                         val now = SystemClock.elapsedRealtime()
                         val remaining = eta.update(now, p.bytesDone, p.bytesTotal)
                         if (now - lastPublish >= PUBLISH_INTERVAL_MS) {
@@ -84,6 +89,7 @@ class BackupWorker(context: Context, params: WorkerParameters) : CoroutineWorker
             RunSummary(Instant.now().toString(), 0, 0, 0, emptyList(), e.message ?: e.javaClass.simpleName)
         }
 
+        if (summary.abortReason == null) session.complete()
         lastRun.save(summary)
         notifications.cancel(Notifications.ID_PROGRESS)
         notifications.notify(Notifications.ID_RESULT, Notifications.result(applicationContext, summary))

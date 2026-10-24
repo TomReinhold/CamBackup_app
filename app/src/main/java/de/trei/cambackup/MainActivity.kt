@@ -27,6 +27,7 @@ import de.trei.cambackup.ui.DriveViewModel
 import de.trei.cambackup.ui.MediaChangeListener
 import de.trei.cambackup.ui.OverviewScreen
 import de.trei.cambackup.ui.gallery.GalleryScreen
+import de.trei.cambackup.ui.settings.InfoScreen
 import de.trei.cambackup.ui.settings.SettingsScreen
 import de.trei.cambackup.ui.theme.CamBackupTheme
 
@@ -44,6 +45,7 @@ private enum class Tab(val label: String, val icon: Int) {
     OVERVIEW("Übersicht", R.drawable.ic_dashboard),
     GALLERY("Galerie", R.drawable.ic_photo_library),
     SETTINGS("Einstellungen", R.drawable.ic_settings),
+    INFO("Info", R.drawable.ic_info),
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -64,8 +66,8 @@ private fun MainScaffold() {
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         topBar = {
-            // Die Einstellungen haben eine eigene Titelleiste (mit Zurück auf Unterseiten)
-            if (tab != Tab.SETTINGS) CenterAlignedTopAppBar(title = { Text(tab.label) })
+            // Einstellungen und Info haben eine eigene Titelleiste (mit Zurück auf Unterseiten)
+            if (tab != Tab.SETTINGS && tab != Tab.INFO) CenterAlignedTopAppBar(title = { Text(tab.label) })
         },
         bottomBar = {
             NavigationBar {
@@ -84,6 +86,7 @@ private fun MainScaffold() {
             Tab.OVERVIEW -> OverviewScreen(library, padding)
             Tab.GALLERY -> GalleryScreen(library, padding)
             Tab.SETTINGS -> SettingsScreen(bottomPadding = padding.calculateBottomPadding())
+            Tab.INFO -> InfoScreen(bottomPadding = padding.calculateBottomPadding())
         }
     }
 }
