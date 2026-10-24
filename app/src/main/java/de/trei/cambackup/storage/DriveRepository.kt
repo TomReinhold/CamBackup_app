@@ -56,6 +56,13 @@ class DriveRepository(private val context: Context) {
         return DocumentFile.fromTreeUri(context, tree)?.takeIf { runCatching { it.isDirectory }.getOrDefault(false) }
     }
 
+    /** Gehört der eingehängte Pfad (z. B. "/storage/1234-ABCD") zum gewählten Speichermedium? */
+    fun isSelectedVolume(mountPath: String?): Boolean {
+        val tree = selectedTree ?: return false
+        val volumeId = DocumentsContract.getTreeDocumentId(tree).substringBefore(':')
+        return mountPath?.trimEnd('/')?.substringAfterLast('/').equals(volumeId, ignoreCase = true)
+    }
+
     fun info(treeUri: Uri): DriveInfo {
         val docId = DocumentsContract.getTreeDocumentId(treeUri) // z. B. "1234-ABCD:Backups"
         val volumeId = docId.substringBefore(':')

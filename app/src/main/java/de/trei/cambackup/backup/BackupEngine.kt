@@ -92,7 +92,7 @@ class BackupEngine(private val context: Context) {
             } catch (e: CancellationException) {
                 throw e
             } catch (e: UserCancelled) {
-                abortReason = "Vom Nutzer abgebrochen"
+                abortReason = "Abgebrochen"
                 break
             } catch (e: Exception) {
                 if (!deviceDir.exists()) {

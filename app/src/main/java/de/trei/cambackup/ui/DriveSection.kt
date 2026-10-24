@@ -1,5 +1,9 @@
 package de.trei.cambackup.ui
 
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
@@ -22,15 +26,19 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -52,8 +60,9 @@ fun DriveSection(modifier: Modifier = Modifier, vm: DriveViewModel = viewModel()
     val pickTree = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree(), vm::onTreePicked)
     val pick = { pickTree.launch(null) }
 
-    // Erneut prüfen, wenn die App wieder sichtbar wird (z. B. nach Einstecken des Sticks)
+    // Erneut prüfen, wenn die App wieder sichtbar wird oder ein Datenträger ein-/ausgesteckt wird
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { vm.refresh() }
+    MediaChangeListener(onChange = vm::refresh)
 
     Card(modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -238,6 +247,28 @@ private fun AssignDeviceDialog(candidates: List<DeviceFolder>, onDismiss: () -> 
         confirmButton = {},
         dismissButton = { TextButton(onClick = onDismiss) { Text("Abbrechen") } },
     )
+}
+
+/** Ruft [onChange] auf, solange sichtbar, wenn ein Datenträger eingehängt oder entfernt wird. */
+@Composable
+private fun MediaChangeListener(onChange: () -> Unit) {
+    val context = LocalContext.current
+    val currentOnChange by rememberUpdatedState(onChange)
+    DisposableEffect(context) {
+        val receiver = object : BroadcastReceiver() {
+            override fun onReceive(c: Context, intent: Intent) = currentOnChange()
+        }
+        val filter = IntentFilter().apply {
+            addAction(Intent.ACTION_MEDIA_MOUNTED)
+            addAction(Intent.ACTION_MEDIA_UNMOUNTED)
+            addAction(Intent.ACTION_MEDIA_EJECT)
+            addAction(Intent.ACTION_MEDIA_REMOVED)
+            addAction(Intent.ACTION_MEDIA_BAD_REMOVAL)
+            addDataScheme("file")
+        }
+        ContextCompat.registerReceiver(context, receiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED)
+        onDispose { context.unregisterReceiver(receiver) }
+    }
 }
 
 private fun formatInstant(iso: String): String = runCatching {
