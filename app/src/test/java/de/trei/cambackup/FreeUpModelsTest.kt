@@ -1,7 +1,9 @@
 package de.trei.cambackup
 
 import android.net.Uri
+import de.trei.cambackup.freeup.PREPARE_RESERVE
 import de.trei.cambackup.freeup.PendingReplacement
+import de.trei.cambackup.freeup.prepareSpaceOk
 import de.trei.cambackup.freeup.RESTORE_RESERVE
 import de.trei.cambackup.freeup.restoreCandidates
 import de.trei.cambackup.freeup.restoreSpaceNeeded
@@ -14,7 +16,9 @@ import de.trei.cambackup.index.IndexState
 import de.trei.cambackup.media.MediaItem
 import io.mockk.mockk
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class FreeUpModelsTest {
@@ -80,5 +84,12 @@ class FreeUpModelsTest {
         assertEquals(EntryStatus.VERIFIED, reverted.status)
         assertNull(reverted.compressedSize)
         assertEquals(entry("a.jpg", 100), reverted)
+    }
+
+    @Test
+    fun `vorbereiten nur mit reserve`() {
+        val mb = 1024L * 1024
+        assertTrue(prepareSpaceOk(PREPARE_RESERVE + 100 * mb, 100 * mb))
+        assertFalse(prepareSpaceOk(PREPARE_RESERVE + 99 * mb, 100 * mb))
     }
 }

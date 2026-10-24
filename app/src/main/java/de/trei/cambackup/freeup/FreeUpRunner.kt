@@ -95,6 +95,11 @@ class FreeUpRunner(private val context: Context) {
                 skip(pre.text)
                 continue
             }
+            // Die Kopien liegen bis zum Ersetzen im Cache – das Smartphone darf dabei nicht volllaufen
+            if (!prepareSpaceOk(context.cacheDir.usableSpace, item.sizeBytes)) {
+                abort = "Zu wenig Platz auf dem Smartphone – bitte erst die vorbereiteten Dateien ersetzen, dann weiter vorbereiten"
+                break
+            }
             try {
                 if (!backupPresent(dirs, c.entry)) {
                     failures += FreeUpSummary.Failure(item.displayName, "Sicherung auf dem Medium fehlt oder ist unvollständig")

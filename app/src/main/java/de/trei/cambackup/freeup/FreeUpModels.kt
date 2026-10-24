@@ -87,6 +87,12 @@ fun restoreSpaceNeeded(candidates: List<RestoreCandidate>): Long {
 /** Freier Platz, der auf dem Smartphone nach dem Zurückholen mindestens übrig bleiben soll. */
 const val RESTORE_RESERVE = 500L * 1024 * 1024
 
+/** Freier Platz, der beim Vorbereiten (verkleinerte Kopien im Cache) mindestens übrig bleiben soll. */
+const val PREPARE_RESERVE = 3L * 1024 * 1024 * 1024
+
+/** Passt die verkleinerte Kopie noch in den Cache? Sie ist höchstens so groß wie das Original. */
+fun prepareSpaceOk(freeBytes: Long, originalBytes: Long): Boolean = freeBytes >= originalBytes + PREPARE_RESERVE
+
 /**
  * Teilt die Kamera-Dateien anhand des Index ein. Nur unveränderte, verifiziert gesicherte Originale
  * kommen als Kandidaten in Frage (Größe muss der gesicherten entsprechen; der Hash wird vor dem
