@@ -5,6 +5,7 @@ import android.content.pm.PackageManager
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.Button
@@ -19,6 +20,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
@@ -34,6 +36,7 @@ import de.trei.cambackup.ui.components.BannerTone
 import de.trei.cambackup.ui.components.FeatureCard
 import de.trei.cambackup.util.fileCount
 import de.trei.cambackup.util.formatBytes
+import de.trei.cambackup.util.formatRemaining
 
 /** Planung, Fortschritt und Ergebnis des Backups für den erkannten Geräteordner. */
 @Composable
@@ -119,7 +122,13 @@ fun BackupPanel(folderUri: String, onBackupFinished: () -> Unit, vm: BackupViewM
                     Text("Backup wird vorbereitet …")
                     LinearProgressIndicator(Modifier.fillMaxWidth())
                 } else {
-                    Text("Datei ${minOf(p.fileIndex + 1, p.fileCount)} von ${p.fileCount}: ${p.currentName}", maxLines = 1)
+                    Row(Modifier.fillMaxWidth()) {
+                        Text("Datei ${minOf(p.fileIndex + 1, p.fileCount)} von ${p.fileCount}", modifier = Modifier.weight(1f))
+                        Text(
+                            if (p.remainingSeconds >= 0) formatRemaining(p.remainingSeconds) else "Restzeit wird ermittelt …",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                     LinearProgressIndicator(
                         progress = { (p.bytesDone.toFloat() / p.bytesTotal).coerceIn(0f, 1f) },
                         modifier = Modifier.fillMaxWidth(),
@@ -129,11 +138,14 @@ fun BackupPanel(folderUri: String, onBackupFinished: () -> Unit, vm: BackupViewM
                         style = MaterialTheme.typography.bodySmall,
                     )
                 }
-                Banner("Läuft auch im Hintergrund weiter. Speichermedium bitte nicht abziehen.")
+                Banner(
+                    "Läuft auch im Hintergrund weiter. Speichermedium bitte nicht abziehen – falls doch, bleibt alles " +
+                        "bereits Geprüfte gesichert und das Backup lässt sich später fortsetzen.",
+                )
                 OutlinedButton(onClick = vm::cancel) { Text("Abbrechen") }
             }
 
-            is BackupState.Finished -> ResultView(s.summary) {
+            is BackupState.Finished -> ResultView(s.summary, onResume = { vm.resume(folderUri) }) {
                 vm.acknowledge(folderUri)
                 onBackupFinished()
             }
@@ -194,7 +206,7 @@ private fun PlanView(plan: BackupPlan, space: SpaceCheck, onStart: () -> Unit) {
 }
 
 @Composable
-private fun ResultView(s: RunSummary, onDone: () -> Unit) {
+private fun ResultView(s: RunSummary, onResume: () -> Unit, onDone: () -> Unit) {
     Banner(
         if (s.isComplete) "Backup abgeschlossen: ${fileCount(s.copied)} (${formatBytes(s.bytesCopied)}) kopiert und geprüft."
         else "Backup unvollständig: ${fileCount(s.copied)} kopiert" + (s.abortReason?.let { " – $it" } ?: ""),
@@ -205,5 +217,16 @@ private fun ResultView(s: RunSummary, onDone: () -> Unit) {
         Text("Fehler bei ${fileCount(s.failures.size)}:", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)
         s.failures.take(10).forEach { Text("• ${it.name}: ${it.reason}", style = MaterialTheme.typography.bodySmall) }
     }
-    Button(onClick = onDone) { Text("OK") }
+    if (s.abortReason != null) {
+        Text(
+            "Alles bis zur Unterbrechung ist geprüft gesichert. Beim Fortsetzen werden nur die fehlenden Dateien kopiert.",
+            style = MaterialTheme.typography.bodySmall,
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(onClick = onResume) { Text("Fortsetzen") }
+            OutlinedButton(onClick = onDone) { Text("Später") }
+        }
+    } else {
+        Button(onClick = onDone) { Text("OK") }
+    }
 }

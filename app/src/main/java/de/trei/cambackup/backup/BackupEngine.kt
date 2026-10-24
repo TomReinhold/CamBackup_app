@@ -20,10 +20,11 @@ import java.time.Instant
 data class BackupProgress(
     val fileIndex: Int,
     val fileCount: Int,
-    val currentName: String,
     /** Bereits verarbeitete Bytes aller Dateien (Kopieren und Prüfen je zur Hälfte gewichtet). */
     val bytesDone: Long,
     val bytesTotal: Long,
+    /** Geschätzte Restdauer in Sekunden, -1 solange noch keine Schätzung möglich ist. */
+    val remainingSeconds: Long = -1,
 )
 
 data class BackupFailure(val item: MediaItem, val reason: String)
@@ -67,7 +68,8 @@ class BackupEngine(private val context: Context) {
         index: BackupIndex,
         /** Zielordner auf dem Medium je Datei (siehe backupDirFor). */
         targetDir: (MediaItem) -> String,
-        isCancelled: () -> Boolean,
+        /** Liefert einen Abbruchgrund (z. B. "Abgebrochen"), sobald der Lauf enden soll. */
+        abortReason: () -> String?,
         onProgress: (BackupProgress) -> Unit,
     ): BackupResult = withContext(Dispatchers.IO) {
         val dirs = DirCache(deviceDir)
@@ -79,12 +81,13 @@ class BackupEngine(private val context: Context) {
         var bytesCopied = 0L
         val failures = mutableListOf<BackupFailure>()
         var abortReason: String? = null
+        var failedInRow = 0
 
         for ((i, item) in plan.toCopy.withIndex()) {
             val report = { bytes: Long ->
                 // Wird während des Kopierens laufend aufgerufen – so greift ein Abbruch auch bei großen Videos zügig
-                if (isCancelled()) throw UserCancelled()
-                onProgress(BackupProgress(i, plan.toCopy.size, item.displayName, doneBefore + bytes, total))
+                abortReason()?.let { throw Aborted(it) }
+                onProgress(BackupProgress(i, plan.toCopy.size, doneBefore + bytes, total))
             }
             try {
                 report(0)
@@ -92,31 +95,42 @@ class BackupEngine(private val context: Context) {
                     Outcome.COPIED -> { copied++; bytesCopied += item.sizeBytes }
                     Outcome.ADOPTED -> adopted++
                 }
+                failedInRow = 0
             } catch (e: CancellationException) {
                 throw e
-            } catch (e: UserCancelled) {
-                abortReason = "Abgebrochen"
+            } catch (e: Aborted) {
+                abortReason = e.reason
                 break
             } catch (e: Exception) {
                 if (!deviceDir.exists()) {
-                    abortReason = "Speichermedium wurde getrennt"
+                    abortReason = MEDIUM_DISCONNECTED
                     break
                 }
                 failures += BackupFailure(item, e.message ?: e.javaClass.simpleName)
+                // Mehrere Fehler in Folge: das Medium antwortet nicht mehr (Wackelkontakt, Stromsparmodus) –
+                // lieber sauber anhalten, als den Rest der Liste als fehlerhaft zu melden
+                if (++failedInRow >= MAX_FAILURES_IN_ROW) {
+                    abortReason = "Speichermedium antwortet nicht mehr"
+                    break
+                }
             }
             doneBefore += item.sizeBytes * 2
         }
-        onProgress(BackupProgress(plan.toCopy.size, plan.toCopy.size, "", doneBefore, total))
+        onProgress(BackupProgress(plan.toCopy.size, plan.toCopy.size, doneBefore, total))
         BackupResult(copied, adopted, bytesCopied, failures, abortReason)
     }
 
     private enum class Outcome { COPIED, ADOPTED }
 
-    private class UserCancelled : Exception()
+    private class Aborted(val reason: String) : Exception(reason)
 
     companion object {
         /** Zwischenordner für Dateien, die gerade geschrieben und geprüft werden. */
         const val STAGING_DIR = "_incoming"
+
+        /** Abbruchgrund, wenn das Medium während des Laufs verschwindet. */
+        const val MEDIUM_DISCONNECTED = "Speichermedium wurde getrennt"
+        private const val MAX_FAILURES_IN_ROW = 3
         private const val STAGING_PATH = "${DeviceRegistry.METADATA_DIR}/$STAGING_DIR"
     }
 

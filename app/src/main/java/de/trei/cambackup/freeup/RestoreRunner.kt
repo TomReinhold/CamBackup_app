@@ -5,6 +5,7 @@ import android.net.Uri
 import android.os.Environment
 import android.os.StatFs
 import de.trei.cambackup.backup.RunSummary
+import de.trei.cambackup.backup.copyWithSha256
 import de.trei.cambackup.backup.sha256
 import de.trei.cambackup.index.BackupIndex
 import de.trei.cambackup.index.IndexCache
@@ -150,23 +151,36 @@ class RestoreRunner(private val context: Context) {
         if (entry.compressedSha256 != null && hashOf(uri) != entry.compressedSha256) {
             throw IOException("Datei wurde nach dem Verkleinern verändert – bleibt unangetastet")
         }
-        // Bis zu zwei Versuche: ein abgebrochener Schreibvorgang wird sofort wiederholt
-        var lastError: Exception? = null
-        repeat(2) {
-            try {
-                io.writeSynced(uri, c.item.displayName) { out ->
-                    (resolver.openInputStream(backup.uri) ?: throw IOException("Original nicht lesbar")).use { it.copyTo(out, 1 shl 20) }
-                }
-                if (hashOf(uri) == entry.originalSha256) {
-                    index.record(entry.asVerifiedOnly().copy(keepOriginal = keepOriginal))
-                    return
-                }
-                lastError = IOException("Prüfsumme nach dem Zurückholen falsch")
-            } catch (e: Exception) {
-                lastError = e
-            }
+        // Erst vollständig vom Medium in den App-Speicher holen und prüfen: wird das Medium dabei
+        // abgezogen, bleibt die Datei auf dem Smartphone unberührt (keine halb überschriebene Datei)
+        if (phoneFreeBytes() < entry.originalSize + entry.originalSize - (entry.compressedSize ?: 0) + RESTORE_RESERVE) {
+            throw IOException("Zu wenig Platz auf dem Smartphone für diese Datei")
         }
-        throw IOException("Zurückholen fehlgeschlagen (${lastError?.message}) – Original bleibt auf dem Medium, bitte erneut versuchen")
+        val staged = File(context.cacheDir, "restore.tmp")
+        try {
+            val copy = (resolver.openInputStream(backup.uri) ?: throw IOException("Original nicht lesbar")).use { input ->
+                staged.outputStream().use { out -> copyWithSha256(input, out) {} }
+            }
+            if (copy.sha256 != entry.originalSha256) throw IOException("Original auf dem Medium beschädigt (Prüfsumme falsch)")
+
+            // Bis zu zwei Versuche: ein abgebrochener Schreibvorgang wird sofort wiederholt
+            var lastError: Exception? = null
+            repeat(2) {
+                try {
+                    io.writeSynced(uri, c.item.displayName) { out -> staged.inputStream().use { it.copyTo(out, 1 shl 20) } }
+                    if (hashOf(uri) == entry.originalSha256) {
+                        index.record(entry.asVerifiedOnly().copy(keepOriginal = keepOriginal))
+                        return
+                    }
+                    lastError = IOException("Prüfsumme nach dem Zurückholen falsch")
+                } catch (e: Exception) {
+                    lastError = e
+                }
+            }
+            throw IOException("Zurückholen fehlgeschlagen (${lastError?.message}) – Original bleibt auf dem Medium, bitte erneut versuchen")
+        } finally {
+            staged.delete()
+        }
     }
 
     private suspend fun hashOf(uri: Uri): String =

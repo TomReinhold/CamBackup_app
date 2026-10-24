@@ -96,10 +96,31 @@ class BackupViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun start(folderUri: String) {
-        val ready = state.value as? BackupState.Ready ?: return
+        startIfPossible(folderUri, state.value as? BackupState.Ready ?: return)
+    }
+
+    private fun startIfPossible(folderUri: String, ready: BackupState.Ready) {
         // Sicherheitsnetz: die UI bietet den Start bei zu wenig Platz gar nicht erst an
         if (ready.space is SpaceCheck.NotEnough || ready.plan.toCopy.isEmpty()) return
         BackupWorker.start(getApplication(), folderUri)
+    }
+
+    /** Unterbrochenes Backup fortsetzen: neu planen (bereits Gesichertes entfällt) und gleich starten. */
+    fun resume(folderUri: String) {
+        lastRun.markSeen()
+        prepareJob?.cancel()
+        prepareJob = viewModelScope.launch {
+            planState.value = BackupState.Preparing
+            val ready = try {
+                val p = runner.prepare(folderUri)
+                BackupState.Ready(p.plan, p.space, p.missing, p.missingUris)
+            } catch (e: Exception) {
+                planState.value = BackupState.Error(e.message ?: e.javaClass.simpleName)
+                return@launch
+            }
+            planState.value = ready
+            startIfPossible(folderUri, ready)
+        }
     }
 
     fun cancel() = BackupWorker.cancel(getApplication())

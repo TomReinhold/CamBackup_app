@@ -13,6 +13,7 @@ import de.trei.cambackup.backup.RunSummary
 import de.trei.cambackup.freeup.FreeUpSummary
 import de.trei.cambackup.util.fileCount
 import de.trei.cambackup.util.formatBytes
+import de.trei.cambackup.util.formatRemaining
 
 object Notifications {
     const val CHANNEL_PROGRESS = "backup_progress"
@@ -44,8 +45,8 @@ object Notifications {
             .setContentTitle("Backup läuft")
             .setContentText(
                 if (p == null || p.fileCount == 0) "Wird vorbereitet …"
-                else "Datei ${minOf(p.fileIndex + 1, p.fileCount)} von ${p.fileCount} · " +
-                    "${formatBytes(p.bytesDone / 2)} von ${formatBytes(p.bytesTotal / 2)}",
+                else "${formatBytes(p.bytesDone / 2)} von ${formatBytes(p.bytesTotal / 2)}" +
+                    (if (p.remainingSeconds >= 0) " · ${formatRemaining(p.remainingSeconds)}" else ""),
             )
             .setProgress(1000, p?.let { if (it.bytesTotal > 0) (it.bytesDone * 1000 / it.bytesTotal).toInt() else 0 } ?: 0, p == null)
             .setOngoing(true)

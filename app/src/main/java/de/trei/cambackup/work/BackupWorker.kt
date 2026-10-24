@@ -3,6 +3,7 @@ package de.trei.cambackup.work
 import android.content.Context
 import android.app.NotificationManager
 import android.content.pm.ServiceInfo
+import android.net.Uri
 import android.os.SystemClock
 import android.util.Log
 import androidx.work.CoroutineWorker
@@ -16,8 +17,10 @@ import androidx.work.WorkerParameters
 import androidx.work.workDataOf
 import de.trei.cambackup.backup.BackupProgress
 import de.trei.cambackup.backup.BackupRunner
+import de.trei.cambackup.backup.EtaEstimator
 import de.trei.cambackup.backup.LastRunStore
 import de.trei.cambackup.backup.RunSummary
+import de.trei.cambackup.storage.DriveRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.sync.withLock
 import java.time.Instant
@@ -55,12 +58,23 @@ class BackupWorker(context: Context, params: WorkerParameters) : CoroutineWorker
             BackupRunner.lock.withLock {
                 val prepared = runner.prepare(folder)
                 var lastPublish = 0L
-                // execute() schließt auch bei Abbruch sauber ab und liefert eine Zusammenfassung
-                runner.execute(prepared, userCancelled = { isStopped }) { p ->
-                    val now = SystemClock.elapsedRealtime()
-                    if (now - lastPublish >= PUBLISH_INTERVAL_MS) {
-                        lastPublish = now
-                        publish(p)
+                val eta = EtaEstimator()
+                EjectWatcher(applicationContext, DriveRepository(applicationContext).volumeIdOf(Uri.parse(folder))).use { eject ->
+                    // execute() schließt auch bei Abbruch sauber ab und liefert eine Zusammenfassung
+                    val abortReason = {
+                        when {
+                            eject.ejecting -> "Speichermedium wird ausgeworfen"
+                            isStopped -> "Abgebrochen"
+                            else -> null
+                        }
+                    }
+                    runner.execute(prepared, abortReason) { p ->
+                        val now = SystemClock.elapsedRealtime()
+                        val remaining = eta.update(now, p.bytesDone, p.bytesTotal)
+                        if (now - lastPublish >= PUBLISH_INTERVAL_MS) {
+                            lastPublish = now
+                            publish(p.copy(remainingSeconds = remaining))
+                        }
                     }
                 }
             }
@@ -83,7 +97,7 @@ class BackupWorker(context: Context, params: WorkerParameters) : CoroutineWorker
             workDataOf(
                 KEY_FILE_INDEX to p.fileIndex,
                 KEY_FILE_COUNT to p.fileCount,
-                KEY_NAME to p.currentName,
+                KEY_REMAINING to p.remainingSeconds,
                 KEY_BYTES_DONE to p.bytesDone,
                 KEY_BYTES_TOTAL to p.bytesTotal,
             ),
@@ -102,7 +116,7 @@ class BackupWorker(context: Context, params: WorkerParameters) : CoroutineWorker
         private const val KEY_FOLDER = "folder"
         private const val KEY_FILE_INDEX = "fileIndex"
         private const val KEY_FILE_COUNT = "fileCount"
-        private const val KEY_NAME = "name"
+        private const val KEY_REMAINING = "remaining"
         private const val KEY_BYTES_DONE = "bytesDone"
         private const val KEY_BYTES_TOTAL = "bytesTotal"
 
@@ -126,9 +140,9 @@ class BackupWorker(context: Context, params: WorkerParameters) : CoroutineWorker
             return BackupProgress(
                 fileIndex = data.getInt(KEY_FILE_INDEX, 0),
                 fileCount = data.getInt(KEY_FILE_COUNT, 0),
-                currentName = data.getString(KEY_NAME).orEmpty(),
                 bytesDone = data.getLong(KEY_BYTES_DONE, 0),
                 bytesTotal = total,
+                remainingSeconds = data.getLong(KEY_REMAINING, -1),
             )
         }
     }

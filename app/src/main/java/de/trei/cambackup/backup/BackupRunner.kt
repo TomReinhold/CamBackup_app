@@ -70,12 +70,13 @@ class BackupRunner(private val context: Context) {
     }
 
     /**
-     * Führt das Backup aus. Ein Abbruch (über [userCancelled] oder durch Abbrechen der Coroutine)
+     * Führt das Backup aus. Ein Abbruch (über [abortReason] oder durch Abbrechen der Coroutine)
      * beendet nur die laufende Datei; Index, Protokoll und Zusammenfassung werden trotzdem geschrieben.
      */
     suspend fun execute(
         prepared: Prepared,
-        userCancelled: () -> Boolean,
+        /** Grund für einen vorzeitigen Abbruch (Nutzer, Medium wird ausgeworfen) oder null. */
+        abortReason: () -> String?,
         onProgress: (BackupProgress) -> Unit,
     ): RunSummary {
         if (prepared.space is SpaceCheck.NotEnough) {
@@ -83,13 +84,13 @@ class BackupRunner(private val context: Context) {
         }
         val caller = currentCoroutineContext()
         // NonCancellable: das Ende des Laufs wird immer sauber abgeschlossen; der Abbruch wird
-        // stattdessen zwischen den Datenblöcken über isCancelled abgefragt.
+        // stattdessen zwischen den Datenblöcken über abortReason abgefragt.
         val s = settings.current()
         return withContext(NonCancellable) {
             val result = engine.run(
                 prepared.deviceDir, prepared.plan, prepared.index,
                 targetDir = { backupDirFor(it.relativePath, it.dateTakenMillis, s.folderLayout, s.separateFolders) },
-                isCancelled = { userCancelled() || !caller.isActive },
+                abortReason = { abortReason() ?: if (!caller.isActive) "Abgebrochen" else null },
                 onProgress = onProgress,
             )
             val finishError = runCatching { finish(prepared, result) }.exceptionOrNull()
