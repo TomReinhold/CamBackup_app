@@ -8,7 +8,6 @@ import de.trei.cambackup.index.BackupIndex
 import de.trei.cambackup.index.IndexEntry
 import de.trei.cambackup.media.MediaItem
 import de.trei.cambackup.media.readUri
-import de.trei.cambackup.settings.FolderLayout
 import de.trei.cambackup.storage.DeviceRegistry
 import de.trei.cambackup.storage.DirCache
 import de.trei.cambackup.storage.SafIo
@@ -66,7 +65,8 @@ class BackupEngine(private val context: Context) {
         deviceDir: DocumentFile,
         plan: BackupPlan,
         index: BackupIndex,
-        layout: FolderLayout,
+        /** Zielordner auf dem Medium je Datei (siehe backupDirFor). */
+        targetDir: (MediaItem) -> String,
         isCancelled: () -> Boolean,
         onProgress: (BackupProgress) -> Unit,
     ): BackupResult = withContext(Dispatchers.IO) {
@@ -88,7 +88,7 @@ class BackupEngine(private val context: Context) {
             }
             try {
                 report(0)
-                when (backupOne(item, dirs, index, layout, report)) {
+                when (backupOne(item, dirs, index, targetDir(item), report)) {
                     Outcome.COPIED -> { copied++; bytesCopied += item.sizeBytes }
                     Outcome.ADOPTED -> adopted++
                 }
@@ -124,10 +124,9 @@ class BackupEngine(private val context: Context) {
         item: MediaItem,
         dirs: DirCache,
         index: BackupIndex,
-        layout: FolderLayout,
+        subPath: String,
         report: (Long) -> Unit,
     ): Outcome {
-        val subPath = if (layout == FolderLayout.FLAT) "" else backupSubPath(item.dateTakenMillis)
         val dir = dirs.dir(subPath)
         val files = dirs.files(subPath)
 

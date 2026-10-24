@@ -30,8 +30,14 @@ data class CompressionSettings(
     val folderLayout: FolderLayout = FolderLayout.YEAR_MONTH,
     /** Nur sichern, auf dem Smartphone nichts ersetzen. */
     val dryRun: Boolean = true,
+    /** Zu sichernde Ordner (RELATIVE_PATH, z. B. "DCIM/Camera/"). Mindestens einer. */
+    val mediaFolders: Set<String> = setOf(DEFAULT_FOLDER),
 ) {
+    /** Bei mehreren Ordnern bekommt jeder auf dem Medium einen eigenen Unterordner. */
+    val separateFolders: Boolean get() = mediaFolders.size > 1
+
     companion object {
+        const val DEFAULT_FOLDER = "DCIM/Camera/"
         val IMAGE_EDGE_OPTIONS = listOf(2048, 3072, 4096, null)
         val VIDEO_EDGE_OPTIONS = listOf(720, 1080, null)
         val MIN_AGE_OPTIONS = listOf(0, 7, 30, 90, 365)

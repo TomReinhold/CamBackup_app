@@ -28,6 +28,11 @@ data class IndexEntry(
     val compressedSha256: String? = null,
     val compressedAt: String? = null,
     val compressionParams: String? = null,
+    /**
+     * Nur im Journal: markiert einen entfernten Eintrag (Sicherung wurde gelöscht). Das Journal
+     * wird nur angehängt, daher wird Entfernen als eigene Zeile vermerkt.
+     */
+    val deleted: Boolean = false,
 )
 
 /** Inhalt von `Metadata/backup_index.json`. */
@@ -50,11 +55,16 @@ class IndexState(entries: Collection<IndexEntry> = emptyList()) {
     val entries: Collection<IndexEntry> get() = byBackupPath.values
     val size: Int get() = byBackupPath.size
 
-    /** Fügt hinzu bzw. ersetzt den Eintrag mit gleichem backupPath. */
+    /** Fügt hinzu bzw. ersetzt den Eintrag mit gleichem backupPath; [IndexEntry.deleted] entfernt ihn. */
     fun put(entry: IndexEntry) {
-        byBackupPath.put(entry.backupPath, entry)?.let { old -> byPhonePath[old.phonePath]?.remove(old) }
+        byBackupPath.remove(entry.backupPath)?.let { old -> byPhonePath[old.phonePath]?.remove(old) }
+        if (entry.deleted) return
+        byBackupPath[entry.backupPath] = entry
         byPhonePath.getOrPut(entry.phonePath) { mutableListOf() }.add(entry)
     }
+
+    /** Alle Einträge je Pfad auf dem Smartphone (mehrere, wenn eine geänderte Datei erneut gesichert wurde). */
+    fun groupedByPhonePath(): Map<String, List<IndexEntry>> = byPhonePath.filterValues { it.isNotEmpty() }
 
     fun forPhonePath(phonePath: String): List<IndexEntry> = byPhonePath[phonePath].orEmpty()
 

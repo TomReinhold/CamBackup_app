@@ -7,16 +7,31 @@ import android.provider.MediaStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-/** Liest alle Fotos und Videos aus DCIM/Camera über den MediaStore. */
+/** Ein Ordner auf dem Smartphone, der Fotos oder Videos enthält. */
+data class MediaFolder(val relativePath: String, val count: Int, val bytes: Long)
+
+/**
+ * Liest Fotos und Videos über den MediaStore. Nur der interne Speicher wird betrachtet – Dateien
+ * auf dem Backup-Medium sollen nie als Medienordner erscheinen.
+ */
 class MediaScanner(private val resolver: ContentResolver) {
 
-    suspend fun scanCameraFolder(): List<MediaItem> = withContext(Dispatchers.IO) {
-        val images = query(MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL), isVideo = false)
-        val videos = query(MediaStore.Video.Media.getContentUri(MediaStore.VOLUME_EXTERNAL), isVideo = true)
-        (images + videos).sortedByDescending { it.dateTakenMillis }
+    /** Alle Fotos und Videos aus den gewählten Ordnern (genau diese Ordner, ohne Unterordner). */
+    suspend fun scan(folders: Set<String>): List<MediaItem> = withContext(Dispatchers.IO) {
+        if (folders.isEmpty()) return@withContext emptyList()
+        (query(IMAGES, isVideo = false, folders) + query(VIDEOS, isVideo = true, folders))
+            .sortedByDescending { it.dateTakenMillis }
     }
 
-    private fun query(collection: Uri, isVideo: Boolean): List<MediaItem> {
+    /** Alle Ordner mit Fotos/Videos, größte zuerst – für die Auswahl in den Einstellungen. */
+    suspend fun listFolders(): List<MediaFolder> = withContext(Dispatchers.IO) {
+        (query(IMAGES, false, null) + query(VIDEOS, true, null))
+            .groupBy { it.relativePath }
+            .map { (path, items) -> MediaFolder(path, items.size, items.sumOf { it.sizeBytes }) }
+            .sortedWith(compareByDescending<MediaFolder> { it.relativePath == CAMERA_RELATIVE_PATH }.thenByDescending { it.bytes })
+    }
+
+    private fun query(collection: Uri, isVideo: Boolean, folders: Set<String>?): List<MediaItem> {
         val projection = arrayOf(
             MediaStore.MediaColumns._ID,
             MediaStore.MediaColumns.DISPLAY_NAME,
@@ -27,8 +42,11 @@ class MediaScanner(private val resolver: ContentResolver) {
             MediaStore.MediaColumns.DATE_MODIFIED,
             MediaStore.MediaColumns.DURATION,
         )
-        val selection = "${MediaStore.MediaColumns.RELATIVE_PATH} = ?"
-        val args = arrayOf(CAMERA_RELATIVE_PATH)
+        val (selection, args) = if (folders == null) {
+            null to null
+        } else {
+            "${MediaStore.MediaColumns.RELATIVE_PATH} IN (${folders.joinToString { "?" }})" to folders.toTypedArray()
+        }
 
         val result = mutableListOf<MediaItem>()
         resolver.query(collection, projection, selection, args, null)?.use { c ->
@@ -43,13 +61,14 @@ class MediaScanner(private val resolver: ContentResolver) {
 
             while (c.moveToNext()) {
                 val id = c.getLong(idCol)
+                val path = c.getString(pathCol) ?: continue
                 // DATE_TAKEN ist in ms, DATE_MODIFIED in Sekunden
                 val taken = if (c.isNull(takenCol)) c.getLong(modifiedCol) * 1000 else c.getLong(takenCol)
                 result += MediaItem(
                     id = id,
                     uri = ContentUris.withAppendedId(collection, id),
                     displayName = c.getString(nameCol) ?: "unbenannt_$id",
-                    relativePath = c.getString(pathCol) ?: CAMERA_RELATIVE_PATH,
+                    relativePath = path,
                     mimeType = c.getString(mimeCol) ?: if (isVideo) "video/*" else "image/*",
                     sizeBytes = c.getLong(sizeCol),
                     dateTakenMillis = taken,
@@ -63,5 +82,8 @@ class MediaScanner(private val resolver: ContentResolver) {
 
     companion object {
         const val CAMERA_RELATIVE_PATH = "DCIM/Camera/"
+
+        val IMAGES: Uri = MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
+        val VIDEOS: Uri = MediaStore.Video.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
     }
 }

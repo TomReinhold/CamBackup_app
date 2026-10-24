@@ -14,6 +14,10 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.map
+import de.trei.cambackup.settings.SettingsRepository
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -29,6 +33,7 @@ sealed interface LibraryState {
 class LibraryViewModel(app: Application) : AndroidViewModel(app) {
 
     private val scanner = MediaScanner(app.contentResolver)
+    private val settings = SettingsRepository(app)
     private val scan = MutableStateFlow<ScanState>(ScanState.Loading)
     private var job: Job? = null
 
@@ -54,7 +59,14 @@ class LibraryViewModel(app: Application) : AndroidViewModel(app) {
         }
     }.stateIn(viewModelScope, SharingStarted.Eagerly, LibraryState.Loading)
 
-    /** Berechtigung prüfen und Kameraordner neu einlesen (z. B. nach Rückkehr in die App). */
+    init {
+        // Neu einlesen, sobald sich die Auswahl der Medienordner ändert
+        viewModelScope.launch {
+            settings.settings.map { it.mediaFolders }.distinctUntilChanged().drop(1).collect { refresh() }
+        }
+    }
+
+    /** Berechtigung prüfen und Medienordner neu einlesen (z. B. nach Rückkehr in die App). */
     fun refresh() {
         when (MediaPermissions.currentAccess(getApplication())) {
             MediaAccess.NONE -> scan.value = ScanState.NeedsPermission
@@ -64,7 +76,7 @@ class LibraryViewModel(app: Application) : AndroidViewModel(app) {
                 job?.cancel()
                 job = viewModelScope.launch {
                     scan.value = try {
-                        ScanState.Done(scanner.scanCameraFolder())
+                        ScanState.Done(scanner.scan(settings.current().mediaFolders))
                     } catch (e: Exception) {
                         ScanState.Failed(e.message ?: e.javaClass.simpleName)
                     }

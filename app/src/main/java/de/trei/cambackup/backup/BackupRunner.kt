@@ -1,6 +1,8 @@
 package de.trei.cambackup.backup
 
 import android.content.Context
+import android.net.Uri
+import de.trei.cambackup.storage.DirCache
 import androidx.documentfile.provider.DocumentFile
 import de.trei.cambackup.index.BackupIndex
 import de.trei.cambackup.index.IndexCache
@@ -38,9 +40,13 @@ class BackupRunner(private val context: Context) {
         val plan: BackupPlan,
         val space: SpaceCheck,
         val indexedCount: Int,
+        /** Gesichert, aber auf dem Smartphone gelöscht – der Nutzer entscheidet, was damit geschieht. */
+        val missing: List<MissingItem>,
+        /** Adresse der jeweils neuesten Sicherung auf dem Medium (für Vorschaubilder), je Pfad. */
+        val missingUris: Map<String, Uri>,
     )
 
-    /** Lädt Index und Kamera-Dateien und berechnet, was zu sichern ist. */
+    /** Lädt Index und Mediendateien und berechnet, was zu sichern ist. */
     suspend fun prepare(deviceFolderName: String): Prepared {
         val root = drives.openRoot() ?: throw IOException("Speichermedium nicht verbunden")
         val deviceDir = withContext(Dispatchers.IO) { root.findFile(deviceFolderName) }
@@ -53,8 +59,19 @@ class BackupRunner(private val context: Context) {
         engine.cleanupStaging(deviceDir)
         withContext(Dispatchers.IO) { registry.ensureNoMedia(deviceDir) }
         val info = drives.info(drives.selectedTree!!)
-        val plan = planBackup(scanner.scanCameraFolder(), index.state, info.fsType)
-        return Prepared(deviceDir, index, plan, checkSpace(plan.bytesToCopy, info.space?.freeBytes), index.state.size)
+        val folders = settings.current().mediaFolders
+        val items = scanner.scan(folders)
+        val plan = planBackup(items, index.state, info.fsType)
+        val missing = findMissing(items, index.state, folders)
+        val uris = withContext(Dispatchers.IO) {
+            val dirs = DirCache(deviceDir)
+            missing.mapNotNull { m -> MissingRunner.backupFile(dirs, m.latest)?.let { m.phonePath to it.uri } }.toMap()
+        }
+        return Prepared(
+            deviceDir, index, plan, checkSpace(plan.bytesToCopy, info.space?.freeBytes), index.state.size,
+            missing = missing,
+            missingUris = uris,
+        )
     }
 
     /**
@@ -72,9 +89,11 @@ class BackupRunner(private val context: Context) {
         val caller = currentCoroutineContext()
         // NonCancellable: das Ende des Laufs wird immer sauber abgeschlossen; der Abbruch wird
         // stattdessen zwischen den Datenblöcken über isCancelled abgefragt.
+        val s = settings.current()
         return withContext(NonCancellable) {
             val result = engine.run(
-                prepared.deviceDir, prepared.plan, prepared.index, settings.current().folderLayout,
+                prepared.deviceDir, prepared.plan, prepared.index,
+                targetDir = { backupDirFor(it.relativePath, it.dateTakenMillis, s.folderLayout, s.separateFolders) },
                 isCancelled = { userCancelled() || !caller.isActive },
                 onProgress = onProgress,
             )

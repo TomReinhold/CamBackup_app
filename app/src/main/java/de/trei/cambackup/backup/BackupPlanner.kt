@@ -4,6 +4,7 @@ import de.trei.cambackup.index.EntryStatus
 import de.trei.cambackup.index.IndexEntry
 import de.trei.cambackup.index.IndexState
 import de.trei.cambackup.media.MediaItem
+import de.trei.cambackup.settings.FolderLayout
 import java.time.Instant
 import java.time.ZoneId
 
@@ -75,6 +76,22 @@ fun checkSpace(bytesToCopy: Long, freeBytes: Long?): SpaceCheck {
 fun backupSubPath(dateTakenMillis: Long, zone: ZoneId = ZoneId.systemDefault()): String {
     val date = Instant.ofEpochMilli(dateTakenMillis).atZone(zone)
     return "%04d/%02d".format(date.year, date.monthValue)
+}
+
+/**
+ * Zielordner auf dem Medium (relativ zum Geräteordner). Bei mehreren Medienordnern liegt jeder
+ * in einem eigenen Unterordner mit seinem Pfad, z. B. "Pictures/Screenshots/2026/10".
+ */
+fun backupDirFor(
+    relativePath: String,
+    dateTakenMillis: Long,
+    layout: FolderLayout,
+    separateFolders: Boolean,
+    zone: ZoneId = ZoneId.systemDefault(),
+): String {
+    val folder = if (separateFolders) relativePath.trim('/') else ""
+    val date = if (layout == FolderLayout.FLAT) "" else backupSubPath(dateTakenMillis, zone)
+    return listOf(folder, date).filter { it.isNotEmpty() }.joinToString("/")
 }
 
 /** Pfad relativ zum Geräteordner; [subPath] "" steht für den Geräteordner selbst. */

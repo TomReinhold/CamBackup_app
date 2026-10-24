@@ -13,6 +13,7 @@ import de.trei.cambackup.compress.SavingsEstimate
 import de.trei.cambackup.compress.SizeSample
 import de.trei.cambackup.compress.estimateSavings
 import de.trei.cambackup.compress.spreadSample
+import de.trei.cambackup.media.MediaFolder
 import de.trei.cambackup.media.MediaItem
 import de.trei.cambackup.media.MediaScanner
 import de.trei.cambackup.settings.CompressionSettings
@@ -23,6 +24,7 @@ import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -83,10 +85,24 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
     /** Letzte fertige Schätzung – bleibt während einer Neuberechnung sichtbar. */
     private var estimateCache: EstimateState? = null
 
+    /** Alle Ordner mit Fotos/Videos auf dem Smartphone – zur Auswahl. */
+    private val _folders = MutableStateFlow<List<MediaFolder>?>(null)
+    val folders: StateFlow<List<MediaFolder>?> = _folders.asStateFlow()
+
     init {
+        viewModelScope.launch { _folders.value = runCatching { scanner.listFolders() }.getOrDefault(emptyList()) }
+        // Vorschau und Schätzung beziehen sich auf die gewählten Ordner
         viewModelScope.launch {
-            items.value = runCatching { scanner.scanCameraFolder() }.getOrDefault(emptyList())
+            repo.settings.map { it.mediaFolders }.distinctUntilChanged().collect { folders ->
+                items.value = runCatching { scanner.scan(folders) }.getOrDefault(emptyList())
+            }
         }
+    }
+
+    /** Ordner an- oder abwählen; mindestens ein Ordner bleibt gewählt. */
+    fun toggleFolder(path: String) = update { s ->
+        val next = if (path in s.mediaFolders) s.mediaFolders - path else s.mediaFolders + path
+        if (next.isEmpty()) s else s.copy(mediaFolders = next)
     }
 
     val preview: StateFlow<PreviewState> = combine(
@@ -132,9 +148,8 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { repo.update(transform) }
     }
 
-    fun reset() {
-        viewModelScope.launch { repo.reset() }
-    }
+    /** Alle Werte auf Standard – die Auswahl der Medienordner bleibt erhalten. */
+    fun reset() = update { CompressionSettings(mediaFolders = it.mediaFolders) }
 
     fun showPreview(delta: Int) {
         val count = (preview.value as? PreviewState.Ready)?.count ?: return

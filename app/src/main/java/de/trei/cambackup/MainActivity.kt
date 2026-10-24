@@ -59,7 +59,7 @@ private fun MainScaffold(onOpenSettings: () -> Unit) {
     val library: LibraryViewModel = viewModel()
     var tab by rememberSaveable { mutableStateOf(Tab.OVERVIEW) }
 
-    // Kameraordner bei jeder Rückkehr in die App neu einlesen
+    // Medienordner bei jeder Rückkehr in die App neu einlesen
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { library.refresh() }
 
     Scaffold(

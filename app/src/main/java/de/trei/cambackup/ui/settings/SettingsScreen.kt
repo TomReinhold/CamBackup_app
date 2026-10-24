@@ -4,6 +4,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -27,6 +28,7 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -60,6 +62,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import de.trei.cambackup.compress.SavingsEstimate
+import de.trei.cambackup.media.MediaFolder
 import de.trei.cambackup.settings.CompressionSettings
 import de.trei.cambackup.settings.FolderLayout
 import de.trei.cambackup.settings.VideoCodec
@@ -72,6 +75,7 @@ fun SettingsScreen(onBack: () -> Unit, vm: SettingsViewModel = viewModel()) {
     val settings by vm.settings.collectAsStateWithLifecycle()
     val preview by vm.preview.collectAsStateWithLifecycle()
     val estimate by vm.estimate.collectAsStateWithLifecycle()
+    val folders by vm.folders.collectAsStateWithLifecycle()
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
 
     BackHandler(onBack = onBack)
@@ -103,6 +107,7 @@ fun SettingsScreen(onBack: () -> Unit, vm: SettingsViewModel = viewModel()) {
                 .padding(horizontal = 16.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
+            FolderSettings(folders, settings.mediaFolders, vm::toggleFolder)
             PreviewCard(preview, onPrev = { vm.showPreview(-1) }, onNext = { vm.showPreview(1) })
             EstimateCard(estimate, settings)
             ImageSettings(settings, vm::update)
@@ -125,7 +130,7 @@ private fun PreviewCard(state: PreviewState, onPrev: () -> Unit, onNext: () -> U
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text("Vorschau", style = MaterialTheme.typography.titleMedium)
-                    Hint("Echte Kompression eines Fotos aus deinem Kameraordner")
+                    Hint("Echte Kompression eines deiner Fotos")
                 }
                 if (state is PreviewState.Ready && state.count > 1) {
                     FilledTonalIconButton(onClick = onPrev) { Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, "Vorheriges Bild") }
@@ -145,7 +150,7 @@ private fun PreviewCard(state: PreviewState, onPrev: () -> Unit, onNext: () -> U
 
             when (state) {
                 PreviewState.Loading -> PreviewPlaceholder { CircularProgressIndicator() }
-                PreviewState.NoImages -> PreviewPlaceholder { Hint("Keine Fotos im Kameraordner gefunden.") }
+                PreviewState.NoImages -> PreviewPlaceholder { Hint("Keine Fotos in den gewählten Ordnern gefunden.") }
                 is PreviewState.Error -> PreviewPlaceholder { Hint("Vorschau nicht möglich: ${state.message}") }
                 is PreviewState.Ready -> {
                     val img = state.images
@@ -350,6 +355,60 @@ private fun BreakdownRow(label: String, count: Int, before: Long, after: Long) {
 // ---------------------------------------------------------------- Einstellungen
 
 private typealias Update = ((CompressionSettings) -> CompressionSettings) -> Unit
+
+/** Auswahl der zu sichernden Ordner, mit Anzahl und Größe. */
+@Composable
+private fun FolderSettings(folders: List<MediaFolder>?, selected: Set<String>, onToggle: (String) -> Unit) {
+    SettingsSection("Medienordner", "Welche Ordner gesichert und verkleinert werden") {
+        if (folders == null) {
+            LinearProgressIndicator(Modifier.fillMaxWidth())
+            return@SettingsSection
+        }
+        // Gewählte Ordner, die (noch) leer sind, trotzdem anzeigen, damit man sie abwählen kann
+        val all = folders + selected.filter { s -> folders.none { it.relativePath == s } }.map { MediaFolder(it, 0, 0) }
+        Column {
+            all.forEach { f ->
+                val checked = f.relativePath in selected
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .clickable(enabled = !(checked && selected.size == 1)) { onToggle(f.relativePath) }
+                        .padding(vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Checkbox(checked = checked, onCheckedChange = { onToggle(f.relativePath) }, enabled = !(checked && selected.size == 1))
+                    Column(Modifier.weight(1f)) {
+                        Text(folderLabel(f.relativePath), style = MaterialTheme.typography.bodyLarge)
+                        Text(
+                            f.relativePath.trimEnd('/') + " · ${fileCount(f.count)} · ${formatBytes(f.bytes)}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
+        }
+        Hint(
+            if (selected.size > 1) {
+                "Mehrere Ordner: Auf dem Speichermedium bekommt jeder einen eigenen Unterordner (z. B. „DCIM/Camera/2026/10“). " +
+                    "Bereits gesicherte Dateien bleiben, wo sie sind."
+            } else {
+                "Bei einem Ordner liegen die Sicherungen direkt im Geräteordner. Bei mehreren bekommt jeder einen eigenen Unterordner."
+            },
+        )
+    }
+}
+
+/** Verständlicher Name für bekannte Ordner. */
+private fun folderLabel(path: String): String = when (path.trimEnd('/')) {
+    "DCIM/Camera" -> "Kamera"
+    "Pictures/Screenshots", "DCIM/Screenshots" -> "Screenshots"
+    "Movies" -> "Filme"
+    "Pictures" -> "Bilder"
+    "Download" -> "Downloads"
+    else -> path.trimEnd('/').substringAfterLast('/')
+}
 
 @Composable
 private fun ImageSettings(s: CompressionSettings, update: Update) {

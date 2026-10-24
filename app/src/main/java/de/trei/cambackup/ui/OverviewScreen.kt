@@ -64,7 +64,7 @@ fun OverviewScreen(library: LibraryViewModel, contentPadding: PaddingValues) {
     }
 }
 
-/** Zeigt [content] erst, wenn der Zugriff auf die Fotos erteilt und der Kameraordner gelesen ist. */
+/** Zeigt [content] erst, wenn der Zugriff auf die Fotos erteilt und die Medienordner gelesen sind. */
 @Composable
 fun LibraryGate(
     state: LibraryState,
@@ -86,7 +86,7 @@ fun LibraryGate(
             LibraryState.Loading, is LibraryState.Loaded -> CircularProgressIndicator(Modifier.align(Alignment.Center))
             LibraryState.NeedsPermission -> CenteredMessage(
                 title = "Zugriff auf Fotos und Videos",
-                text = "CamBackup sichert deinen Kameraordner. Dafür wird Zugriff auf alle Fotos und Videos benötigt.",
+                text = "CamBackup sichert deine Fotos und Videos. Dafür wird Zugriff auf alle Fotos und Videos benötigt.",
                 button = "Zugriff erlauben",
                 onClick = { permissionLauncher.launch(MediaPermissions.required) },
             )
@@ -119,7 +119,7 @@ private fun CenteredMessage(title: String, text: String, button: String, onClick
 private fun CameraFolderCard(s: LibraryStats) {
     FeatureCard(
         icon = R.drawable.ic_smartphone,
-        title = "Kameraordner",
+        title = "Fotos und Videos",
         subtitle = "${fileCount(s.totalCount)} auf diesem Smartphone",
     ) {
         Row(verticalAlignment = Alignment.Bottom) {

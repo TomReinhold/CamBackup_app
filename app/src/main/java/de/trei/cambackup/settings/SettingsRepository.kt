@@ -8,6 +8,7 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -46,6 +47,7 @@ class SettingsRepository(context: Context) {
             minSavingsPercent = p[MIN_SAVINGS] ?: d.minSavingsPercent,
             folderLayout = p[LAYOUT]?.let { runCatching { FolderLayout.valueOf(it) }.getOrNull() } ?: d.folderLayout,
             dryRun = p[DRY_RUN] ?: d.dryRun,
+            mediaFolders = p[FOLDERS]?.takeIf { it.isNotEmpty() } ?: d.mediaFolders,
         )
     }
 
@@ -68,6 +70,7 @@ class SettingsRepository(context: Context) {
         p[MIN_SAVINGS] = s.minSavingsPercent
         p[LAYOUT] = s.folderLayout.name
         p[DRY_RUN] = s.dryRun
+        p[FOLDERS] = s.mediaFolders
     }
 
     private companion object {
@@ -82,5 +85,6 @@ class SettingsRepository(context: Context) {
         val MIN_SAVINGS = intPreferencesKey("min_savings_percent")
         val LAYOUT = stringPreferencesKey("folder_layout")
         val DRY_RUN = booleanPreferencesKey("dry_run")
+        val FOLDERS = stringSetPreferencesKey("media_folders")
     }
 }

@@ -15,6 +15,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
@@ -40,7 +43,7 @@ fun BackupPanel(deviceFolderName: String, onBackupFinished: () -> Unit, vm: Back
 
     LaunchedEffect(deviceFolderName) { vm.prepareIfIdle(deviceFolderName) }
     // Nach Ende eines Laufs sofort neu einlesen (Status in Übersicht und Fotos)
-    val finished = state is BackupState.Finished
+    val finished = state is BackupState.Finished || state is BackupState.MissingFinished
     LaunchedEffect(finished) { if (finished) onBackupFinished() }
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { vm.prepareIfIdle(deviceFolderName) }
 
@@ -61,11 +64,54 @@ fun BackupPanel(deviceFolderName: String, onBackupFinished: () -> Unit, vm: Back
     ) {
         when (val s = state) {
             BackupState.Preparing -> {
-                Text("Vergleiche Kameraordner mit dem Speichermedium …", style = MaterialTheme.typography.bodyMedium)
+                Text("Vergleiche Medienordner mit dem Speichermedium …", style = MaterialTheme.typography.bodyMedium)
                 LinearProgressIndicator(Modifier.fillMaxWidth())
             }
 
-            is BackupState.Ready -> PlanView(s.plan, s.space, onStart = start)
+            is BackupState.Ready -> {
+                if (s.missing.isNotEmpty()) {
+                    var showMissing by rememberSaveable { mutableStateOf(false) }
+                    MissingBanner(s.missing) { showMissing = true }
+                    if (showMissing) {
+                        MissingDialog(
+                            missing = s.missing,
+                            thumbnails = s.missingUris,
+                            onDismiss = { showMissing = false },
+                            onApply = { actions ->
+                                showMissing = false
+                                vm.applyMissing(deviceFolderName, actions)
+                            },
+                        )
+                    }
+                }
+                PlanView(s.plan, s.space, onStart = start)
+            }
+
+            is BackupState.ApplyingMissing -> {
+                Text(
+                    if (s.total > 0) "Bearbeite gelöschte Dateien: ${minOf(s.done + 1, s.total)} von ${s.total}"
+                    else "Gelöschte Dateien werden bearbeitet …",
+                )
+                if (s.total > 0) {
+                    LinearProgressIndicator(progress = { s.done.toFloat() / s.total }, modifier = Modifier.fillMaxWidth())
+                } else {
+                    LinearProgressIndicator(Modifier.fillMaxWidth())
+                }
+            }
+
+            is BackupState.MissingFinished -> {
+                val m = s.summary
+                Banner(
+                    "${fileCount(m.restored)} wiederhergestellt, ${fileCount(m.deleted)} im Backup gelöscht" +
+                        (m.abortReason?.let { " – $it" } ?: ""),
+                    if (m.failures.isEmpty() && m.abortReason == null) BannerTone.SUCCESS else BannerTone.WARNING,
+                )
+                m.failures.take(10).forEach { Text("• ${it.name}: ${it.reason}", style = MaterialTheme.typography.bodySmall) }
+                Button(onClick = {
+                    vm.acknowledge(deviceFolderName)
+                    onBackupFinished()
+                }) { Text("OK") }
+            }
 
             is BackupState.Running -> {
                 val p = s.progress

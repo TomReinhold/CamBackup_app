@@ -26,6 +26,9 @@ class BackupIndex private constructor(
         state.put(entry)
     }
 
+    /** Entfernt einen Eintrag dauerhaft (Vermerk im Journal). */
+    suspend fun remove(entry: IndexEntry) = record(entry.copy(deleted = true))
+
     /** Schreibt den vollständigen Index und leert das Journal. */
     suspend fun compact() = withContext(Dispatchers.IO) {
         val file = BackupIndexFile(updatedAt = Instant.now().toString(), entries = state.entries.toList())

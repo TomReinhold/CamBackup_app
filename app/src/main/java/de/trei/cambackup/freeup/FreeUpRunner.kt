@@ -63,14 +63,14 @@ class FreeUpRunner(private val context: Context) {
     suspend fun overview(folderName: String): FreeUpOverview {
         val opened = open(folderName)
         IndexCache.get(context).update(opened.index.state)
-        return overviewFor(scanner.scanCameraFolder(), opened.index.state)
+        return overviewFor(scanner.scan(settings.current().mediaFolders), opened.index.state)
     }
 
     suspend fun prepare(folderName: String, onProgress: (FreeUpProgress) -> Unit): FreeUpSummary {
         val s = settings.current()
         val caller = currentCoroutineContext()
         val opened = open(folderName)
-        val candidates = overviewFor(scanner.scanCameraFolder(), opened.index.state).candidates
+        val candidates = overviewFor(scanner.scan(settings.current().mediaFolders), opened.index.state).candidates
         val dirs = DirCache(opened.deviceDir)
         val now = System.currentTimeMillis()
 

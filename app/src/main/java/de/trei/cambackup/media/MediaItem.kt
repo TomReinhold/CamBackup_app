@@ -12,7 +12,7 @@ fun originalUri(uri: Uri): Uri = if (uri.scheme == "content") MediaStore.setRequ
 
 val MediaItem.readUri: Uri get() = originalUri(uri)
 
-/** Ein Foto oder Video aus dem Kameraordner, wie es der MediaStore liefert. */
+/** Ein Foto oder Video aus einem Medienordner, wie es der MediaStore liefert. */
 data class MediaItem(
     val id: Long,
     val uri: Uri,
