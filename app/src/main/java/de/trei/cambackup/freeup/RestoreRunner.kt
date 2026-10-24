@@ -97,9 +97,16 @@ class RestoreRunner(private val context: Context) {
     /** Freier Platz im internen Speicher des Smartphones. */
     fun phoneFreeBytes(): Long = StatFs(Environment.getExternalStorageDirectory().path).availableBytes
 
-    suspend fun restoreAll(folderUri: String, keepOriginal: Boolean, onProgress: (done: Int, total: Int, name: String) -> Unit): RestoreSummary {
+    /** Holt alle verkleinerten Dateien zurück – oder nur die mit den MediaStore-IDs in [only]. */
+    suspend fun restoreAll(
+        folderUri: String,
+        keepOriginal: Boolean,
+        only: Set<Long>? = null,
+        onProgress: (done: Int, total: Int, name: String) -> Unit,
+    ): RestoreSummary {
         val (dir, index) = openIndex(folderUri)
         val candidates = restoreCandidates(scanner.scan(settings.current().mediaFolders), index.state)
+            .filter { only == null || it.item.id in only }
         if (phoneFreeBytes() < restoreSpaceNeeded(candidates)) {
             return RestoreSummary(Instant.now().toString(), 0, 0, emptyList(), "Zu wenig Platz auf dem Smartphone")
         }

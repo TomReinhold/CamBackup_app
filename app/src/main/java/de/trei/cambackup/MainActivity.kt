@@ -14,6 +14,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -23,6 +24,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.viewmodel.compose.viewModel
 import de.trei.cambackup.library.LibraryViewModel
+import de.trei.cambackup.ui.DriveState
 import de.trei.cambackup.ui.DriveViewModel
 import de.trei.cambackup.ui.MediaChangeListener
 import de.trei.cambackup.ui.OverviewScreen
@@ -53,6 +55,7 @@ private enum class Tab(val label: String, val icon: Int) {
 private fun MainScaffold() {
     val library: LibraryViewModel = viewModel()
     val drive: DriveViewModel = viewModel()
+    val driveState by drive.state.collectAsStateWithLifecycle()
     var tab by rememberSaveable { mutableStateOf(Tab.OVERVIEW) }
 
     // Medienordner und Speichermedium bei jeder Rückkehr in die App neu prüfen – und sofort, wenn ein
@@ -84,7 +87,7 @@ private fun MainScaffold() {
     ) { padding ->
         when (tab) {
             Tab.OVERVIEW -> OverviewScreen(library, padding)
-            Tab.GALLERY -> GalleryScreen(library, padding)
+            Tab.GALLERY -> GalleryScreen(library, padding, folderUri = (driveState as? DriveState.Ready)?.info?.folderUri?.toString())
             Tab.SETTINGS -> SettingsScreen(bottomPadding = padding.calculateBottomPadding())
             Tab.INFO -> InfoScreen(bottomPadding = padding.calculateBottomPadding())
         }

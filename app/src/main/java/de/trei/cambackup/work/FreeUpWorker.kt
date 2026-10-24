@@ -58,7 +58,7 @@ class FreeUpWorker(context: Context, params: WorkerParameters) : CoroutineWorker
         }
         val summary = try {
             BackupRunner.lock.withLock {
-                if (replacing) runner.replace(inputData.getLongArray(KEY_ONLY)?.toSet(), publish) else runner.prepare(inputData.getString(KEY_FOLDER)!!, publish)
+                if (replacing) runner.replace(publish) else runner.prepare(inputData.getString(KEY_FOLDER)!!, publish)
             }
         } catch (e: CancellationException) {
             throw e
@@ -76,19 +76,14 @@ class FreeUpWorker(context: Context, params: WorkerParameters) : CoroutineWorker
         private const val TAG = "FreeUpWorker"
         private const val KEY_REPLACE = "replace"
         private const val KEY_FOLDER = "folder"
-        private const val KEY_ONLY = "only"
         private const val KEY_DONE = "done"
         private const val KEY_TOTAL = "total"
         private const val KEY_NAME = "name"
 
         fun prepare(context: Context, folderUri: String, tag: String) = enqueue(context, workDataOf(KEY_FOLDER to folderUri), tag)
 
-        /**
-         * Nur aufrufen, nachdem der Nutzer dem Schreiben per createWriteRequest zugestimmt hat –
-         * für genau diese Dateien ([only] = MediaStore-IDs, null = ganzer Stapel).
-         */
-        fun replace(context: Context, tag: String, only: LongArray? = null) =
-            enqueue(context, workDataOf(KEY_REPLACE to true, KEY_ONLY to only), tag)
+        /** Nur aufrufen, nachdem der Nutzer dem Schreiben per createWriteRequest zugestimmt hat. */
+        fun replace(context: Context, tag: String) = enqueue(context, workDataOf(KEY_REPLACE to true), tag)
 
         fun cancel(context: Context) {
             WorkManager.getInstance(context).cancelUniqueWork(UNIQUE_NAME)

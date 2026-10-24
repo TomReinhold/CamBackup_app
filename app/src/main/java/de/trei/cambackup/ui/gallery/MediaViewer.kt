@@ -114,7 +114,8 @@ private fun InfoPanel(item: LibraryItem, modifier: Modifier) {
     val date = DateFormat.getDateTimeInstance(DateFormat.LONG, DateFormat.SHORT).format(Date(m.dateTakenMillis))
     val (statusText, color) = when (item.status) {
         MediaStatus.NOT_BACKED_UP -> "Noch nicht gesichert" to Color.White.copy(alpha = 0.7f)
-        MediaStatus.BACKED_UP -> "Original gesichert" to Color(0xFF9EC5FF)
+        MediaStatus.BACKED_UP ->
+            (if (item.excluded) "Original gesichert · wird nicht verkleinert" else "Original gesichert") to Color(0xFF9EC5FF)
         MediaStatus.COMPRESSED ->
             (if (item.driveConnected) "Verkleinert – Original gesichert" else "Verkleinert") to StatusColors.compressed
         MediaStatus.UNKNOWN -> "Sicherung nicht prüfbar – Speichermedium nicht verbunden" to Color.White.copy(alpha = 0.7f)
@@ -144,6 +145,7 @@ private fun InfoPanel(item: LibraryItem, modifier: Modifier) {
             if (item.status == MediaStatus.BACKED_UP || item.status == MediaStatus.COMPRESSED) Spacer(Modifier.width(8.dp))
             Text(statusText, color = color, style = MaterialTheme.typography.labelLarge)
         }
+        Text("Auf dem Smartphone: ${m.relativePath.trimEnd('/')}", color = Color.White.copy(alpha = 0.6f), style = MaterialTheme.typography.bodySmall)
         item.entry?.backupPath?.let {
             Text("Auf dem Medium: $it", color = Color.White.copy(alpha = 0.6f), style = MaterialTheme.typography.bodySmall)
         }

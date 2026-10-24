@@ -32,23 +32,6 @@ data class PendingBatch(
 ) {
     val bytesSaved: Long get() = items.sumOf { it.originalSize - it.newSize }
 }
-
-/**
- * Kleine Auswahl zum Ausprobieren: bis zu [videos] Videos (die kleinsten, schnell zu prüfen) und
- * Bilder gleichmäßig über den Stapel verteilt (verschiedene Jahre und Kameramodi). Reihenfolge wie im Stapel.
- */
-fun testSelection(items: List<PendingReplacement>, count: Int = 10, videos: Int = 2): List<PendingReplacement> {
-    if (items.size <= count) return items
-    val picked = items.filter { it.isVideo }.sortedBy { it.originalSize }.take(minOf(videos, count)).toMutableSet()
-    val images = items.filter { !it.isVideo }
-    val want = count - picked.size
-    if (want > 0 && images.isNotEmpty()) {
-        val step = images.size.toDouble() / want
-        for (i in 0 until minOf(want, images.size)) picked += images[(i * step).toInt()]
-    }
-    return items.filter { it in picked }
-}
-
 /** Ergebnis von Vorbereitung bzw. Ersetzen. */
 @Serializable
 data class FreeUpSummary(
@@ -136,6 +119,15 @@ fun overviewFor(items: List<MediaItem>, index: IndexState): FreeUpOverview {
     }
     return FreeUpOverview(candidates, compressed, compressedSaved, notBackedUp, kept)
 }
+
+/**
+ * Einträge, deren Markierung „nicht verkleinern“ sich ändert. Nur gesicherte Originale (noch nicht
+ * verkleinert) lassen sich ausschließen; bereits gesetzte Markierungen bleiben unverändert.
+ */
+fun keepOriginalChanges(index: IndexState, backupPaths: Set<String>, keep: Boolean): List<IndexEntry> =
+    index.entries
+        .filter { it.backupPath in backupPaths && it.status == EntryStatus.VERIFIED && it.keepOriginal != keep }
+        .map { it.copy(keepOriginal = keep) }
 
 /** Index-Eintrag nach erfolgreichem Ersetzen. */
 fun IndexEntry.asCompressed(p: PendingReplacement, at: String) = copy(

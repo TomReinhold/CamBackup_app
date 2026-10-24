@@ -143,9 +143,8 @@ class FreeUpRunner(private val context: Context) {
     /**
      * Ersetzt die vorbereiteten Dateien. Setzt voraus, dass der Nutzer per MediaStore.createWriteRequest
      * zugestimmt hat. Läuft bis zum Ende der aktuellen Datei auch bei Abbruch weiter (NonCancellable).
-     * Mit [only] wird nur diese Auswahl ersetzt (Test mit wenigen Dateien); der Rest bleibt vorbereitet.
      */
-    suspend fun replace(only: Set<Long>? = null, onProgress: (FreeUpProgress) -> Unit): FreeUpSummary {
+    suspend fun replace(onProgress: (FreeUpProgress) -> Unit): FreeUpSummary {
         val batch = store.batch.value ?: return summary(0, 0, emptyList(), "Nichts vorbereitet")
         if (settings.current().dryRun) return summary(0, 0, emptyList(), "Probelauf ist aktiv – es wurde nichts ersetzt")
         val caller = currentCoroutineContext()
@@ -157,15 +156,14 @@ class FreeUpRunner(private val context: Context) {
             var saved = 0L
             val failures = mutableListOf<FreeUpSummary.Failure>()
             var abort: String? = null
-            val work = if (only == null) batch.items else batch.items.filter { it.mediaId in only }
-            val processed = mutableSetOf<Long>()
-            for ((i, p) in work.withIndex()) {
+            var processed = 0
+            for ((i, p) in batch.items.withIndex()) {
                 if (!caller.isActive) {
                     abort = "Abgebrochen"
                     break
                 }
-                processed += p.mediaId
-                onProgress(FreeUpProgress(i, work.size, p.displayName, replacing = true))
+                processed = i + 1
+                onProgress(FreeUpProgress(i, batch.items.size, p.displayName, replacing = true))
                 try {
                     replaceOne(p, opened.index, dirs)
                     replaced++
@@ -187,11 +185,38 @@ class FreeUpRunner(private val context: Context) {
             }
             IndexCache.get(context).update(opened.index.state)
             // Nicht bearbeitete Dateien bleiben vorbereitet (z. B. nach Abbruch)
-            val rest = batch.items.filter { it.mediaId !in processed }
+            val rest = batch.items.drop(processed)
             store.saveBatch(batch.copy(items = rest).takeIf { rest.isNotEmpty() })
             if (rest.isEmpty()) images.clearCache()
             summary(replaced, saved, failures, abort)
         }
+    }
+
+    /**
+     * Schließt gesicherte Originale vom Verkleinern aus ([keep] = true) bzw. gibt sie wieder frei.
+     * Bereits vorbereitete Versionen dieser Dateien werden verworfen. Liefert die Zahl der Änderungen.
+     */
+    suspend fun setKeepOriginal(folderUri: String, backupPaths: Set<String>, keep: Boolean): Int {
+        val opened = open(folderUri)
+        val changes = keepOriginalChanges(opened.index.state, backupPaths, keep)
+        if (changes.isEmpty()) return 0
+        withContext(NonCancellable + Dispatchers.IO) {
+            changes.forEach { opened.index.record(it) }
+            opened.index.compact()
+            val metadata = opened.deviceDir.findFile(DeviceRegistry.METADATA_DIR)
+            val text = if (keep) "vom Verkleinern ausgeschlossen" else "wieder zum Verkleinern freigegeben"
+            metadata?.let { runCatching { io.appendText(it, "backup_log.txt", "${Instant.now()}  ${changes.size} $text\n") } }
+            IndexCache.get(context).update(opened.index.state)
+            if (keep) {
+                val paths = changes.map { it.phonePath }.toSet()
+                store.batch.value?.let { batch ->
+                    val (drop, rest) = batch.items.partition { it.phonePath in paths }
+                    drop.forEach { File(it.newFile).delete() }
+                    store.saveBatch(batch.copy(items = rest).takeIf { rest.isNotEmpty() })
+                }
+            }
+        }
+        return changes.size
     }
 
     private suspend fun replaceOne(p: PendingReplacement, index: BackupIndex, dirs: DirCache) {

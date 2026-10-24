@@ -36,6 +36,8 @@ class BackupIndex private constructor(
         // Erst nach erfolgreichem Schreiben des Index löschen. Ein Abbruch genau dazwischen ist
         // harmlos: das Journal wird beim nächsten Laden erneut eingespielt (gleiche backupPaths).
         metadataDir.findFile(JOURNAL_FILE)?.delete()
+        // Nur zum Nachschlagen – ein Fehler hier darf den Index nicht gefährden
+        runCatching { io.replaceAtomically(metadataDir, FILE_LIST, fileListCsv(state.entries)) }
     }
 
     companion object {

@@ -4,7 +4,6 @@ import android.net.Uri
 import de.trei.cambackup.freeup.PREPARE_RESERVE
 import de.trei.cambackup.freeup.PendingReplacement
 import de.trei.cambackup.freeup.prepareSpaceOk
-import de.trei.cambackup.freeup.testSelection
 import de.trei.cambackup.freeup.RESTORE_RESERVE
 import de.trei.cambackup.freeup.restoreCandidates
 import de.trei.cambackup.freeup.restoreSpaceNeeded
@@ -85,29 +84,6 @@ class FreeUpModelsTest {
         assertEquals(EntryStatus.VERIFIED, reverted.status)
         assertNull(reverted.compressedSize)
         assertEquals(entry("a.jpg", 100), reverted)
-    }
-
-    private fun pending(id: Long, video: Boolean, size: Long) = PendingReplacement(
-        id, "content://$id", "$id", "DCIM/Camera/$id", video, "2026/$id", size, "o$id", "/c/$id", size / 3, "n$id", "",
-    )
-
-    @Test
-    fun `testauswahl mit kleinsten videos und verteilten bildern`() {
-        val items = (1L..100L).map { pending(it, video = it % 10 == 0L, size = 1000 - it) }
-        val test = testSelection(items)
-        assertEquals(10, test.size)
-        assertEquals(listOf(90L, 100L), test.filter { it.isVideo }.map { it.mediaId })
-        val images = test.filter { !it.isVideo }.map { it.mediaId }
-        assertEquals(8, images.toSet().size)
-        assertTrue(images.first() < 10 && images.last() > 70)
-        assertEquals(test, test.sortedBy { it.mediaId })
-    }
-
-    @Test
-    fun `testauswahl bei kleinem stapel ist alles`() {
-        val items = (1L..4L).map { pending(it, video = false, size = 10) }
-        assertEquals(items, testSelection(items))
-        assertEquals(10, testSelection((1L..30L).map { pending(it, video = false, size = 10) }).size)
     }
 
     @Test

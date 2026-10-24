@@ -16,7 +16,6 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -28,8 +27,6 @@ import de.trei.cambackup.R
 import de.trei.cambackup.freeup.FreeUpOverview
 import de.trei.cambackup.freeup.FreeUpSummary
 import de.trei.cambackup.freeup.PendingBatch
-import de.trei.cambackup.freeup.PendingReplacement
-import de.trei.cambackup.freeup.testSelection
 import de.trei.cambackup.ui.components.Banner
 import de.trei.cambackup.ui.components.BannerTone
 import de.trei.cambackup.ui.components.FeatureCard
@@ -88,7 +85,7 @@ fun FreeUpPanel(folderUri: String, onFinished: () -> Unit, vm: FreeUpViewModel =
             is FreeUpState.Ready -> ReadyView(
                 batch = s.batch,
                 dryRun = s.dryRun,
-                onReplace = { items -> writeRequest.launch(IntentSenderRequest.Builder(vm.writeRequest(s.batch, items).intentSender).build()) },
+                onReplace = { writeRequest.launch(IntentSenderRequest.Builder(vm.writeRequest(s.batch).intentSender).build()) },
                 onDiscard = { vm.discard(folderUri) },
             )
 
@@ -120,8 +117,8 @@ private fun OverviewView(o: FreeUpOverview, dryRun: Boolean, minAgeDays: Int, on
     }
     if (o.keptOriginal > 0) {
         Text(
-            "${fileCount(o.keptOriginal)} " + (if (o.keptOriginal == 1) "wurde" else "wurden") +
-                " zurückgeholt und " + (if (o.keptOriginal == 1) "bleibt" else "bleiben") + " in Originalgröße.",
+            "${fileCount(o.keptOriginal)} " + (if (o.keptOriginal == 1) "bleibt" else "bleiben") +
+                " auf Wunsch in Originalgröße (in der Galerie mit Schloss markiert).",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -153,8 +150,7 @@ private fun OverviewView(o: FreeUpOverview, dryRun: Boolean, minAgeDays: Int, on
 }
 
 @Composable
-private fun ReadyView(batch: PendingBatch, dryRun: Boolean, onReplace: (List<PendingReplacement>?) -> Unit, onDiscard: () -> Unit) {
-    val test = remember(batch) { testSelection(batch.items) }
+private fun ReadyView(batch: PendingBatch, dryRun: Boolean, onReplace: () -> Unit, onDiscard: () -> Unit) {
     val before = batch.items.sumOf { it.originalSize }
     val after = batch.items.sumOf { it.newSize }
     Banner("${fileCount(batch.items.size)} bereit: ${formatBytes(before)} → ${formatBytes(after)} – spart ${formatBytes(before - after)}", BannerTone.SUCCESS)
@@ -175,14 +171,8 @@ private fun ReadyView(batch: PendingBatch, dryRun: Boolean, onReplace: (List<Pen
         )
     }
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Button(onClick = { onReplace(null) }, enabled = !dryRun) { Text("Jetzt ersetzen") }
+        Button(onClick = onReplace, enabled = !dryRun) { Text("Jetzt ersetzen") }
         TextButton(onClick = onDiscard) { Text("Verwerfen") }
-    }
-    // Erst mit wenigen Dateien ausprobieren und das Ergebnis in der Galerie ansehen
-    if (test.size < batch.items.size) {
-        OutlinedButton(onClick = { onReplace(test) }, enabled = !dryRun, modifier = Modifier.fillMaxWidth()) {
-            Text("Testweise ${test.size} ersetzen")
-        }
     }
 }
 
