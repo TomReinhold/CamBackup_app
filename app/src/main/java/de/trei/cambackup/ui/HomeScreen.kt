@@ -99,6 +99,7 @@ private fun Message(text: String, buttonText: String, onClick: () -> Unit) {
 @Composable
 private fun MediaOverview(summary: MediaSummary, items: List<MediaItem>) {
     LazyColumn(Modifier.fillMaxSize()) {
+        item { DriveSection(neededBytes = summary.totalBytes, modifier = Modifier.padding(top = 16.dp)) }
         item { SummaryCard(summary) }
         items(items, key = { (if (it.isVideo) "v" else "i") + it.id }) { item ->
             MediaRow(item)
