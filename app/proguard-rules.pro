@@ -1,0 +1,1 @@
+# Projektspezifische ProGuard-Regeln
