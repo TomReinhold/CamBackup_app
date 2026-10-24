@@ -21,6 +21,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
@@ -41,7 +42,7 @@ import kotlinx.coroutines.withContext
 
 /** App-Info: Version, Funktionsweise, Sicherheitsregeln, Gerät, Bibliotheken. */
 @Composable
-fun AboutScreen() {
+fun AboutScreen(onShowMetadata: () -> Unit) {
     val context = LocalContext.current
     val info = remember { context.packageManager.getPackageInfo(context.packageName, 0) }
     val identity = remember { LocalIdentityStore(context).get() }
@@ -120,6 +121,10 @@ fun AboutScreen() {
         modifier = Modifier.fillMaxWidth(),
         textAlign = androidx.compose.ui.text.style.TextAlign.Center,
     )
+    // Unauffälliger Zugang zur technischen Ansicht
+    TextButton(onClick = onShowMetadata, modifier = Modifier.fillMaxWidth()) {
+        Text("Metadaten anzeigen", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
+    }
 }
 
 @Composable

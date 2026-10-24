@@ -86,6 +86,12 @@ enum class SettingsPage(val title: String) {
     VIDEOS("Videos verkleinern"),
     RULES("Wann verkleinern"),
     ABOUT("Über die App"),
+    /** Bewusst nur über einen unauffälligen Link auf der App-Info erreichbar. */
+    METADATA("Metadaten"),
+    ;
+
+    /** Seite, zu der „Zurück“ führt (null = Startseite der Einstellungen). */
+    val parent: SettingsPage? get() = if (this == METADATA) ABOUT else null
 }
 
 /**
@@ -103,7 +109,7 @@ fun SettingsScreen(bottomPadding: Dp, vm: SettingsViewModel = viewModel()) {
     var confirmReset by remember { mutableStateOf(false) }
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
 
-    BackHandler(enabled = page != null) { page = null }
+    BackHandler(enabled = page != null) { page = page?.parent }
 
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
@@ -112,7 +118,7 @@ fun SettingsScreen(bottomPadding: Dp, vm: SettingsViewModel = viewModel()) {
             TopAppBar(
                 title = { Text(page?.title ?: "Einstellungen") },
                 navigationIcon = {
-                    if (page != null) IconButton(onClick = { page = null }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Zurück") }
+                    if (page != null) IconButton(onClick = { page = page?.parent }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Zurück") }
                 },
                 scrollBehavior = scrollBehavior,
             )
@@ -145,7 +151,8 @@ fun SettingsScreen(bottomPadding: Dp, vm: SettingsViewModel = viewModel()) {
                 }
                 SettingsPage.VIDEOS -> VideoSettings(settings, vm::update)
                 SettingsPage.RULES -> RulesSettings(settings, vm::update)
-                SettingsPage.ABOUT -> AboutScreen()
+                SettingsPage.ABOUT -> AboutScreen(onShowMetadata = { page = SettingsPage.METADATA })
+                SettingsPage.METADATA -> MetadataScreen()
             }
         }
     }
