@@ -55,11 +55,12 @@ import de.trei.cambackup.ui.LibraryGate
 import de.trei.cambackup.ui.components.StatusColors
 import java.time.LocalDate
 
-private enum class Filter(val label: String, val matches: (LibraryItem) -> Boolean) {
-    ALL("Alle", { true }),
-    OPEN("Nicht gesichert", { it.status == MediaStatus.NOT_BACKED_UP }),
-    BACKED_UP("Gesichert", { it.status == MediaStatus.BACKED_UP }),
-    COMPRESSED("Verkleinert", { it.status == MediaStatus.COMPRESSED }),
+/** [needsDrive]: nur sinnvoll, wenn das Speichermedium verbunden ist (sonst ist der Status unbekannt). */
+private enum class Filter(val label: String, val needsDrive: Boolean, val matches: (LibraryItem) -> Boolean) {
+    ALL("Alle", false, { true }),
+    OPEN("Nicht gesichert", true, { it.status == MediaStatus.NOT_BACKED_UP }),
+    BACKED_UP("Gesichert", true, { it.status == MediaStatus.BACKED_UP }),
+    COMPRESSED("Verkleinert", false, { it.status == MediaStatus.COMPRESSED }),
 }
 
 /** Raster aller Kamera-Dateien nach Aufnahmetag, mit Sicherungsstatus – ähnlich Google Fotos. */
@@ -71,7 +72,9 @@ fun GalleryScreen(library: LibraryViewModel, contentPadding: PaddingValues) {
     var openIndex by rememberSaveable { mutableStateOf<Int?>(null) }
 
     LibraryGate(state, library::refresh, contentPadding) { loaded ->
-        val filtered = remember(loaded.items, filter) { loaded.items.filter(filter.matches).sortedByDescending { it.media.dateTakenMillis } }
+        val filters = Filter.entries.filter { loaded.driveConnected || !it.needsDrive }
+        val active = filter.takeIf { it in filters } ?: Filter.ALL
+        val filtered = remember(loaded.items, active) { loaded.items.filter(active.matches).sortedByDescending { it.media.dateTakenMillis } }
         val groups = remember(filtered) { groupByDay(filtered) }
         val today = remember { LocalDate.now() }
         val thumbPx = with(LocalDensity.current) { 160.dp.roundToPx() }
@@ -91,10 +94,10 @@ fun GalleryScreen(library: LibraryViewModel, contentPadding: PaddingValues) {
                     Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp, vertical = 8.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    Filter.entries.forEach { f ->
+                    filters.forEach { f ->
                         val count = loaded.items.count(f.matches)
                         FilterChip(
-                            selected = filter == f,
+                            selected = active == f,
                             onClick = { filter = f },
                             label = { Text("${f.label} · $count") },
                         )
@@ -134,7 +137,7 @@ fun GalleryScreen(library: LibraryViewModel, contentPadding: PaddingValues) {
 
 @Composable
 private fun DayHeader(label: String, items: List<LibraryItem>) {
-    val allSafe = items.all { it.status != MediaStatus.NOT_BACKED_UP }
+    val allSafe = items.all { it.driveConnected && (it.status == MediaStatus.BACKED_UP || it.status == MediaStatus.COMPRESSED) }
     Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
         Text(label, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
         if (allSafe) {
@@ -167,7 +170,7 @@ private fun Tile(item: LibraryItem, thumbPx: Int, modifier: Modifier, onClick: (
 @Composable
 fun StatusBadge(status: MediaStatus, modifier: Modifier = Modifier) {
     when (status) {
-        MediaStatus.NOT_BACKED_UP -> Unit
+        MediaStatus.NOT_BACKED_UP, MediaStatus.UNKNOWN -> Unit
         MediaStatus.BACKED_UP -> Icon(
             painterResource(R.drawable.ic_cloud_done), "Gesichert", tint = Color.White, modifier = modifier.size(18.dp),
         )

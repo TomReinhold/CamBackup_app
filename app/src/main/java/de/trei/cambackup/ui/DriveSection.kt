@@ -48,8 +48,6 @@ import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import de.trei.cambackup.R
@@ -79,10 +77,6 @@ fun DriveSection(onLibraryChanged: () -> Unit, modifier: Modifier = Modifier, vm
     val pick by vm.pick.collectAsStateWithLifecycle()
     val autoFound by vm.autoFound.collectAsStateWithLifecycle()
     val pickTree = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree(), vm::onTreePicked)
-
-    // Erneut prüfen, wenn die App wieder sichtbar wird oder ein Datenträger ein-/ausgesteckt wird
-    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { vm.refresh() }
-    MediaChangeListener(onChange = vm::refresh)
 
     val ready = state as? DriveState.Ready
     Column(modifier, verticalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -347,8 +341,9 @@ private fun NameDialog(title: String, text: String, initial: String, confirm: St
 }
 
 /** Ruft [onChange] auf, solange sichtbar, wenn ein Datenträger eingehängt oder entfernt wird. */
+/** Meldet das Ein- und Ausstecken von Datenträgern, solange die Oberfläche sichtbar ist. */
 @Composable
-private fun MediaChangeListener(onChange: () -> Unit) {
+fun MediaChangeListener(onChange: () -> Unit) {
     val context = LocalContext.current
     val currentOnChange by rememberUpdatedState(onChange)
     DisposableEffect(context) {

@@ -10,6 +10,7 @@ import de.trei.cambackup.library.dayLabel
 import de.trei.cambackup.library.formatDuration
 import de.trei.cambackup.library.groupByDay
 import de.trei.cambackup.library.statsOf
+import de.trei.cambackup.library.withoutDrive
 import de.trei.cambackup.media.MediaItem
 import io.mockk.mockk
 import org.junit.Assert.assertEquals
@@ -41,6 +42,20 @@ class LibraryModelTest {
         assertEquals(70, s.savedBytes)
         assertEquals(1, s.openCount)
         assertEquals(50, s.openBytes)
+    }
+
+    @Test fun withoutDriveNothingCountsAsBackedUp() {
+        val index = IndexState(listOf(entry("a.jpg", 100), entry("b.jpg", 100, EntryStatus.COMPRESSED, 30)))
+        val items = listOf(item("a.jpg", 100), item("b.jpg", 30), item("c.jpg", 50)).map { classify(it, index).withoutDrive() }
+        assertEquals(listOf(MediaStatus.UNKNOWN, MediaStatus.COMPRESSED, MediaStatus.UNKNOWN), items.map { it.status })
+        assertEquals(false, items.any { it.driveConnected })
+
+        val s = statsOf(items)
+        assertEquals(0, s.backedUpCount)
+        assertEquals(0, s.openCount)
+        assertEquals(2, s.unknownCount)
+        assertEquals(150, s.unknownBytes)
+        assertEquals(1, s.compressedCount)
     }
 
     @Test fun changedFileIsNotBackedUp() {

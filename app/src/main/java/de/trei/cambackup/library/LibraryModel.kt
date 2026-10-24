@@ -15,9 +15,25 @@ enum class MediaStatus {
     BACKED_UP,
     /** Original auf dem Medium, auf dem Smartphone die verkleinerte Version. */
     COMPRESSED,
+    /** Speichermedium nicht verbunden – ob die Datei gesichert ist, lässt sich nicht prüfen. */
+    UNKNOWN,
 }
 
-data class LibraryItem(val media: MediaItem, val status: MediaStatus, val entry: IndexEntry?)
+data class LibraryItem(
+    val media: MediaItem,
+    val status: MediaStatus,
+    val entry: IndexEntry?,
+    /** false: Speichermedium nicht verbunden, der Status beruht nur auf dem lokalen Stand. */
+    val driveConnected: Boolean = true,
+)
+
+/**
+ * Ohne verbundenes Speichermedium wird nichts als „gesichert“ angezeigt. „Verkleinert“ bleibt
+ * erkennbar – das beschreibt die Datei auf dem Smartphone selbst.
+ */
+fun LibraryItem.withoutDrive(): LibraryItem =
+    if (status == MediaStatus.COMPRESSED) copy(driveConnected = false)
+    else copy(status = MediaStatus.UNKNOWN, entry = null, driveConnected = false)
 
 data class LibraryStats(
     val totalCount: Int,
@@ -30,6 +46,8 @@ data class LibraryStats(
     val savedBytes: Long,
     val openCount: Int,
     val openBytes: Long,
+    val unknownCount: Int = 0,
+    val unknownBytes: Long = 0,
 )
 
 fun classify(item: MediaItem, index: IndexState): LibraryItem {
@@ -46,6 +64,7 @@ fun statsOf(items: List<LibraryItem>): LibraryStats {
     val backed = sum(MediaStatus.BACKED_UP)
     val compressed = sum(MediaStatus.COMPRESSED)
     val open = sum(MediaStatus.NOT_BACKED_UP)
+    val unknown = sum(MediaStatus.UNKNOWN)
     return LibraryStats(
         totalCount = items.size,
         totalBytes = items.sumOf { it.media.sizeBytes },
@@ -56,6 +75,8 @@ fun statsOf(items: List<LibraryItem>): LibraryStats {
         savedBytes = compressed.sumOf { (it.entry?.originalSize ?: 0) - it.media.sizeBytes },
         openCount = open.size,
         openBytes = open.sumOf { it.media.sizeBytes },
+        unknownCount = unknown.size,
+        unknownBytes = unknown.sumOf { it.media.sizeBytes },
     )
 }
 

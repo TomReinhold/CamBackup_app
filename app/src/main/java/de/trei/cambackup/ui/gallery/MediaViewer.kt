@@ -115,7 +115,9 @@ private fun InfoPanel(item: LibraryItem, modifier: Modifier) {
     val (statusText, color) = when (item.status) {
         MediaStatus.NOT_BACKED_UP -> "Noch nicht gesichert" to Color.White.copy(alpha = 0.7f)
         MediaStatus.BACKED_UP -> "Original gesichert" to Color(0xFF9EC5FF)
-        MediaStatus.COMPRESSED -> "Verkleinert – Original gesichert" to StatusColors.compressed
+        MediaStatus.COMPRESSED ->
+            (if (item.driveConnected) "Verkleinert – Original gesichert" else "Verkleinert") to StatusColors.compressed
+        MediaStatus.UNKNOWN -> "Sicherung nicht prüfbar – Speichermedium nicht verbunden" to Color.White.copy(alpha = 0.7f)
     }
     Column(
         modifier
@@ -139,7 +141,7 @@ private fun InfoPanel(item: LibraryItem, modifier: Modifier) {
         )
         Row(verticalAlignment = Alignment.CenterVertically) {
             StatusBadge(item.status)
-            if (item.status != MediaStatus.NOT_BACKED_UP) Spacer(Modifier.width(8.dp))
+            if (item.status == MediaStatus.BACKED_UP || item.status == MediaStatus.COMPRESSED) Spacer(Modifier.width(8.dp))
             Text(statusText, color = color, style = MaterialTheme.typography.labelLarge)
         }
         item.entry?.backupPath?.let {

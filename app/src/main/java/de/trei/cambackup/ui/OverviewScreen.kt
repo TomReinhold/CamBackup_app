@@ -58,7 +58,7 @@ fun OverviewScreen(library: LibraryViewModel, contentPadding: PaddingValues) {
             ),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            item { CameraFolderCard(loaded.stats) }
+            item { CameraFolderCard(loaded.stats, loaded.driveConnected) }
             item { DriveSection(onLibraryChanged = library::refresh) }
         }
     }
@@ -116,7 +116,7 @@ private fun CenteredMessage(title: String, text: String, button: String, onClick
 }
 
 @Composable
-private fun CameraFolderCard(s: LibraryStats) {
+private fun CameraFolderCard(s: LibraryStats, driveConnected: Boolean) {
     FeatureCard(
         icon = R.drawable.ic_smartphone,
         title = "Fotos und Videos",
@@ -131,13 +131,24 @@ private fun CameraFolderCard(s: LibraryStats) {
             listOf(
                 BarSegment(s.compressedBytes, StatusColors.compressed),
                 BarSegment(s.backedUpBytes, StatusColors.backedUp()),
-                BarSegment(s.openBytes, StatusColors.open()),
+                BarSegment(s.openBytes + s.unknownBytes, StatusColors.open()),
             ),
         )
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             LegendStat(StatusColors.compressed, "Verkleinert", "${s.compressedCount}", formatBytes(s.compressedBytes), Modifier.weight(1f))
-            LegendStat(StatusColors.backedUp(), "Gesichert", "${s.backedUpCount}", formatBytes(s.backedUpBytes), Modifier.weight(1f))
-            LegendStat(StatusColors.open(), "Offen", "${s.openCount}", formatBytes(s.openBytes), Modifier.weight(1f))
+            if (driveConnected) {
+                LegendStat(StatusColors.backedUp(), "Gesichert", "${s.backedUpCount}", formatBytes(s.backedUpBytes), Modifier.weight(1f))
+                LegendStat(StatusColors.open(), "Offen", "${s.openCount}", formatBytes(s.openBytes), Modifier.weight(1f))
+            } else {
+                LegendStat(StatusColors.open(), "Nicht geprüft", "${s.unknownCount}", formatBytes(s.unknownBytes), Modifier.weight(2f))
+            }
+        }
+        if (!driveConnected) {
+            Text(
+                "Ob deine Fotos und Videos gesichert sind, zeigt die App nur bei verbundenem Speichermedium.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
         if (s.savedBytes > 0) {
             Row(verticalAlignment = Alignment.CenterVertically) {

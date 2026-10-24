@@ -23,6 +23,8 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.viewmodel.compose.viewModel
 import de.trei.cambackup.library.LibraryViewModel
+import de.trei.cambackup.ui.DriveViewModel
+import de.trei.cambackup.ui.MediaChangeListener
 import de.trei.cambackup.ui.OverviewScreen
 import de.trei.cambackup.ui.gallery.GalleryScreen
 import de.trei.cambackup.ui.settings.SettingsScreen
@@ -48,10 +50,16 @@ private enum class Tab(val label: String, val icon: Int) {
 @Composable
 private fun MainScaffold() {
     val library: LibraryViewModel = viewModel()
+    val drive: DriveViewModel = viewModel()
     var tab by rememberSaveable { mutableStateOf(Tab.OVERVIEW) }
 
-    // Medienordner bei jeder Rückkehr in die App neu einlesen
-    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { library.refresh() }
+    // Medienordner und Speichermedium bei jeder Rückkehr in die App neu prüfen – und sofort, wenn ein
+    // Datenträger ein- oder ausgesteckt wird (der Sicherungsstatus hängt davon ab, auf jedem Tab)
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
+        library.refresh()
+        drive.refresh()
+    }
+    MediaChangeListener(onChange = drive::refresh)
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),

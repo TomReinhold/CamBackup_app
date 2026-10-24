@@ -18,6 +18,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.map
 import de.trei.cambackup.settings.SettingsRepository
+import de.trei.cambackup.storage.DriveStatus
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -25,7 +26,7 @@ sealed interface LibraryState {
     data object Loading : LibraryState
     data object NeedsPermission : LibraryState
     data object PartialAccess : LibraryState
-    data class Loaded(val items: List<LibraryItem>, val stats: LibraryStats) : LibraryState
+    data class Loaded(val items: List<LibraryItem>, val stats: LibraryStats, val driveConnected: Boolean = true) : LibraryState
     data class Error(val message: String) : LibraryState
 }
 
@@ -45,7 +46,7 @@ class LibraryViewModel(app: Application) : AndroidViewModel(app) {
         data class Failed(val message: String) : ScanState
     }
 
-    val state: StateFlow<LibraryState> = combine(scan, IndexCache.get(app).entries) { s, entries ->
+    val state: StateFlow<LibraryState> = combine(scan, IndexCache.get(app).entries, DriveStatus.connected) { s, entries, connected ->
         when (s) {
             ScanState.Loading -> LibraryState.Loading
             ScanState.NeedsPermission -> LibraryState.NeedsPermission
@@ -53,8 +54,10 @@ class LibraryViewModel(app: Application) : AndroidViewModel(app) {
             is ScanState.Failed -> LibraryState.Error(s.message)
             is ScanState.Done -> {
                 val index = IndexState(entries)
-                val items = s.items.map { classify(it, index) }
-                LibraryState.Loaded(items, statsOf(items))
+                // Ohne verbundenes Medium (oder solange das noch nicht geprüft ist) gilt nichts als gesichert
+                val online = connected == true
+                val items = s.items.map { classify(it, index).let { item -> if (online) item else item.withoutDrive() } }
+                LibraryState.Loaded(items, statsOf(items), online)
             }
         }
     }.stateIn(viewModelScope, SharingStarted.Eagerly, LibraryState.Loading)

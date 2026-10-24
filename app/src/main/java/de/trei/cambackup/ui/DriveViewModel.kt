@@ -13,9 +13,12 @@ import de.trei.cambackup.storage.DeviceRelation
 import de.trei.cambackup.storage.DriveDetector
 import de.trei.cambackup.storage.DriveInfo
 import de.trei.cambackup.storage.DriveRepository
+import de.trei.cambackup.storage.DriveStatus
 import de.trei.cambackup.storage.FolderCheck
 import de.trei.cambackup.storage.LocalIdentityStore
 import de.trei.cambackup.storage.RemovableVolume
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -70,8 +73,12 @@ class DriveViewModel(app: Application) : AndroidViewModel(app) {
     /** Zuletzt gewählter (noch nicht übernommener) Ordner – wird bei Abbruch wieder freigegeben. */
     private var pendingTree: Uri? = null
 
+    private var refreshJob: Job? = null
+
     fun refresh() {
-        viewModelScope.launch {
+        // Neueste Prüfung gewinnt: beim Auswerfen kommen mehrere Meldungen kurz nacheinander
+        refreshJob?.cancel()
+        refreshJob = viewModelScope.launch {
             _state.value = try {
                 when (val r = detector.detect()) {
                     is DetectResult.Active -> ready(r.folder)
@@ -81,9 +88,12 @@ class DriveViewModel(app: Application) : AndroidViewModel(app) {
                     }
                     is DetectResult.NotFound -> DriveState.NoFolder(hadFolder = drives.activeFolder != null, newVolume = r.newVolume)
                 }
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 DriveState.Error(e.message ?: e.javaClass.simpleName)
             }
+            DriveStatus.set(_state.value is DriveState.Ready)
         }
     }
 
@@ -171,6 +181,7 @@ class DriveViewModel(app: Application) : AndroidViewModel(app) {
         pendingTree = null
         _autoFound.value = null
         _state.value = ready(claimed)
+        DriveStatus.set(true)
     }
 
     private fun action(block: suspend () -> Unit) {
