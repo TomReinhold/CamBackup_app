@@ -229,6 +229,7 @@ private fun PlanView(plan: BackupPlan, space: SpaceCheck, onStart: () -> Unit) {
 private fun ResultView(s: RunSummary, onResume: () -> Unit, onDone: () -> Unit) {
     Banner(
         if (s.isComplete && s.copied == 0 && s.moved > 0) "Ordnerstruktur angepasst: ${fileCount(s.moved)} verschoben."
+        else if (s.isComplete && s.copied == 0 && s.adopted == 0) "Backup abgeschlossen – es gab nichts Neues zu sichern."
         else if (s.isComplete) "Backup abgeschlossen: ${fileCount(s.copied)} (${formatBytes(s.bytesCopied)}) kopiert und geprüft."
         else "Backup unvollständig: ${fileCount(s.copied)} kopiert" + (s.abortReason?.let { " – $it" } ?: ""),
         if (s.isComplete) BannerTone.SUCCESS else BannerTone.WARNING,

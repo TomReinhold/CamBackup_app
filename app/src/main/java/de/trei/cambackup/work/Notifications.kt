@@ -74,7 +74,11 @@ object Notifications {
             .setContentTitle(if (s.isComplete) "Backup abgeschlossen" else "Backup unvollständig")
             .setContentText(
                 buildString {
-                    append("${fileCount(s.copied)} gesichert (${formatBytes(s.bytesCopied)})")
+                    when {
+                        s.copied > 0 -> append("${fileCount(s.copied)} gesichert (${formatBytes(s.bytesCopied)})")
+                        s.moved > 0 -> append("Ordnerstruktur angepasst")
+                        else -> append("Nichts Neues zu sichern")
+                    }
                     if (s.moved > 0) append(", ${s.moved} umsortiert")
                     if (s.failures.isNotEmpty()) append(", ${s.failures.size} Fehler")
                     s.abortReason?.let { append(" – $it") }
