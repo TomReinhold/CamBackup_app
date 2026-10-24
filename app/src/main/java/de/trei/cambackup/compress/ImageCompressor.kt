@@ -9,6 +9,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
 import kotlin.math.sqrt
+import de.trei.cambackup.util.toMsg
+import de.trei.cambackup.util.msg
+import de.trei.cambackup.util.L10n
+import de.trei.cambackup.util.AppError
+import de.trei.cambackup.R
 
 data class CompressedImage(
     val bytes: ByteArray,
@@ -56,7 +61,7 @@ class ImageCompressor(private val resolver: ContentResolver) {
     }
 
     fun decodeBytes(bytes: ByteArray): Bitmap =
-        BitmapFactory.decodeByteArray(bytes, 0, bytes.size) ?: error("JPEG nicht dekodierbar")
+        BitmapFactory.decodeByteArray(bytes, 0, bytes.size) ?: throw AppError(R.string.err_jpeg_decode)
 
     private fun decode(uri: Uri, targetSize: (Int, Int) -> Pair<Int, Int>): Bitmap {
         val source = ImageDecoder.createSource(resolver, uri)

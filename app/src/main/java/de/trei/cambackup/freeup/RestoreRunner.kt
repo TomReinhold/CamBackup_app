@@ -17,7 +17,14 @@ import de.trei.cambackup.storage.DeviceRegistry
 import de.trei.cambackup.storage.DirCache
 import de.trei.cambackup.storage.DriveRepository
 import de.trei.cambackup.storage.SafIo
-import de.trei.cambackup.util.formatBytes
+import de.trei.cambackup.R
+import de.trei.cambackup.util.AppError
+import de.trei.cambackup.util.L10n
+import de.trei.cambackup.util.Msg
+import de.trei.cambackup.util.formatBytesEn
+import de.trei.cambackup.util.msg
+import de.trei.cambackup.util.toMsg
+
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.currentCoroutineContext
@@ -109,7 +116,7 @@ class RestoreRunner(private val context: Context) {
         val candidates = restoreCandidates(scanner.scan(settings.current().mediaFolders), index.state)
             .filter { only == null || it.item.id in only }
         if (phoneFreeBytes() < restoreSpaceNeeded(candidates)) {
-            return RestoreSummary(Instant.now().toString(), 0, 0, emptyList(), "Zu wenig Platz auf dem Smartphone")
+            return RestoreSummary(Instant.now().toString(), 0, 0, emptyList(), L10n.str(R.string.restore_phone_full))
         }
         val dirs = DirCache(dir)
         val caller = currentCoroutineContext()
@@ -117,12 +124,12 @@ class RestoreRunner(private val context: Context) {
         return withContext(NonCancellable + Dispatchers.IO) {
             var restored = 0
             var added = 0L
-            val failures = mutableListOf<RunSummary.Failure>()
-            var abort: String? = null
+            val failures = mutableListOf<Pair<String, Msg>>()
+            var abort: Msg? = null
             for ((i, c) in candidates.withIndex()) {
                 JobControl.waitWhilePaused(JobControl.RESTORE) { !caller.isActive }
                 if (!caller.isActive) {
-                    abort = "Abgebrochen"
+                    abort = msg(R.string.abort_cancelled)
                     break
                 }
                 onProgress(i, candidates.size, c.item.displayName)
@@ -132,45 +139,46 @@ class RestoreRunner(private val context: Context) {
                     added += c.extraBytes
                 } catch (e: Exception) {
                     if (!dir.exists()) {
-                        abort = "Speichermedium wurde getrennt"
+                        abort = msg(R.string.abort_disconnected)
                         break
                     }
-                    failures += RunSummary.Failure(c.item.displayName, e.message ?: e.javaClass.simpleName)
+                    failures += c.item.displayName to e.toMsg()
                 }
             }
             if (dir.exists()) {
                 index.compact()
-                val line = "${Instant.now()}  Originale zurückgeholt: $restored (${formatBytes(added)} wieder belegt), ${failures.size} Fehler" +
-                    (abort?.let { " – abgebrochen: $it" } ?: "") + "\n" +
-                    failures.joinToString("") { "    Fehler: ${it.name}: ${it.reason}\n" }
+                // Protokoll auf dem Medium: immer englisch
+                val line = "${Instant.now()}  Originals restored: $restored (${formatBytesEn(added)} used again), ${failures.size} errors" +
+                    (abort?.let { " – aborted: ${it.en}" } ?: "") + "\n" +
+                    failures.joinToString("") { (name, reason) -> "    Error: $name: ${reason.en}\n" }
                 runCatching { io.appendText(dir.findFile(DeviceRegistry.METADATA_DIR)!!, "backup_log.txt", line) }
             }
             IndexCache.get(context).update(index.state)
-            RestoreSummary(Instant.now().toString(), restored, added, failures, abort)
+            RestoreSummary(Instant.now().toString(), restored, added, failures.map { RunSummary.Failure(it.first, it.second.ui) }, abort?.ui)
         }
     }
 
     private suspend fun restoreOne(c: RestoreCandidate, dirs: DirCache, index: BackupIndex, keepOriginal: Boolean) {
         val entry = c.entry
         val backup = dirs.files(entry.backupPath.substringBeforeLast('/', ""))[entry.backupPath.substringAfterLast('/')]
-            ?: throw IOException("Original auf dem Medium fehlt")
-        if (backup.length() != entry.originalSize) throw IOException("Original auf dem Medium unvollständig")
+            ?: throw AppError(R.string.err_original_missing)
+        if (backup.length() != entry.originalSize) throw AppError(R.string.err_original_incomplete)
         val uri = c.item.uri
         // Sicherheitsregel: nur die unveränderte verkleinerte Version wird überschrieben
         if (entry.compressedSha256 != null && hashOf(uri) != entry.compressedSha256) {
-            throw IOException("Datei wurde nach dem Verkleinern verändert – bleibt unangetastet")
+            throw AppError(R.string.err_changed_after_compress)
         }
         // Erst vollständig vom Medium in den App-Speicher holen und prüfen: wird das Medium dabei
         // abgezogen, bleibt die Datei auf dem Smartphone unberührt (keine halb überschriebene Datei)
         if (phoneFreeBytes() < entry.originalSize + entry.originalSize - (entry.compressedSize ?: 0) + RESTORE_RESERVE) {
-            throw IOException("Zu wenig Platz auf dem Smartphone für diese Datei")
+            throw AppError(R.string.err_phone_full_file)
         }
         val staged = File(context.cacheDir, "restore.tmp")
         try {
-            val copy = (resolver.openInputStream(backup.uri) ?: throw IOException("Original nicht lesbar")).use { input ->
+            val copy = (resolver.openInputStream(backup.uri) ?: throw AppError(R.string.err_original_unreadable)).use { input ->
                 staged.outputStream().use { out -> copyWithSha256(input, out) {} }
             }
-            if (copy.sha256 != entry.originalSha256) throw IOException("Original auf dem Medium beschädigt (Prüfsumme falsch)")
+            if (copy.sha256 != entry.originalSha256) throw AppError(R.string.err_original_damaged)
 
             // Bis zu zwei Versuche: ein abgebrochener Schreibvorgang wird sofort wiederholt
             var lastError: Exception? = null
@@ -181,17 +189,17 @@ class RestoreRunner(private val context: Context) {
                         index.record(entry.asVerifiedOnly().copy(keepOriginal = keepOriginal))
                         return
                     }
-                    lastError = IOException("Prüfsumme nach dem Zurückholen falsch")
+                    lastError = AppError(R.string.err_checksum_after_restore)
                 } catch (e: Exception) {
                     lastError = e
                 }
             }
-            throw IOException("Zurückholen fehlgeschlagen (${lastError?.message}) – Original bleibt auf dem Medium, bitte erneut versuchen")
+            throw AppError(msg(R.string.err_restore_failed_retry, lastError?.toMsg() ?: Msg.Raw("?")))
         } finally {
             staged.delete()
         }
     }
 
     private suspend fun hashOf(uri: Uri): String =
-        withContext(Dispatchers.IO) { (resolver.openInputStream(originalUri(uri)) ?: throw IOException("nicht lesbar")).use { sha256(it).sha256 } }
+        withContext(Dispatchers.IO) { (resolver.openInputStream(originalUri(uri)) ?: throw AppError(R.string.err_unreadable)).use { sha256(it).sha256 } }
 }

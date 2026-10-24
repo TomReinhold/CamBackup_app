@@ -6,6 +6,11 @@ import androidx.documentfile.provider.DocumentFile
 import java.io.FileOutputStream
 import java.io.IOException
 import java.io.OutputStream
+import de.trei.cambackup.util.toMsg
+import de.trei.cambackup.util.msg
+import de.trei.cambackup.util.L10n
+import de.trei.cambackup.util.AppError
+import de.trei.cambackup.R
 
 /**
  * Datei-Hilfen für das Storage Access Framework.
@@ -17,21 +22,21 @@ class SafIo(@PublishedApi internal val resolver: ContentResolver) {
 
     fun readText(file: DocumentFile): String =
         resolver.openInputStream(file.uri)?.use { it.readBytes().decodeToString() }
-            ?: throw IOException("${file.name} nicht lesbar")
+            ?: throw AppError(R.string.err_file_unreadable, file.name.orEmpty())
 
     fun createFile(dir: DocumentFile, name: String): DocumentFile =
-        dir.createFile(OCTET_STREAM, name) ?: throw IOException("„$name“ konnte nicht angelegt werden")
+        dir.createFile(OCTET_STREAM, name) ?: throw AppError(R.string.err_create_file, name)
 
     /**
      * Öffnet [file] zum Schreiben und führt [block] aus; danach werden die Daten per fsync
      * auf das Medium geschrieben, bevor die Datei als fertig gilt.
      */
     inline fun <T> writeSynced(file: DocumentFile, mode: String = "wt", block: (OutputStream) -> T): T =
-        writeSynced(file.uri, file.name ?: "Datei", mode, block)
+        writeSynced(file.uri, file.name ?: "file", mode, block)
 
     /** Wie oben, für beliebige URIs (z. B. MediaStore-Einträge auf dem Smartphone). */
     inline fun <T> writeSynced(uri: Uri, name: String, mode: String = "wt", block: (OutputStream) -> T): T {
-        val pfd = resolver.openFileDescriptor(uri, mode) ?: throw IOException("$name nicht beschreibbar")
+        val pfd = resolver.openFileDescriptor(uri, mode) ?: throw AppError(R.string.err_file_not_writable, name)
         return pfd.use {
             FileOutputStream(it.fileDescriptor).use { out ->
                 val result = block(out)
@@ -58,8 +63,8 @@ class SafIo(@PublishedApi internal val resolver: ContentResolver) {
         dir.findFile(tmpName)?.delete()
         val tmp = createFile(dir, tmpName)
         writeSynced(tmp) { it.write(text.encodeToByteArray()) }
-        dir.findFile(name)?.let { if (!it.delete()) throw IOException("„$name“ konnte nicht ersetzt werden") }
-        if (!tmp.renameTo(name)) throw IOException("„$tmpName“ konnte nicht umbenannt werden")
+        dir.findFile(name)?.let { if (!it.delete()) throw AppError(R.string.err_replace_file, name) }
+        if (!tmp.renameTo(name)) throw AppError(R.string.err_rename_file, tmpName)
     }
 
     /** Liest [name]; fehlt die Datei nach einem Abbruch in [replaceAtomically], wird "<name>.tmp" gelesen. */
@@ -87,9 +92,9 @@ class DirCache(private val base: DocumentFile) {
             val existing = parent.findFile(segment)
             when {
                 existing == null -> parent.createDirectory(segment)
-                    ?: throw IOException("Ordner „$segment“ konnte nicht angelegt werden")
+                    ?: throw AppError(R.string.err_create_folder, segment)
                 existing.isDirectory -> existing
-                else -> throw IOException("„$segment“ ist eine Datei, kein Ordner")
+                else -> throw AppError(R.string.err_not_a_folder, segment)
             }
         }
     }

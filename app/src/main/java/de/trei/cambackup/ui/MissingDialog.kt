@@ -42,6 +42,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
@@ -49,6 +51,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import de.trei.cambackup.R
 import de.trei.cambackup.backup.MissingAction
 import de.trei.cambackup.backup.MissingItem
 import de.trei.cambackup.ui.components.Banner
@@ -63,12 +66,10 @@ import java.util.Date
 @Composable
 fun MissingBanner(missing: List<MissingItem>, onOpen: () -> Unit) {
     Banner(
-        "${fileCount(missing.size)} (${formatBytes(missing.sumOf { it.bytes })}) " +
-            (if (missing.size == 1) "wurde" else "wurden") + " auf dem Smartphone gelöscht, " +
-            (if (missing.size == 1) "ist" else "sind") + " aber noch gesichert.",
+        pluralStringResource(R.plurals.missing_banner, missing.size, fileCount(missing.size), formatBytes(missing.sumOf { it.bytes })),
         BannerTone.WARNING,
     )
-    OutlinedButton(onClick = onOpen, modifier = Modifier.fillMaxWidth()) { Text("Ansehen und entscheiden") }
+    OutlinedButton(onClick = onOpen, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.missing_open)) }
 }
 
 /**
@@ -93,13 +94,12 @@ fun MissingDialog(
         Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surface) {
             Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
                 Row(Modifier.fillMaxWidth().padding(4.dp), verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(onClick = onDismiss) { Icon(Icons.Default.Close, "Schließen") }
-                    Text("Gelöschte Dateien (${missing.size})", style = MaterialTheme.typography.titleLarge)
+                    IconButton(onClick = onDismiss) { Icon(Icons.Default.Close, stringResource(R.string.action_close)) }
+                    Text(stringResource(R.string.missing_dialog_title, missing.size), style = MaterialTheme.typography.titleLarge)
                 }
                 Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
-                        "Diese Fotos und Videos fehlen auf dem Smartphone, liegen aber auf dem Speichermedium. " +
-                            "Wähle für jede Datei oder für alle:",
+                        stringResource(R.string.missing_dialog_text),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -107,11 +107,11 @@ fun MissingDialog(
                         OutlinedButton(
                             onClick = { missing.forEach { choices[it.phonePath] = MissingAction.RESTORE } },
                             modifier = Modifier.weight(1f),
-                        ) { Text("Alle zurückholen", maxLines = 1) }
+                        ) { Text(stringResource(R.string.missing_restore_all), maxLines = 1) }
                         OutlinedButton(
                             onClick = { missing.forEach { choices[it.phonePath] = MissingAction.DELETE_BACKUP } },
                             modifier = Modifier.weight(1f),
-                        ) { Text("Alle löschen", maxLines = 1) }
+                        ) { Text(stringResource(R.string.missing_delete_all), maxLines = 1) }
                     }
                 }
                 Spacer(Modifier.size(8.dp))
@@ -128,15 +128,15 @@ fun MissingDialog(
                     // Zusätzlicher Abstand unten: im Vollbild-Dialog kommen die Systemleisten-Abstände nicht immer an
                     Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 32.dp), verticalAlignment = Alignment.CenterVertically) {
                         Text(
-                            if (choices.isEmpty()) "Noch nichts ausgewählt"
-                            else "$restoreCount zurückholen · $deleteCount löschen",
+                            if (choices.isEmpty()) stringResource(R.string.missing_none_chosen)
+                            else stringResource(R.string.missing_chosen, restoreCount, deleteCount),
                             style = MaterialTheme.typography.bodyMedium,
                             modifier = Modifier.weight(1f),
                         )
                         Button(
                             onClick = { if (deleteCount > 0) confirmDelete = true else onApply(choices.toMap()) },
                             enabled = choices.isNotEmpty(),
-                        ) { Text("Ausführen") }
+                        ) { Text(stringResource(R.string.missing_apply)) }
                     }
                 }
             }
@@ -146,21 +146,19 @@ fun MissingDialog(
     if (confirmDelete) {
         AlertDialog(
             onDismissRequest = { confirmDelete = false },
-            title = { Text("Endgültig löschen?") },
+            title = { Text(stringResource(R.string.missing_delete_title)) },
             text = {
                 Text(
-                    "${fileCount(deleteCount)} " + (if (deleteCount == 1) "wird" else "werden") +
-                        " vom Speichermedium gelöscht. Da " + (if (deleteCount == 1) "sie auch auf dem Smartphone fehlt" else "sie auch auf dem Smartphone fehlen") +
-                        ", gibt es danach keine Kopie mehr.",
+                    pluralStringResource(R.plurals.missing_delete_text, deleteCount, fileCount(deleteCount)),
                 )
             },
             confirmButton = {
                 TextButton(
                     onClick = { confirmDelete = false; onApply(choices.toMap()) },
                     colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
-                ) { Text("Löschen") }
+                ) { Text(stringResource(R.string.action_delete)) }
             },
-            dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("Abbrechen") } },
+            dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text(stringResource(R.string.action_cancel)) } },
         )
     }
 }
@@ -182,7 +180,8 @@ private fun MissingRow(m: MissingItem, thumb: Uri?, thumbPx: Int, choice: Missin
             Column(Modifier.weight(1f)) {
                 Text(m.displayName, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(
-                    "$date · ${formatBytes(m.latest.originalSize)}" + if (m.versions.size > 1) " · ${m.versions.size} Versionen" else "",
+                    "$date · ${formatBytes(m.latest.originalSize)}" +
+                        if (m.versions.size > 1) stringResource(R.string.missing_versions, m.versions.size) else "",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -190,7 +189,11 @@ private fun MissingRow(m: MissingItem, thumb: Uri?, thumbPx: Int, choice: Missin
             }
         }
         // „Zurückholen“ statt „Wiederherstellen“: passt auch auf schmalen Geräten in die Leiste
-        val options = listOf<Pair<MissingAction?, String>>(null to "Offen", MissingAction.RESTORE to "Zurückholen", MissingAction.DELETE_BACKUP to "Löschen")
+        val options = listOf<Pair<MissingAction?, String>>(
+            null to stringResource(R.string.missing_option_open),
+            MissingAction.RESTORE to stringResource(R.string.restore_confirm),
+            MissingAction.DELETE_BACKUP to stringResource(R.string.action_delete),
+        )
         SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
             options.forEachIndexed { i, (action, label) ->
                 SegmentedButton(

@@ -11,6 +11,11 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.IOException
 import java.lang.reflect.Modifier
+import de.trei.cambackup.util.toMsg
+import de.trei.cambackup.util.msg
+import de.trei.cambackup.util.L10n
+import de.trei.cambackup.util.AppError
+import de.trei.cambackup.R
 
 sealed interface ShrinkResult {
     /** Verkleinerte Version liegt fertig (mit EXIF) in [file] im Cache der App. */
@@ -83,7 +88,7 @@ class ImageShrinker(private val context: Context) {
     }
 
     private fun readExif(item: MediaItem): ExifInterface =
-        resolver.openInputStream(item.readUri)?.use { ExifInterface(it) } ?: throw IOException("${item.displayName} nicht lesbar")
+        resolver.openInputStream(item.readUri)?.use { ExifInterface(it) } ?: throw AppError(R.string.err_file_unreadable, item.displayName)
 
     /** Letzte 64 KB der Datei – dort hängen Samsung-Motion-Photos ihr Video an. */
     private fun readTail(item: MediaItem): ByteArray? = runCatching {

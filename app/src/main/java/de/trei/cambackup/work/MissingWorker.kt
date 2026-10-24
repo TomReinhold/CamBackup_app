@@ -24,6 +24,9 @@ import de.trei.cambackup.backup.MissingSummary
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.sync.withLock
 import java.time.Instant
+import de.trei.cambackup.util.fileCount
+import de.trei.cambackup.util.toMsg
+import de.trei.cambackup.util.L10n
 
 /** Stellt gelöschte Dateien wieder her bzw. löscht ihre Sicherungen – nach Entscheidung des Nutzers. */
 class MissingWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
@@ -31,12 +34,12 @@ class MissingWorker(context: Context, params: WorkerParameters) : CoroutineWorke
     private val store = MissingStore.get(context)
     private val notifications = context.getSystemService(NotificationManager::class.java)
 
-    override suspend fun getForegroundInfo(): ForegroundInfo = foregroundInfo("Wird gestartet …", null)
+    override suspend fun getForegroundInfo(): ForegroundInfo = foregroundInfo(L10n.str(R.string.restore_starting), null)
 
     private fun foregroundInfo(text: String, percent: Int?) = ForegroundInfo(
         Notifications.ID_PROGRESS,
         Notifications.simpleProgress(
-            applicationContext, "Gelöschte Dateien bearbeiten", text, percent,
+            applicationContext, L10n.str(R.string.notif_missing), text, percent,
             WorkManager.getInstance(applicationContext).createCancelPendingIntent(id),
         ),
         ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC,
@@ -45,7 +48,7 @@ class MissingWorker(context: Context, params: WorkerParameters) : CoroutineWorke
     override suspend fun doWork(): Result {
         JobControl.setPaused(JobControl.MISSING, false)
         val decisions = store.decisions() ?: return Result.failure()
-        runCatching { setForeground(foregroundInfo("Wird gestartet …", null)) }.onFailure { Log.w(TAG, "Vordergrunddienst nicht möglich", it) }
+        runCatching { setForeground(foregroundInfo(L10n.str(R.string.restore_starting), null)) }.onFailure { Log.w(TAG, "Vordergrunddienst nicht möglich", it) }
         var last = 0L
         val summary = try {
             BackupRunner.lock.withLock {
@@ -54,14 +57,14 @@ class MissingWorker(context: Context, params: WorkerParameters) : CoroutineWorke
                     if (!isStopped && now - last >= 500) {
                         last = now
                         setProgressAsync(workDataOf(KEY_DONE to done, KEY_TOTAL to total, KEY_NAME to name))
-                        notifications.notify(Notifications.ID_PROGRESS, foregroundInfo("${done + 1} von $total: $name", done * 100 / total.coerceAtLeast(1)).notification)
+                        notifications.notify(Notifications.ID_PROGRESS, foregroundInfo(L10n.str(R.string.notif_n_of_total, done + 1, total), done * 100 / total.coerceAtLeast(1)).notification)
                     }
                 }
             }
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            MissingSummary(Instant.now().toString(), 0, 0, emptyList(), e.message ?: e.javaClass.simpleName)
+            MissingSummary(Instant.now().toString(), 0, 0, emptyList(), e.toMsg().ui)
         }
         store.saveSummary(summary)
         notifications.cancel(Notifications.ID_PROGRESS)
@@ -69,8 +72,8 @@ class MissingWorker(context: Context, params: WorkerParameters) : CoroutineWorke
             Notifications.ID_RESULT,
             NotificationCompat.Builder(applicationContext, Notifications.CHANNEL_EVENTS)
                 .setSmallIcon(R.drawable.ic_notification)
-                .setContentTitle("Gelöschte Dateien bearbeitet")
-                .setContentText("${summary.restored} wiederhergestellt, ${summary.deleted} im Backup gelöscht" + (summary.abortReason?.let { " – $it" } ?: ""))
+                .setContentTitle(L10n.str(R.string.notif_missing_done))
+                .setContentText(L10n.str(R.string.missing_result, fileCount(summary.restored), fileCount(summary.deleted)) + (summary.abortReason?.let { " – $it" } ?: ""))
                 .setAutoCancel(true)
                 .build(),
         )

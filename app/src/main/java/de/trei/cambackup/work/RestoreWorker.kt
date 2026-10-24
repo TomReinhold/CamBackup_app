@@ -24,18 +24,20 @@ import de.trei.cambackup.util.fileCount
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.sync.withLock
 import java.time.Instant
+import de.trei.cambackup.util.toMsg
+import de.trei.cambackup.util.L10n
 
 /** Holt die Originale verkleinerter Dateien zurück (nach Zustimmung per createWriteRequest). */
 class RestoreWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
 
     private val notifications = context.getSystemService(NotificationManager::class.java)
 
-    override suspend fun getForegroundInfo(): ForegroundInfo = foregroundInfo("Wird gestartet …", null)
+    override suspend fun getForegroundInfo(): ForegroundInfo = foregroundInfo(L10n.str(R.string.restore_starting), null)
 
     private fun foregroundInfo(text: String, percent: Int?) = ForegroundInfo(
         Notifications.ID_PROGRESS,
         Notifications.simpleProgress(
-            applicationContext, "Originale werden zurückgeholt", text, percent,
+            applicationContext, L10n.str(R.string.notif_restoring), text, percent,
             WorkManager.getInstance(applicationContext).createCancelPendingIntent(id),
         ),
         ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC,
@@ -45,7 +47,7 @@ class RestoreWorker(context: Context, params: WorkerParameters) : CoroutineWorke
         JobControl.setPaused(JobControl.RESTORE, false)
         val folder = inputData.getString(KEY_FOLDER) ?: return Result.failure()
         val keep = inputData.getBoolean(KEY_KEEP, true)
-        runCatching { setForeground(foregroundInfo("Wird gestartet …", null)) }.onFailure { Log.w(TAG, "Vordergrunddienst nicht möglich", it) }
+        runCatching { setForeground(foregroundInfo(L10n.str(R.string.restore_starting), null)) }.onFailure { Log.w(TAG, "Vordergrunddienst nicht möglich", it) }
         var last = 0L
         val summary = try {
             BackupRunner.lock.withLock {
@@ -54,14 +56,14 @@ class RestoreWorker(context: Context, params: WorkerParameters) : CoroutineWorke
                     if (!isStopped && now - last >= 500) {
                         last = now
                         setProgressAsync(workDataOf(KEY_DONE to done, KEY_TOTAL to total))
-                        notifications.notify(Notifications.ID_PROGRESS, foregroundInfo("${done + 1} von $total: $name", done * 100 / total.coerceAtLeast(1)).notification)
+                        notifications.notify(Notifications.ID_PROGRESS, foregroundInfo(L10n.str(R.string.notif_n_of_total, done + 1, total), done * 100 / total.coerceAtLeast(1)).notification)
                     }
                 }
             }
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            RestoreSummary(Instant.now().toString(), 0, 0, emptyList(), e.message ?: e.javaClass.simpleName)
+            RestoreSummary(Instant.now().toString(), 0, 0, emptyList(), e.toMsg().ui)
         }
         RestoreStore.get(applicationContext).save(summary)
         notifications.cancel(Notifications.ID_PROGRESS)
@@ -69,8 +71,8 @@ class RestoreWorker(context: Context, params: WorkerParameters) : CoroutineWorke
             Notifications.ID_RESULT,
             NotificationCompat.Builder(applicationContext, Notifications.CHANNEL_EVENTS)
                 .setSmallIcon(R.drawable.ic_notification)
-                .setContentTitle("Originale zurückgeholt")
-                .setContentText("${fileCount(summary.restored)} wieder in voller Größe" + (summary.abortReason?.let { " – $it" } ?: ""))
+                .setContentTitle(L10n.str(R.string.notif_restored))
+                .setContentText(L10n.str(R.string.notif_restored_text, fileCount(summary.restored)) + (summary.abortReason?.let { " – $it" } ?: ""))
                 .setAutoCancel(true)
                 .build(),
         )

@@ -64,6 +64,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -87,12 +88,12 @@ import java.time.LocalDate
 val LibraryItem.excluded: Boolean get() = status == MediaStatus.BACKED_UP && entry?.keepOriginal == true
 
 /** [needsDrive]: nur sinnvoll, wenn das Speichermedium verbunden ist (sonst ist der Status unbekannt). */
-private enum class Filter(val label: String, val needsDrive: Boolean, val matches: (LibraryItem) -> Boolean) {
-    ALL("Alle", false, { true }),
-    OPEN("Nicht gesichert", true, { it.status == MediaStatus.NOT_BACKED_UP }),
-    BACKED_UP("Gesichert", true, { it.status == MediaStatus.BACKED_UP }),
-    COMPRESSED("Verkleinert", false, { it.status == MediaStatus.COMPRESSED }),
-    EXCLUDED("Nicht verkleinern", true, { it.excluded }),
+private enum class Filter(val label: Int, val needsDrive: Boolean, val matches: (LibraryItem) -> Boolean) {
+    ALL(R.string.filter_all, false, { true }),
+    OPEN(R.string.filter_open, true, { it.status == MediaStatus.NOT_BACKED_UP }),
+    BACKED_UP(R.string.status_backed_up, true, { it.status == MediaStatus.BACKED_UP }),
+    COMPRESSED(R.string.label_compressed, false, { it.status == MediaStatus.COMPRESSED }),
+    EXCLUDED(R.string.filter_excluded, true, { it.excluded }),
 }
 
 /**
@@ -140,6 +141,8 @@ fun GalleryScreen(
         val filtered = remember(loaded.items, active) { loaded.items.filter(active.matches).sortedByDescending { it.media.dateTakenMillis } }
         val groups = remember(filtered) { groupByDay(filtered) }
         val today = remember { LocalDate.now() }
+        val todayText = stringResource(R.string.day_today)
+        val yesterdayText = stringResource(R.string.day_yesterday)
         val thumbPx = with(LocalDensity.current) { 160.dp.roundToPx() }
         val selection = remember(loaded.items, selected) {
             val keys = selected.toSet()
@@ -173,7 +176,7 @@ fun GalleryScreen(
                             FilterChip(
                                 selected = active == f,
                                 onClick = { filter = f },
-                                label = { Text("${f.label} · $count") },
+                                label = { Text("${stringResource(f.label)} · $count") },
                             )
                         }
                     }
@@ -181,7 +184,7 @@ fun GalleryScreen(
                 if (filtered.isEmpty()) {
                     item(span = { GridItemSpan(maxLineSpan) }, key = "empty") {
                         Text(
-                            "Keine Einträge",
+                            stringResource(R.string.gallery_empty),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(24.dp),
@@ -194,7 +197,7 @@ fun GalleryScreen(
                     offset += items.size
                     item(span = { GridItemSpan(maxLineSpan) }, key = "h$day") {
                         // In der Auswahl wählt ein Tipp auf den Tag alle Dateien dieses Tages (ab)
-                        DayHeader(dayLabel(day, today), items, onClick = if (selecting) ({ toggle(items) }) else null)
+                        DayHeader(dayLabel(day, today, todayText, yesterdayText), items, onClick = if (selecting) ({ toggle(items) }) else null)
                     }
                     items(items.size, key = { i -> "m${items[i].media.uri}" }) { i ->
                         val item = items[i]
@@ -271,8 +274,8 @@ private fun SelectionBar(
     Surface(modifier.fillMaxWidth(), tonalElevation = 3.dp, shadowElevation = 6.dp) {
         Column(Modifier.padding(start = 4.dp, end = 12.dp, top = 4.dp, bottom = 12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = onClear) { Icon(Icons.Default.Close, "Auswahl aufheben") }
-                Text("${selection.size} ausgewählt", style = MaterialTheme.typography.titleMedium)
+                IconButton(onClick = onClear) { Icon(Icons.Default.Close, stringResource(R.string.gallery_clear_selection)) }
+                Text(stringResource(R.string.gallery_selected, selection.size), style = MaterialTheme.typography.titleMedium)
             }
             // Probe geht immer (auch ohne Medium): das Original bleibt unverändert
             val trialable = selection.filter { it.status != MediaStatus.COMPRESSED }
@@ -282,23 +285,23 @@ private fun SelectionBar(
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 if (actionsEnabled && compressed.isNotEmpty()) {
-                    FilledTonalButton(onClick = { onRestore(compressed) }) { Text("Original zurückholen (${compressed.size})") }
+                    FilledTonalButton(onClick = { onRestore(compressed) }) { Text(stringResource(R.string.gallery_restore, compressed.size)) }
                 }
                 if (actionsEnabled && excludable.isNotEmpty()) {
-                    FilledTonalButton(onClick = { onKeep(excludable, true) }) { Text("Nicht verkleinern (${excludable.size})") }
+                    FilledTonalButton(onClick = { onKeep(excludable, true) }) { Text(stringResource(R.string.gallery_exclude, excludable.size)) }
                 }
                 if (actionsEnabled && excluded.isNotEmpty()) {
-                    FilledTonalButton(onClick = { onKeep(excluded, false) }) { Text("Verkleinern erlauben (${excluded.size})") }
+                    FilledTonalButton(onClick = { onKeep(excluded, false) }) { Text(stringResource(R.string.gallery_include, excluded.size)) }
                 }
                 if (trialable.isNotEmpty()) {
                     OutlinedButton(onClick = { onTrial(trialable) }, enabled = !trialRunning) {
-                        Text(if (trialRunning) "Probe läuft …" else "Probe verkleinern (${trialable.size})")
+                        Text(if (trialRunning) stringResource(R.string.gallery_trial_running) else stringResource(R.string.gallery_trial, trialable.size))
                     }
                 }
             }
             if (!actionsEnabled && (compressed.isNotEmpty() || excludable.isNotEmpty() || excluded.isNotEmpty())) {
                 Text(
-                    "Speichermedium verbinden, um Originale zurückzuholen oder Dateien auszuschließen.",
+                    stringResource(R.string.gallery_connect_hint),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(start = 12.dp, top = 4.dp),
@@ -314,22 +317,22 @@ private fun RestoreDialog(items: List<LibraryItem>, onDismiss: () -> Unit, onCon
     val extra = items.sumOf { (it.entry?.originalSize ?: it.media.sizeBytes) - it.media.sizeBytes }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Originale zurückholen?") },
+        title = { Text(stringResource(R.string.restore_confirm_title)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("${fileCount(items.size)} werden wieder in voller Größe vom Speichermedium geholt. Das belegt zusätzlich ${formatBytes(extra)} auf dem Smartphone.")
+                Text(stringResource(R.string.gallery_restore_text, fileCount(items.size), formatBytes(extra)))
                 Row(
                     Modifier.fillMaxWidth().toggleable(value = keep, role = Role.Checkbox, onValueChange = { keep = it }),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Checkbox(checked = keep, onCheckedChange = null)
                     Spacer(Modifier.width(8.dp))
-                    Text("Danach nicht erneut verkleinern", style = MaterialTheme.typography.bodyMedium)
+                    Text(stringResource(R.string.restore_keep_original), style = MaterialTheme.typography.bodyMedium)
                 }
             }
         },
-        confirmButton = { TextButton(onClick = { onConfirm(keep) }) { Text("Zurückholen") } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Abbrechen") } },
+        confirmButton = { TextButton(onClick = { onConfirm(keep) }) { Text(stringResource(R.string.restore_confirm)) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
     )
 }
 
@@ -345,7 +348,7 @@ private fun DayHeader(label: String, items: List<LibraryItem>, onClick: (() -> U
     ) {
         Text(label, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
         if (allSafe) {
-            Icon(painterResource(R.drawable.ic_drive_done), "Alle gesichert", tint = StatusColors.backedUp(), modifier = Modifier.size(18.dp))
+            Icon(painterResource(R.drawable.ic_drive_done), stringResource(R.string.gallery_all_backed_up), tint = StatusColors.backedUp(), modifier = Modifier.size(18.dp))
         }
     }
 }
@@ -375,12 +378,12 @@ private fun Tile(item: LibraryItem, thumbPx: Int, selected: Boolean, modifier: M
         }
         if (selected) {
             Icon(
-                Icons.Default.CheckCircle, "Ausgewählt", tint = MaterialTheme.colorScheme.primary,
+                Icons.Default.CheckCircle, stringResource(R.string.gallery_selected_item), tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.align(Alignment.TopStart).padding(4.dp).size(24.dp).clip(CircleShape).background(Color.White),
             )
         }
         if (item.excluded) {
-            Icon(Icons.Default.Lock, "Wird nicht verkleinert", tint = Color.White, modifier = Modifier.align(Alignment.BottomStart).padding(6.dp).size(16.dp))
+            Icon(Icons.Default.Lock, stringResource(R.string.gallery_excluded_item), tint = Color.White, modifier = Modifier.align(Alignment.BottomStart).padding(6.dp).size(16.dp))
         }
         StatusBadge(item.status, Modifier.align(Alignment.BottomEnd).padding(6.dp))
     }
@@ -391,13 +394,13 @@ fun StatusBadge(status: MediaStatus, modifier: Modifier = Modifier) {
     when (status) {
         MediaStatus.NOT_BACKED_UP, MediaStatus.UNKNOWN -> Unit
         MediaStatus.BACKED_UP -> Icon(
-            painterResource(R.drawable.ic_drive_done), "Gesichert", tint = Color.White, modifier = modifier.size(18.dp),
+            painterResource(R.drawable.ic_drive_done), stringResource(R.string.status_backed_up), tint = Color.White, modifier = modifier.size(18.dp),
         )
         MediaStatus.COMPRESSED -> Box(
             modifier.size(22.dp).clip(CircleShape).background(StatusColors.compressed),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(painterResource(R.drawable.ic_compress), "Verkleinert", tint = Color.White, modifier = Modifier.size(14.dp))
+            Icon(painterResource(R.drawable.ic_compress), stringResource(R.string.label_compressed), tint = Color.White, modifier = Modifier.size(14.dp))
         }
     }
 }
@@ -408,7 +411,7 @@ private fun TrialBar(done: Int, total: Int, paused: Boolean, onPause: (Boolean) 
     Surface(modifier.fillMaxWidth(), tonalElevation = 3.dp, shadowElevation = 6.dp) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(
-                (if (paused) "Pausiert – " else "") + "Probe: ${minOf(done + 1, total)} von $total",
+                (if (paused) stringResource(R.string.paused_prefix) else "") + stringResource(R.string.gallery_trial_progress, minOf(done + 1, total), total),
                 style = MaterialTheme.typography.titleSmall,
             )
             LinearProgressIndicator(progress = { if (total > 0) done.toFloat() / total else 0f }, modifier = Modifier.fillMaxWidth())

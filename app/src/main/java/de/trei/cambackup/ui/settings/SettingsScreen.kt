@@ -1,5 +1,17 @@
 package de.trei.cambackup.ui.settings
 
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.pluralStringResource
+import androidx.annotation.StringRes
+import de.trei.cambackup.util.L10n
+import de.trei.cambackup.util.AppLanguage
+import androidx.compose.ui.platform.LocalContext
+import android.os.Build
+import android.content.Context
+import android.content.Intent
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.ui.semantics.Role
+import androidx.compose.material3.RadioButton
 import androidx.activity.compose.BackHandler
 import androidx.annotation.DrawableRes
 import androidx.compose.animation.animateContentSize
@@ -79,12 +91,13 @@ import de.trei.cambackup.util.fileCount
 import de.trei.cambackup.util.formatBytes
 
 /** Unterseiten der Einstellungen. */
-enum class SettingsPage(val title: String) {
-    FOLDERS("Medienordner"),
-    STORAGE("Ablage auf dem Medium"),
-    PHOTOS("Fotos verkleinern"),
-    VIDEOS("Videos verkleinern"),
-    RULES("Wann verkleinern"),
+enum class SettingsPage(@StringRes val title: Int) {
+    FOLDERS(R.string.settings_folders),
+    STORAGE(R.string.settings_storage),
+    PHOTOS(R.string.settings_photos_title),
+    VIDEOS(R.string.settings_videos_title),
+    RULES(R.string.settings_rules),
+    LANGUAGE(R.string.settings_language),
 }
 
 /**
@@ -109,9 +122,9 @@ fun SettingsScreen(bottomPadding: Dp, vm: SettingsViewModel = viewModel()) {
         contentWindowInsets = WindowInsets(0),
         topBar = {
             TopAppBar(
-                title = { Text(page?.title ?: "Einstellungen") },
+                title = { Text(stringResource(page?.title ?: R.string.tab_settings)) },
                 navigationIcon = {
-                    if (page != null) IconButton(onClick = { page = null }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Zurück") }
+                    if (page != null) IconButton(onClick = { page = null }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.action_back)) }
                 },
                 scrollBehavior = scrollBehavior,
             )
@@ -133,7 +146,7 @@ fun SettingsScreen(bottomPadding: Dp, vm: SettingsViewModel = viewModel()) {
                     TextButton(onClick = { confirmReset = true }, modifier = Modifier.align(Alignment.CenterHorizontally)) {
                         Icon(Icons.Default.Refresh, null, Modifier.size(18.dp))
                         Spacer(Modifier.width(6.dp))
-                        Text("Auf Standardwerte zurücksetzen")
+                        Text(stringResource(R.string.settings_reset))
                     }
                 }
                 SettingsPage.FOLDERS -> FolderSettings(folders, settings.mediaFolders, vm::toggleFolder)
@@ -144,6 +157,7 @@ fun SettingsScreen(bottomPadding: Dp, vm: SettingsViewModel = viewModel()) {
                 }
                 SettingsPage.VIDEOS -> VideoSettings(settings, vm::update)
                 SettingsPage.RULES -> RulesSettings(settings, vm::update)
+                SettingsPage.LANGUAGE -> LanguageSettings()
             }
         }
     }
@@ -151,10 +165,10 @@ fun SettingsScreen(bottomPadding: Dp, vm: SettingsViewModel = viewModel()) {
     if (confirmReset) {
         AlertDialog(
             onDismissRequest = { confirmReset = false },
-            title = { Text("Zurücksetzen?") },
-            text = { Text("Alle Einstellungen außer den Medienordnern werden auf die Standardwerte gesetzt. Der Probelauf ist danach wieder aktiv.") },
-            confirmButton = { TextButton(onClick = { confirmReset = false; vm.reset() }) { Text("Zurücksetzen") } },
-            dismissButton = { TextButton(onClick = { confirmReset = false }) { Text("Abbrechen") } },
+            title = { Text(stringResource(R.string.settings_reset_title)) },
+            text = { Text(stringResource(R.string.settings_reset_text)) },
+            confirmButton = { TextButton(onClick = { confirmReset = false; vm.reset() }) { Text(stringResource(R.string.settings_reset_confirm)) } },
+            dismissButton = { TextButton(onClick = { confirmReset = false }) { Text(stringResource(R.string.action_cancel)) } },
         )
     }
 }
@@ -169,35 +183,85 @@ private fun SettingsHome(
 ) {
     EstimateCard(estimate, s)
 
-    SettingsGroup("Sicherung") {
+    SettingsGroup(stringResource(R.string.settings_group_backup)) {
         NavItem(
-            R.drawable.ic_folder, "Medienordner",
+            R.drawable.ic_folder, stringResource(R.string.settings_folders),
             s.mediaFolders.sortedBy { it != CompressionSettings.DEFAULT_FOLDER }.joinToString { folderLabel(it) },
         ) { open(SettingsPage.FOLDERS) }
         NavItem(
-            R.drawable.ic_usb, "Ablage auf dem Medium",
-            layoutLabel(s.folderLayout) +
-                if (s.separateFolders) " · je Medienordner" else "",
+            R.drawable.ic_usb, stringResource(R.string.settings_storage),
+            stringResource(layoutLabel(s.folderLayout)) +
+                if (s.separateFolders) stringResource(R.string.settings_per_folder_suffix) else "",
         ) { open(SettingsPage.STORAGE) }
     }
 
-    SettingsGroup("Verkleinern") {
+    SettingsGroup(stringResource(R.string.settings_group_shrink)) {
         NavItem(
-            R.drawable.ic_image, "Fotos",
-            (s.imageMaxEdge?.let { "max. $it px" } ?: "Originalgröße") + " · Qualität ${s.jpegQuality}" +
-                if (s.keepGps) " · mit Standort" else " · ohne Standort",
+            R.drawable.ic_image, stringResource(R.string.settings_photos),
+            (s.imageMaxEdge?.let { stringResource(R.string.settings_photos_max, it) } ?: stringResource(R.string.settings_photos_original)) +
+                stringResource(R.string.settings_photos_quality, s.jpegQuality) +
+                stringResource(if (s.keepGps) R.string.settings_photos_with_gps else R.string.settings_photos_without_gps),
         ) { open(SettingsPage.PHOTOS) }
         NavItem(
-            R.drawable.ic_videocam, "Videos",
-            (s.videoMaxShortEdge?.let { "${it}p" } ?: "Originalauflösung") + " · ${s.videoCodec.label} · ${s.videoBitrateMbps} Mbit/s" +
+            R.drawable.ic_videocam, stringResource(R.string.settings_videos),
+            (s.videoMaxShortEdge?.let { "${it}p" } ?: stringResource(R.string.settings_videos_original)) + " · ${s.videoCodec.label} · ${s.videoBitrateMbps} Mbit/s" +
                 if (s.videoLimit30Fps) " · 30 fps" else "",
         ) { open(SettingsPage.VIDEOS) }
         NavItem(
-            R.drawable.ic_schedule, "Wann verkleinern",
-            (if (s.minAgeDays == 0) "sofort" else "ab ${minAgeLabel(s.minAgeDays)}") + " · mind. ${s.minSavingsPercent} % kleiner",
-            badge = if (s.dryRun) "Probelauf" else null,
+            R.drawable.ic_schedule, stringResource(R.string.settings_rules),
+            (if (s.minAgeDays == 0) stringResource(R.string.settings_rules_now) else stringResource(R.string.settings_rules_from, minAgeLabel(s.minAgeDays))) +
+                stringResource(R.string.settings_rules_min_saving, s.minSavingsPercent),
+            badge = if (s.dryRun) stringResource(R.string.settings_dry_run) else null,
         ) { open(SettingsPage.RULES) }
     }
+
+    SettingsGroup(stringResource(R.string.settings_group_app)) {
+        NavItem(R.drawable.ic_language, stringResource(R.string.settings_language), stringResource(languageLabel(AppLanguage.current(LocalContext.current)))) {
+            open(SettingsPage.LANGUAGE)
+        }
+    }
+}
+
+@StringRes
+private fun languageLabel(language: AppLanguage) = when (language) {
+    AppLanguage.SYSTEM -> R.string.language_system
+    AppLanguage.GERMAN -> R.string.language_german
+    AppLanguage.ENGLISH -> R.string.language_english
+}
+
+/** Sprache der App: wie das System (sonst Englisch), Deutsch oder Englisch. */
+@Composable
+private fun LanguageSettings() {
+    val context = LocalContext.current
+    var current by remember { mutableStateOf(AppLanguage.current(context)) }
+    SettingsSection(stringResource(R.string.settings_language), stringResource(R.string.language_hint)) {
+        AppLanguage.entries.forEach { language ->
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .selectable(selected = current == language, role = Role.RadioButton) {
+                        if (current != language) {
+                            current = language
+                            AppLanguage.set(context, language)
+                            // Vor Android 13 übernimmt erst ein Neustart die Sprache überall (auch in Benachrichtigungen)
+                            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) restartApp(context)
+                        }
+                    }
+                    .padding(vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                RadioButton(selected = current == language, onClick = null)
+                Spacer(Modifier.width(12.dp))
+                Text(stringResource(languageLabel(language)), style = MaterialTheme.typography.bodyLarge)
+            }
+        }
+    }
+}
+
+private fun restartApp(context: Context) {
+    val intent = context.packageManager.getLaunchIntentForPackage(context.packageName) ?: return
+    context.startActivity(Intent.makeRestartActivityTask(intent.component))
+    Runtime.getRuntime().exit(0)
 }
 
 @Composable
@@ -253,17 +317,17 @@ private fun PreviewCard(state: PreviewState, onPrev: () -> Unit, onNext: () -> U
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text("Vorschau", style = MaterialTheme.typography.titleMedium)
-                    Hint("Echte Kompression eines deiner Fotos")
+                    Text(stringResource(R.string.preview_title), style = MaterialTheme.typography.titleMedium)
+                    Hint(stringResource(R.string.preview_hint))
                 }
                 if (state is PreviewState.Ready && state.count > 1) {
-                    FilledTonalIconButton(onClick = onPrev) { Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, "Vorheriges Bild") }
-                    FilledTonalIconButton(onClick = onNext) { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, "Nächstes Bild") }
+                    FilledTonalIconButton(onClick = onPrev) { Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, stringResource(R.string.preview_prev)) }
+                    FilledTonalIconButton(onClick = onNext) { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, stringResource(R.string.preview_next)) }
                 }
             }
 
             SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-                listOf(false to "Ganzes Bild", true to "Detail 100 %").forEachIndexed { i, (value, label) ->
+                listOf(false to stringResource(R.string.preview_whole), true to stringResource(R.string.preview_detail)).forEachIndexed { i, (value, label) ->
                     SegmentedButton(
                         selected = detail == value,
                         onClick = { detail = value },
@@ -274,18 +338,18 @@ private fun PreviewCard(state: PreviewState, onPrev: () -> Unit, onNext: () -> U
 
             when (state) {
                 PreviewState.Loading -> PreviewPlaceholder { CircularProgressIndicator() }
-                PreviewState.NoImages -> PreviewPlaceholder { Hint("Keine Fotos in den gewählten Ordnern gefunden.") }
-                is PreviewState.Error -> PreviewPlaceholder { Hint("Vorschau nicht möglich: ${state.message}") }
+                PreviewState.NoImages -> PreviewPlaceholder { Hint(stringResource(R.string.preview_no_images)) }
+                is PreviewState.Error -> PreviewPlaceholder { Hint(stringResource(R.string.preview_error, state.message)) }
                 is PreviewState.Ready -> {
                     val img = state.images
                     CompareSlider(
                         before = if (detail) img.originalDetail else img.originalFull,
                         after = if (detail) img.compressedDetail else img.compressedFull,
-                        beforeLabel = "Original",
-                        afterLabel = "Verkleinert",
+                        beforeLabel = stringResource(R.string.label_original),
+                        afterLabel = stringResource(R.string.label_compressed),
                     )
                     Text(
-                        "${img.name} · Bild ${state.index + 1} von ${state.count}",
+                        stringResource(R.string.preview_position, img.name, state.index + 1, state.count),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
@@ -314,10 +378,10 @@ private fun PreviewPlaceholder(content: @Composable () -> Unit) {
 private fun SizeComparison(img: PreviewImages) {
     val saved = if (img.originalBytes > 0) 100 - (img.compressedBytes * 100 / img.originalBytes).toInt() else 0
     Row(verticalAlignment = Alignment.CenterVertically) {
-        SizeColumn("Original", formatBytes(img.originalBytes), "${img.originalSize.first} × ${img.originalSize.second}", Modifier.weight(1f))
+        SizeColumn(stringResource(R.string.label_original), formatBytes(img.originalBytes), "${img.originalSize.first} × ${img.originalSize.second}", Modifier.weight(1f))
         Text("→", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
         SizeColumn(
-            "Verkleinert",
+            stringResource(R.string.label_compressed),
             formatBytes(img.compressedBytes),
             "${img.compressedSize.first} × ${img.compressedSize.second}",
             Modifier.weight(1f).padding(start = 16.dp),
@@ -358,17 +422,17 @@ private fun EstimateCard(state: EstimateState, settings: CompressionSettings) {
 
     ElevatedCard(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp).animateContentSize(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text("Voraussichtlicher Speicherplatz", style = MaterialTheme.typography.titleMedium)
+            Text(stringResource(R.string.estimate_title), style = MaterialTheme.typography.titleMedium)
             if (e == null) {
                 LinearProgressIndicator(Modifier.fillMaxWidth())
-                Hint("Probebilder werden komprimiert …")
+                Hint(stringResource(R.string.estimate_calculating))
                 return@Column
             }
 
             Row(verticalAlignment = Alignment.Bottom) {
                 if (e.imageCount + e.videoCount == 0) {
                     Text(
-                        "Noch nichts zu verkleinern",
+                        stringResource(R.string.estimate_nothing),
                         style = MaterialTheme.typography.titleLarge,
                         modifier = Modifier.weight(1f),
                     )
@@ -380,7 +444,7 @@ private fun EstimateCard(state: EstimateState, settings: CompressionSettings) {
                         color = MaterialTheme.colorScheme.primary,
                     )
                     Spacer(Modifier.width(8.dp))
-                    Text("werden frei", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(bottom = 4.dp))
+                    Text(stringResource(R.string.estimate_freed), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(bottom = 4.dp))
                     Spacer(Modifier.weight(1f))
                 }
                 if (calculating) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
@@ -388,24 +452,24 @@ private fun EstimateCard(state: EstimateState, settings: CompressionSettings) {
 
             // Balken umfassen alle Kamera-Dateien; zu junge Dateien bleiben unverändert (grau)
             val total = e.before + e.tooRecentBytes
-            UsageBar("Jetzt", e.imagesBefore, e.videosBefore, e.tooRecentBytes, 0, total)
-            UsageBar("Danach", e.imagesAfter, e.videosAfter, e.tooRecentBytes, e.saved, total)
+            UsageBar(stringResource(R.string.estimate_now), e.imagesBefore, e.videosBefore, e.tooRecentBytes, 0, total)
+            UsageBar(stringResource(R.string.estimate_after), e.imagesAfter, e.videosAfter, e.tooRecentBytes, e.saved, total)
             Legend(showUnchanged = e.tooRecentCount > 0)
 
-            BreakdownRow("Bilder", e.imageCount, e.imagesBefore, e.imagesAfter)
-            BreakdownRow("Videos", e.videoCount, e.videosBefore, e.videosAfter)
+            BreakdownRow(stringResource(R.string.label_images), e.imageCount, e.imagesBefore, e.imagesAfter)
+            BreakdownRow(stringResource(R.string.label_videos), e.videoCount, e.videosBefore, e.videosAfter)
 
             if (e.tooRecentCount > 0) {
                 Hint(
-                    "${fileCount(e.tooRecentCount)} (${formatBytes(e.tooRecentBytes)}) " +
-                        (if (e.tooRecentCount == 1) "ist" else "sind") +
-                        " jünger als ${minAgeLabel(settings.minAgeDays)} und " +
-                        (if (e.tooRecentCount == 1) "bleibt" else "bleiben") + " in Originalqualität.",
+                    pluralStringResource(
+                        R.plurals.estimate_too_recent, e.tooRecentCount,
+                        fileCount(e.tooRecentCount), formatBytes(e.tooRecentBytes), minAgeLabel(settings.minAgeDays),
+                    ),
                 )
             }
             Hint(
-                "Schätzung: Bilder anhand von ${(state as? EstimateState.Ready)?.sampleCount ?: "einigen"} Probebildern, " +
-                    "Videos anhand Dauer × Bitrate.",
+                (state as? EstimateState.Ready)?.sampleCount?.let { stringResource(R.string.estimate_basis, it) }
+                    ?: stringResource(R.string.estimate_basis_some),
             )
         }
     }
@@ -449,10 +513,10 @@ private val FreedColor = Color(0xFF7CC68D)
 @Composable
 private fun Legend(showUnchanged: Boolean) {
     Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.padding(start = 56.dp)) {
-        LegendItem(MaterialTheme.colorScheme.primary, "Bilder")
-        LegendItem(MaterialTheme.colorScheme.tertiary, "Videos")
-        if (showUnchanged) LegendItem(MaterialTheme.colorScheme.outline, "bleibt")
-        LegendItem(FreedColor, "frei")
+        LegendItem(MaterialTheme.colorScheme.primary, stringResource(R.string.label_images))
+        LegendItem(MaterialTheme.colorScheme.tertiary, stringResource(R.string.label_videos))
+        if (showUnchanged) LegendItem(MaterialTheme.colorScheme.outline, stringResource(R.string.estimate_legend_unchanged))
+        LegendItem(FreedColor, stringResource(R.string.estimate_legend_free))
     }
 }
 
@@ -483,7 +547,7 @@ private typealias Update = ((CompressionSettings) -> CompressionSettings) -> Uni
 /** Auswahl der zu sichernden Ordner, mit Anzahl und Größe. */
 @Composable
 private fun FolderSettings(folders: List<MediaFolder>?, selected: Set<String>, onToggle: (String) -> Unit) {
-    SettingsSection("Medienordner", "Welche Ordner gesichert und verkleinert werden") {
+    SettingsSection(stringResource(R.string.settings_folders), stringResource(R.string.folders_subtitle)) {
         if (folders == null) {
             LinearProgressIndicator(Modifier.fillMaxWidth())
             return@SettingsSection
@@ -515,10 +579,9 @@ private fun FolderSettings(folders: List<MediaFolder>?, selected: Set<String>, o
         }
         Hint(
             if (selected.size > 1) {
-                "Mehrere Ordner: Auf dem Speichermedium bekommt jeder einen eigenen Unterordner (z. B. „DCIM/Camera/2026/10“). " +
-                    "Bereits gesicherte Dateien werden beim nächsten Backup dorthin verschoben."
+                stringResource(R.string.folders_hint_multiple)
             } else {
-                "Bei einem Ordner liegen die Sicherungen direkt im Geräteordner. Bei mehreren bekommt jeder einen eigenen Unterordner."
+                stringResource(R.string.folders_hint_single)
             },
         )
     }
@@ -526,43 +589,43 @@ private fun FolderSettings(folders: List<MediaFolder>?, selected: Set<String>, o
 
 /** Verständlicher Name für bekannte Ordner. */
 private fun folderLabel(path: String): String = when (path.trimEnd('/')) {
-    "DCIM/Camera" -> "Kamera"
-    "Pictures/Screenshots", "DCIM/Screenshots" -> "Screenshots"
-    "Movies" -> "Filme"
-    "Pictures" -> "Bilder"
-    "Download" -> "Downloads"
+    "DCIM/Camera" -> L10n.str(R.string.folder_camera)
+    "Pictures/Screenshots", "DCIM/Screenshots" -> L10n.str(R.string.folder_screenshots)
+    "Movies" -> L10n.str(R.string.folder_movies)
+    "Pictures" -> L10n.str(R.string.folder_pictures)
+    "Download" -> L10n.str(R.string.folder_downloads)
     else -> path.trimEnd('/').substringAfterLast('/')
 }
 
 @Composable
 private fun ImageSettings(s: CompressionSettings, update: Update) {
-    SettingsSection("Bilder", "Werden als JPEG neu gespeichert") {
+    SettingsSection(stringResource(R.string.label_images), stringResource(R.string.photos_subtitle)) {
         SegmentedSetting(
-            label = "Maximale Kantenlänge",
+            label = stringResource(R.string.photos_max_edge),
             options = CompressionSettings.IMAGE_EDGE_OPTIONS,
             selected = s.imageMaxEdge,
-            optionLabel = { it?.toString() ?: "Original" },
+            optionLabel = { it?.toString() ?: L10n.str(R.string.label_original) },
             onSelect = { v -> update { it.copy(imageMaxEdge = v) } },
             hint = when (s.imageMaxEdge) {
-                2048 -> "≈ 4 MP – gut für Bildschirm und Teilen"
-                3072 -> "≈ 9 MP – auch für Fotoabzüge bis ca. 20 × 30 cm"
-                4096 -> "≈ 16 MP – kaum sichtbarer Unterschied zum Original"
-                else -> "Auflösung bleibt, nur die JPEG-Qualität wird angepasst"
+                2048 -> stringResource(R.string.photos_edge_2048)
+                3072 -> stringResource(R.string.photos_edge_3072)
+                4096 -> stringResource(R.string.photos_edge_4096)
+                else -> stringResource(R.string.photos_edge_original)
             },
         )
         SliderSetting(
-            label = "JPEG-Qualität",
+            label = stringResource(R.string.photos_quality),
             value = s.jpegQuality,
             range = CompressionSettings.QUALITY_RANGE,
             step = 5,
             valueLabel = { "$it" },
             onChange = { v -> update { it.copy(jpegQuality = v) } },
-            startHint = "kleiner",
-            endHint = "besser",
+            startHint = stringResource(R.string.photos_quality_smaller),
+            endHint = stringResource(R.string.photos_quality_better),
         )
         SwitchSetting(
-            title = "Standort (GPS) behalten",
-            description = "Aufnahmedatum und Kameradaten bleiben immer erhalten",
+            title = stringResource(R.string.photos_keep_gps),
+            description = stringResource(R.string.photos_keep_gps_hint),
             checked = s.keepGps,
             onChange = { v -> update { it.copy(keepGps = v) } },
         )
@@ -571,12 +634,12 @@ private fun ImageSettings(s: CompressionSettings, update: Update) {
 
 @Composable
 private fun VideoSettings(s: CompressionSettings, update: Update) {
-    SettingsSection("Videos", "Werden neu kodiert – das dauert und braucht Akku") {
+    SettingsSection(stringResource(R.string.label_videos), stringResource(R.string.videos_subtitle)) {
         SegmentedSetting(
-            label = "Maximale Auflösung",
+            label = stringResource(R.string.videos_max_resolution),
             options = CompressionSettings.VIDEO_EDGE_OPTIONS,
             selected = s.videoMaxShortEdge,
-            optionLabel = { it?.let { p -> "${p}p" } ?: "Original" },
+            optionLabel = { it?.let { p -> "${p}p" } ?: L10n.str(R.string.label_original) },
             onSelect = { v -> update { it.copy(videoMaxShortEdge = v) } },
         )
         SegmentedSetting(
@@ -586,13 +649,13 @@ private fun VideoSettings(s: CompressionSettings, update: Update) {
             optionLabel = { it.label },
             onSelect = { v -> update { it.copy(videoCodec = v) } },
             hint = if (s.videoCodec == VideoCodec.HEVC) {
-                "Etwa halb so groß bei gleicher Qualität; spielt auf aktuellen Geräten problemlos"
+                stringResource(R.string.videos_hevc_hint)
             } else {
-                "Läuft überall, auch auf älteren Geräten und Fernsehern"
+                stringResource(R.string.videos_h264_hint)
             },
         )
         SliderSetting(
-            label = "Videobitrate",
+            label = stringResource(R.string.videos_bitrate),
             value = s.videoBitrateMbps,
             range = CompressionSettings.BITRATE_RANGE,
             step = 1,
@@ -601,10 +664,10 @@ private fun VideoSettings(s: CompressionSettings, update: Update) {
             startHint = "≈ ${formatBytes(bytesPerMinute(CompressionSettings.BITRATE_RANGE.first))}/min",
             endHint = "≈ ${formatBytes(bytesPerMinute(CompressionSettings.BITRATE_RANGE.last))}/min",
         )
-        Hint("Aktuell ≈ ${formatBytes(bytesPerMinute(s.videoBitrateMbps))} pro Minute Video")
+        Hint(stringResource(R.string.videos_per_minute, formatBytes(bytesPerMinute(s.videoBitrateMbps))))
         SwitchSetting(
-            title = "Auf 30 Bilder/s begrenzen",
-            description = "Spart bei 60-fps-Videos zusätzlich Platz",
+            title = stringResource(R.string.videos_limit_30),
+            description = stringResource(R.string.videos_limit_30_hint),
             checked = s.videoLimit30Fps,
             onChange = { v -> update { it.copy(videoLimit30Fps = v) } },
         )
@@ -616,27 +679,27 @@ private fun bytesPerMinute(mbps: Int): Long =
 
 @Composable
 private fun RulesSettings(s: CompressionSettings, update: Update) {
-    SettingsSection("Wann wird verkleinert?", "Gilt für Fotos und Videos") {
+    SettingsSection(stringResource(R.string.rules_title), stringResource(R.string.rules_subtitle)) {
         SegmentedSetting(
-            label = "Erst verkleinern ab einem Alter von",
+            label = stringResource(R.string.rules_min_age),
             options = CompressionSettings.MIN_AGE_OPTIONS,
             selected = s.minAgeDays,
             optionLabel = ::minAgeShort,
             onSelect = { v -> update { it.copy(minAgeDays = v) } },
-            hint = "Neuere Fotos und Videos bleiben auf dem Smartphone in Originalqualität",
+            hint = stringResource(R.string.rules_min_age_hint),
         )
         SliderSetting(
-            label = "Mindest-Ersparnis",
+            label = stringResource(R.string.rules_min_saving),
             value = s.minSavingsPercent,
             range = CompressionSettings.MIN_SAVINGS_RANGE,
             step = 5,
             valueLabel = { "$it %" },
             onChange = { v -> update { it.copy(minSavingsPercent = v) } },
         )
-        Hint("Dateien, die dadurch nicht mindestens ${s.minSavingsPercent} % kleiner werden, bleiben unverändert.")
+        Hint(stringResource(R.string.rules_min_saving_hint, s.minSavingsPercent))
         SwitchSetting(
-            title = "Probelauf",
-            description = "Nur sichern – auf dem Smartphone wird nichts ersetzt",
+            title = stringResource(R.string.settings_dry_run),
+            description = stringResource(R.string.rules_dry_run_hint),
             checked = s.dryRun,
             onChange = { v -> update { it.copy(dryRun = v) } },
         )
@@ -646,8 +709,7 @@ private fun RulesSettings(s: CompressionSettings, update: Update) {
                     Icon(Icons.Default.Warning, null, tint = MaterialTheme.colorScheme.onErrorContainer)
                     Spacer(Modifier.width(12.dp))
                     Text(
-                        "Nach erfolgreicher, geprüfter Sicherung werden Fotos und Videos auf dem Smartphone " +
-                            "durch die verkleinerten Versionen ersetzt. Die Originale liegen dann nur noch auf dem Speichermedium.",
+                        stringResource(R.string.rules_dry_run_off_warning),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onErrorContainer,
                     )
@@ -659,33 +721,33 @@ private fun RulesSettings(s: CompressionSettings, update: Update) {
 
 @Composable
 private fun StorageSettings(s: CompressionSettings, update: Update) {
-    SettingsSection("Ablage auf dem Speichermedium", "Wie die Originale im Backup-Ordner abgelegt werden") {
+    SettingsSection(stringResource(R.string.storage_title), stringResource(R.string.storage_subtitle)) {
         SegmentedSetting(
-            label = "Unterordner",
+            label = stringResource(R.string.storage_subfolders),
             options = FolderLayout.entries,
             selected = s.folderLayout,
             optionLabel = ::layoutShort,
             onSelect = { v -> update { it.copy(folderLayout = v) } },
-            hint = "Bereits gesicherte Dateien werden beim nächsten Backup automatisch in diese Struktur verschoben.",
+            hint = stringResource(R.string.storage_hint),
         )
         FolderPreview(s.folderLayout, s.separateFolders)
         Hint(
-            "Bei mehreren Medienordnern bekommt jeder zusätzlich einen eigenen Unterordner (z. B. „Pictures/Screenshots“). " +
-                "Den Backup-Ordner selbst wählst du in der Übersicht unter „Speichermedium“.",
+            stringResource(R.string.storage_hint_folders),
         )
     }
 }
 
 private fun layoutShort(layout: FolderLayout) = when (layout) {
-    FolderLayout.FLAT -> "Keine"
-    FolderLayout.YEAR -> "Jahr"
-    FolderLayout.YEAR_MONTH -> "Jahr / Monat"
+    FolderLayout.FLAT -> L10n.str(R.string.layout_short_flat)
+    FolderLayout.YEAR -> L10n.str(R.string.layout_short_year)
+    FolderLayout.YEAR_MONTH -> L10n.str(R.string.layout_short_year_month)
 }
 
+@StringRes
 fun layoutLabel(layout: FolderLayout) = when (layout) {
-    FolderLayout.FLAT -> "Ohne Unterordner"
-    FolderLayout.YEAR -> "Nach Jahr"
-    FolderLayout.YEAR_MONTH -> "Nach Jahr und Monat"
+    FolderLayout.FLAT -> R.string.layout_flat
+    FolderLayout.YEAR -> R.string.layout_year
+    FolderLayout.YEAR_MONTH -> R.string.layout_year_month
 }
 
 /** Beispielhafte Ordnerstruktur auf dem Medium für die gewählte Ablage. */
@@ -693,7 +755,7 @@ fun layoutLabel(layout: FolderLayout) = when (layout) {
 private fun FolderPreview(layout: FolderLayout, separateFolders: Boolean) {
     // (Einrückungstiefe, Name, ist Ordner)
     val lines = buildList {
-        add(Triple(0, "Backup-Ordner", true))
+        add(Triple(0, L10n.str(R.string.storage_preview_root), true))
         var depth = 1
         if (separateFolders) add(Triple(depth++, "DCIM/Camera", true))
         when (layout) {
@@ -727,14 +789,12 @@ private fun FolderPreview(layout: FolderLayout, separateFolders: Boolean) {
 }
 
 private fun minAgeShort(days: Int) = when (days) {
-    0 -> "sofort"
-    365 -> "1 Jahr"
-    else -> "$days T."
+    0 -> L10n.str(R.string.age_short_now)
+    365 -> L10n.str(R.string.age_year)
+    else -> L10n.str(R.string.age_short_days, days)
 }
 
 private fun minAgeLabel(days: Int) = when (days) {
-    0 -> "0 Tage"
-    1 -> "1 Tag"
-    365 -> "1 Jahr"
-    else -> "$days Tage"
+    365 -> L10n.str(R.string.age_year)
+    else -> L10n.plural(R.plurals.age_days, days, days)
 }

@@ -65,10 +65,12 @@ class LibraryModelTest {
 
     @Test fun dayLabels() {
         val today = LocalDate.of(2026, 10, 24) // Samstag
-        assertEquals("Heute", dayLabel(today, today))
-        assertEquals("Gestern", dayLabel(today.minusDays(1), today))
-        assertEquals("Mi., 21. Okt.", dayLabel(LocalDate.of(2026, 10, 21), today))
-        assertEquals("So., 31. Dez. 2023", dayLabel(LocalDate.of(2023, 12, 31), today))
+        assertEquals("Heute", dayLabel(today, today, "Heute", "Gestern", german = true))
+        assertEquals("Gestern", dayLabel(today.minusDays(1), today, "Heute", "Gestern", german = true))
+        assertEquals("Mi., 21. Okt.", dayLabel(LocalDate.of(2026, 10, 21), today, "Heute", "Gestern", german = true))
+        assertEquals("Wed, Oct 21", dayLabel(LocalDate.of(2026, 10, 21), today, "Today", "Yesterday", german = false))
+        assertEquals("So., 31. Dez. 2023", dayLabel(LocalDate.of(2023, 12, 31), today, "Heute", "Gestern", german = true))
+        assertEquals("Sun, Dec 31, 2023", dayLabel(LocalDate.of(2023, 12, 31), today, "Today", "Yesterday", german = false))
     }
 
     @Test fun groupsByLocalDayNewestFirst() {

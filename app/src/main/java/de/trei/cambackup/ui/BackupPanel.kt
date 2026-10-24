@@ -20,6 +20,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
@@ -76,8 +77,8 @@ fun BackupPanel(folderUri: String, onBackupFinished: () -> Unit, vm: BackupViewM
 
     FeatureCard(
         icon = R.drawable.ic_cloud_upload,
-        title = "Backup",
-        subtitle = "Originale bitgenau auf das Speichermedium kopieren",
+        title = stringResource(R.string.backup_title),
+        subtitle = stringResource(R.string.backup_subtitle),
     ) {
         if (state !is BackupState.Running && state !is BackupState.ApplyingMissing) {
             result?.let { ResultView(it) }
@@ -85,15 +86,15 @@ fun BackupPanel(folderUri: String, onBackupFinished: () -> Unit, vm: BackupViewM
         }
         when (val s = state) {
             BackupState.Preparing -> {
-                Text("Vergleiche Medienordner mit dem Speichermedium …", style = MaterialTheme.typography.bodyMedium)
+                Text(stringResource(R.string.backup_comparing), style = MaterialTheme.typography.bodyMedium)
                 LinearProgressIndicator(Modifier.fillMaxWidth())
                 // Dauert nur Sekunden – Pausieren lohnt nicht, Abbrechen schon
                 JobControls(paused = false, onPause = null, onCancel = vm::cancelPrepare)
             }
 
             BackupState.Cancelled -> {
-                Text("Vergleich abgebrochen.", style = MaterialTheme.typography.bodyMedium)
-                Button(onClick = { vm.prepare(folderUri) }) { Text("Erneut prüfen") }
+                Text(stringResource(R.string.backup_compare_cancelled), style = MaterialTheme.typography.bodyMedium)
+                Button(onClick = { vm.prepare(folderUri) }) { Text(stringResource(R.string.backup_compare_again)) }
             }
 
             is BackupState.Ready -> {
@@ -123,9 +124,10 @@ fun BackupPanel(folderUri: String, onBackupFinished: () -> Unit, vm: BackupViewM
             is BackupState.ApplyingMissing -> {
                 Text(
                     when {
-                        missingPaused -> "Pausiert – gelöschte Dateien: ${minOf(s.done + 1, s.total)} von ${s.total}"
-                        s.total > 0 -> "Bearbeite gelöschte Dateien: ${minOf(s.done + 1, s.total)} von ${s.total}"
-                        else -> "Gelöschte Dateien werden bearbeitet …"
+                        missingPaused -> stringResource(R.string.paused_prefix) +
+                            stringResource(R.string.missing_progress, minOf(s.done + 1, s.total), s.total)
+                        s.total > 0 -> stringResource(R.string.missing_progress, minOf(s.done + 1, s.total), s.total)
+                        else -> stringResource(R.string.missing_starting)
                     },
                 )
                 if (s.total > 0) {
@@ -139,22 +141,22 @@ fun BackupPanel(folderUri: String, onBackupFinished: () -> Unit, vm: BackupViewM
             is BackupState.Running -> {
                 val p = s.progress
                 if (backupPaused) {
-                    Text("Pausiert", style = MaterialTheme.typography.titleSmall)
+                    Text(stringResource(R.string.paused), style = MaterialTheme.typography.titleSmall)
                 }
                 if (p != null && p.moving) {
-                    Text("Neue Ordnerstruktur: ${minOf(p.fileIndex + 1, p.fileCount)} von ${p.fileCount} Dateien verschoben")
+                    Text(stringResource(R.string.backup_moving_progress, minOf(p.fileIndex + 1, p.fileCount), p.fileCount))
                     LinearProgressIndicator(
                         progress = { if (p.fileCount > 0) p.fileIndex.toFloat() / p.fileCount else 0f },
                         modifier = Modifier.fillMaxWidth(),
                     )
                 } else if (p == null || p.bytesTotal == 0L) {
-                    Text("Backup wird vorbereitet …")
+                    Text(stringResource(R.string.backup_starting))
                     LinearProgressIndicator(Modifier.fillMaxWidth())
                 } else {
                     Row(Modifier.fillMaxWidth()) {
-                        Text("Datei ${minOf(p.fileIndex + 1, p.fileCount)} von ${p.fileCount}", modifier = Modifier.weight(1f))
+                        Text(stringResource(R.string.backup_file_progress, minOf(p.fileIndex + 1, p.fileCount), p.fileCount), modifier = Modifier.weight(1f))
                         Text(
-                            if (p.remainingSeconds >= 0) formatRemaining(p.remainingSeconds) else "Restzeit wird ermittelt …",
+                            if (p.remainingSeconds >= 0) formatRemaining(p.remainingSeconds) else stringResource(R.string.backup_eta_pending),
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
@@ -163,21 +165,20 @@ fun BackupPanel(folderUri: String, onBackupFinished: () -> Unit, vm: BackupViewM
                         modifier = Modifier.fillMaxWidth(),
                     )
                     Text(
-                        "${formatBytes(p.bytesDone / 2)} von ${formatBytes(p.bytesTotal / 2)} kopiert und geprüft",
+                        stringResource(R.string.backup_bytes_progress, formatBytes(p.bytesDone / 2), formatBytes(p.bytesTotal / 2)),
                         style = MaterialTheme.typography.bodySmall,
                     )
                 }
                 Banner(
-                    "Läuft auch im Hintergrund weiter. Speichermedium bitte nicht abziehen – falls doch, bleibt alles " +
-                        "bereits Geprüfte gesichert und das Backup lässt sich später fortsetzen.",
-                    title = "Speichermedium bitte nicht abziehen",
+                    stringResource(R.string.backup_running_info),
+                    title = stringResource(R.string.dont_unplug),
                 )
                 JobControls(backupPaused, vm::setBackupPaused, vm::cancel)
             }
 
             is BackupState.Error -> {
-                Banner("Fehler: ${s.message}", BannerTone.ERROR)
-                Button(onClick = { vm.prepare(folderUri) }) { Text("Erneut versuchen") }
+                Banner(stringResource(R.string.error_prefix, s.message), BannerTone.ERROR)
+                Button(onClick = { vm.prepare(folderUri) }) { Text(stringResource(R.string.action_retry)) }
             }
         }
     }
@@ -187,26 +188,26 @@ fun BackupPanel(folderUri: String, onBackupFinished: () -> Unit, vm: BackupViewM
 private fun PlanView(plan: BackupPlan, space: SpaceCheck, resume: Boolean, showDone: Boolean, onStart: () -> Unit) {
     if (plan.tooLargeForFileSystem.isNotEmpty()) {
         Banner(
-            "${fileCount(plan.tooLargeForFileSystem.size)} größer als 4 GB – passt nicht auf ein FAT32-Medium: " +
-                "${plan.tooLargeForFileSystem.joinToString { it.displayName }}. Bitte ein mit exFAT formatiertes Medium verwenden.",
+            stringResource(R.string.backup_too_large_fat, fileCount(plan.tooLargeForFileSystem.size), plan.tooLargeForFileSystem.joinToString { it.displayName }),
             BannerTone.WARNING,
         )
     }
     if (plan.toMove.isNotEmpty()) {
         val from = plan.currentLayout?.let { d ->
-            " (bisher: ${layoutLabel(d.layout)}" + (if (d.separateFolders) ", je Medienordner" else "") + ")"
+            val label = stringResource(layoutLabel(d.layout))
+            stringResource(if (d.separateFolders) R.string.backup_layout_was_separate else R.string.backup_layout_was, label)
         }.orEmpty()
         Banner(
-            "Neue Ordnerstruktur: ${fileCount(plan.toMove.size)} liegen noch in der bisherigen Ablage$from und werden " +
-                "beim Backup auf dem Medium verschoben. Der Inhalt bleibt unverändert, es wird nichts neu kopiert.",
-            title = "Neue Ordnerstruktur: ${fileCount(plan.toMove.size)} werden verschoben",
+            stringResource(R.string.backup_relocate_info, fileCount(plan.toMove.size), from),
+            title = stringResource(R.string.backup_relocate_title, fileCount(plan.toMove.size)),
         )
     }
     if (!plan.hasWork) {
         // Direkt nach einem erfolgreichen Lauf sagt das Ergebnis darüber schon dasselbe
         if (showDone) {
             Banner(
-                "Alles gesichert" + (if (plan.alreadyBackedUp > 0) " – ${fileCount(plan.alreadyBackedUp)} liegen auf dem Medium." else "."),
+                if (plan.alreadyBackedUp > 0) stringResource(R.string.backup_all_done_count, fileCount(plan.alreadyBackedUp))
+                else stringResource(R.string.backup_all_done),
                 BannerTone.SUCCESS,
             )
         }
@@ -214,38 +215,37 @@ private fun PlanView(plan: BackupPlan, space: SpaceCheck, resume: Boolean, showD
     }
     if (plan.toCopy.isNotEmpty()) {
         Row {
-            Text("Neu zu sichern", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+            Text(stringResource(R.string.backup_to_copy), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
             Text("${fileCount(plan.toCopy.size)} · ${formatBytes(plan.bytesToCopy)}", style = MaterialTheme.typography.titleSmall)
         }
     }
     if (plan.alreadyBackedUp > 0) {
         Row {
-            Text("Bereits gesichert", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+            Text(stringResource(R.string.backup_already), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
             Text(fileCount(plan.alreadyBackedUp), style = MaterialTheme.typography.bodyMedium)
         }
     }
     when (space) {
         is SpaceCheck.Enough -> Text(
-            "Benötigt inkl. Reserve: ${formatBytes(space.requiredBytes)} – frei: ${formatBytes(space.freeBytes)}",
+            stringResource(R.string.backup_space_ok, formatBytes(space.requiredBytes), formatBytes(space.freeBytes)),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         is SpaceCheck.NotEnough -> Banner(
-            "Zu wenig Platz: benötigt ${formatBytes(space.requiredBytes)} (inkl. Reserve), frei nur " +
-                "${formatBytes(space.freeBytes)}. Bitte Platz schaffen oder ein größeres Medium verwenden.",
+            stringResource(R.string.backup_space_low, formatBytes(space.requiredBytes), formatBytes(space.freeBytes)),
             BannerTone.ERROR,
         )
         is SpaceCheck.Unknown -> Text(
-            "Freier Platz unbekannt – benötigt werden ca. ${formatBytes(space.requiredBytes)}.",
+            stringResource(R.string.backup_space_unknown, formatBytes(space.requiredBytes)),
             style = MaterialTheme.typography.bodySmall,
         )
     }
     Button(onClick = onStart, enabled = space !is SpaceCheck.NotEnough, modifier = Modifier.fillMaxWidth()) {
         Text(
             when {
-                resume -> "Fortsetzen"
-                plan.toCopy.isEmpty() -> "Ordnerstruktur anpassen"
-                else -> "Backup starten"
+                resume -> stringResource(R.string.action_resume)
+                plan.toCopy.isEmpty() -> stringResource(R.string.backup_relocate_start)
+                else -> stringResource(R.string.backup_start)
             },
         )
     }
@@ -255,7 +255,7 @@ private fun PlanView(plan: BackupPlan, space: SpaceCheck, resume: Boolean, showD
 @Composable
 private fun MissingResultView(m: MissingSummary) {
     Banner(
-        "${fileCount(m.restored)} wiederhergestellt, ${fileCount(m.deleted)} im Backup gelöscht" +
+        stringResource(R.string.missing_result, fileCount(m.restored), fileCount(m.deleted)) +
             (m.abortReason?.let { " – $it" } ?: ""),
         if (m.failures.isEmpty() && m.abortReason == null) BannerTone.SUCCESS else BannerTone.WARNING,
     )
@@ -265,21 +265,21 @@ private fun MissingResultView(m: MissingSummary) {
 @Composable
 private fun ResultView(s: RunSummary) {
     Banner(
-        if (s.isComplete && s.copied == 0 && s.moved > 0) "Ordnerstruktur angepasst: ${fileCount(s.moved)} verschoben."
-        else if (s.isComplete && s.copied == 0 && s.adopted == 0) "Backup abgeschlossen – es gab nichts Neues zu sichern."
-        else if (s.isComplete) "Backup abgeschlossen: ${fileCount(s.copied)} (${formatBytes(s.bytesCopied)}) kopiert und geprüft."
-        else "Backup unvollständig: ${fileCount(s.copied)} kopiert" + (s.abortReason?.let { " – $it" } ?: ""),
+        if (s.isComplete && s.copied == 0 && s.moved > 0) stringResource(R.string.backup_result_moved, fileCount(s.moved))
+        else if (s.isComplete && s.copied == 0 && s.adopted == 0) stringResource(R.string.backup_result_nothing)
+        else if (s.isComplete) stringResource(R.string.backup_result_done, fileCount(s.copied), formatBytes(s.bytesCopied))
+        else stringResource(R.string.backup_result_incomplete, fileCount(s.copied)) + (s.abortReason?.let { " – $it" } ?: ""),
         if (s.isComplete) BannerTone.SUCCESS else BannerTone.WARNING,
     )
-    if (s.adopted > 0) Text("Bereits vorhanden und übernommen: ${fileCount(s.adopted)}", style = MaterialTheme.typography.bodySmall)
-    if (s.moved > 0) Text("In die neue Ordnerstruktur verschoben: ${fileCount(s.moved)}", style = MaterialTheme.typography.bodySmall)
+    if (s.adopted > 0) Text(stringResource(R.string.backup_result_adopted, fileCount(s.adopted)), style = MaterialTheme.typography.bodySmall)
+    if (s.moved > 0) Text(stringResource(R.string.backup_result_moved_count, fileCount(s.moved)), style = MaterialTheme.typography.bodySmall)
     if (s.failures.isNotEmpty()) {
-        Text("Fehler bei ${fileCount(s.failures.size)}:", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)
+        Text(stringResource(R.string.failures_header, fileCount(s.failures.size)), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)
         s.failures.take(10).forEach { Text("• ${it.name}: ${it.reason}", style = MaterialTheme.typography.bodySmall) }
     }
     if (s.abortReason != null) {
         Text(
-            "Alles bis zur Unterbrechung ist geprüft gesichert. Beim Fortsetzen werden nur die fehlenden Dateien kopiert.",
+            stringResource(R.string.backup_result_resume_info),
             style = MaterialTheme.typography.bodySmall,
         )
     }

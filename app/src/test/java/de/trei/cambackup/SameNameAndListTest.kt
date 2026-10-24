@@ -81,11 +81,11 @@ class SameNameAndListTest {
             ),
             zone,
         )
-        assertTrue(csv.startsWith("﻿Datei auf dem Medium;Pfad auf dem Smartphone;"))
-        val lines = csv.removePrefix("﻿").split("\r\n").filter { it.isNotEmpty() }
+        assertTrue(csv.startsWith("${Char(0xFEFF)}File on the storage device;Path on the phone;"))
+        val lines = csv.removePrefix("${Char(0xFEFF)}").split("\r\n").filter { it.isNotEmpty() }
         assertEquals(4, lines.size) // Kopf + 3, gelöschte fehlt
-        assertEquals("2026/IMG_1 (1).jpg;Pictures/Camera/IMG_1.jpg;2026-09-21 16:13:20;image/jpeg;100;Gesichert;100;;ja;sha-2026/IMG_1 (1).jpg", lines[1])
-        assertEquals("2026/IMG_1.jpg;DCIM/Camera/IMG_1.jpg;2026-09-21 16:13:20;image/jpeg;100;Auf dem Smartphone verkleinert;10;2026-10-24 22:20:45;;sha-2026/IMG_1.jpg", lines[2])
+        assertEquals("2026/IMG_1 (1).jpg;Pictures/Camera/IMG_1.jpg;2026-09-21 16:13:20;image/jpeg;100;Backed up;100;;yes;sha-2026/IMG_1 (1).jpg", lines[1])
+        assertEquals("2026/IMG_1.jpg;DCIM/Camera/IMG_1.jpg;2026-09-21 16:13:20;image/jpeg;100;Compressed on the phone;10;2026-10-24 22:20:45;;sha-2026/IMG_1.jpg", lines[2])
         assertTrue(lines[3].startsWith("\"2026/a;b.jpg\";\"DCIM/Camera/a;b.jpg\";"))
     }
 

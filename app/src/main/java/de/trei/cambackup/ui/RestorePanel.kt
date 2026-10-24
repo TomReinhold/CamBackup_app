@@ -29,6 +29,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.AndroidViewModel
@@ -59,6 +61,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import de.trei.cambackup.util.toMsg
 
 sealed interface RestoreState {
     data object Loading : RestoreState
@@ -85,7 +88,7 @@ class RestoreViewModel(app: Application) : AndroidViewModel(app) {
             ov == null -> RestoreState.Loading
             else -> ov.fold(
                 onSuccess = { if (it.candidates.isEmpty()) RestoreState.Nothing else RestoreState.Ready(it) },
-                onFailure = { RestoreState.Error(it.message ?: it.javaClass.simpleName) },
+                onFailure = { RestoreState.Error(it.toMsg().ui) },
             )
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), RestoreState.Loading)
@@ -153,11 +156,11 @@ fun RestorePanel(folderUri: String, onFinished: () -> Unit, vm: RestoreViewModel
     // Ohne verkleinerte Dateien keine Karte – außer um das Ergebnis eines eben beendeten Laufs zu zeigen
     if ((state is RestoreState.Nothing || state is RestoreState.Loading) && result == null) return
 
-    FeatureCard(icon = R.drawable.ic_restore, title = "Originale zurückholen", subtitle = "Verkleinerte Dateien wieder in voller Größe") {
+    FeatureCard(icon = R.drawable.ic_restore, title = stringResource(R.string.restore_title), subtitle = stringResource(R.string.restore_subtitle)) {
         if (state !is RestoreState.Running) {
             result?.let { r ->
                 Banner(
-                    "${fileCount(r.restored)} wieder in voller Größe (${formatBytes(r.bytesAdded)})" + (r.abortReason?.let { " – $it" } ?: ""),
+                    stringResource(R.string.restore_result, fileCount(r.restored), formatBytes(r.bytesAdded)) + (r.abortReason?.let { " – $it" } ?: ""),
                     if (r.failures.isEmpty() && r.abortReason == null) BannerTone.SUCCESS else BannerTone.WARNING,
                 )
                 r.failures.take(10).forEach { Text("• ${it.name}: ${it.reason}", style = MaterialTheme.typography.bodySmall) }
@@ -167,37 +170,39 @@ fun RestorePanel(folderUri: String, onFinished: () -> Unit, vm: RestoreViewModel
             is RestoreState.Ready -> {
                 val o = s.overview
                 Row {
-                    Text("Verkleinert auf dem Smartphone", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+                    Text(stringResource(R.string.restore_compressed), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
                     Text(fileCount(o.candidates.size), style = MaterialTheme.typography.titleSmall)
                 }
                 Row {
-                    Text("Braucht zusätzlich", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+                    Text(stringResource(R.string.restore_needs), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
                     Text(formatBytes(o.candidates.sumOf { it.extraBytes }), style = MaterialTheme.typography.titleSmall)
                 }
                 if (o.enoughSpace) {
                     Text(
-                        "Frei auf dem Smartphone: ${formatBytes(o.phoneFree)}",
+                        stringResource(R.string.restore_phone_free, formatBytes(o.phoneFree)),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 } else {
                     Banner(
-                        "Zu wenig Platz auf dem Smartphone: benötigt ${formatBytes(o.spaceNeeded)} (inkl. Reserve), frei ${formatBytes(o.phoneFree)}.",
+                        stringResource(R.string.restore_space_low, formatBytes(o.spaceNeeded), formatBytes(o.phoneFree)),
                         BannerTone.ERROR,
                     )
                 }
                 OutlinedButton(onClick = { confirm = true }, enabled = o.enoughSpace, modifier = Modifier.fillMaxWidth()) {
-                    Text("Alle Originale zurückholen")
+                    Text(stringResource(R.string.restore_all))
                 }
                 if (confirm) {
                     AlertDialog(
                         onDismissRequest = { confirm = false },
-                        title = { Text("Originale zurückholen?") },
+                        title = { Text(stringResource(R.string.restore_confirm_title)) },
                         text = {
                             Column {
                                 Text(
-                                    "${fileCount(o.candidates.size)} " + (if (o.candidates.size == 1) "wird" else "werden") +
-                                        " durch das Original vom Speichermedium ersetzt. Das belegt ${formatBytes(o.candidates.sumOf { it.extraBytes })} mehr auf dem Smartphone.",
+                                    pluralStringResource(
+                                        R.plurals.restore_confirm_text, o.candidates.size,
+                                        fileCount(o.candidates.size), formatBytes(o.candidates.sumOf { it.extraBytes }),
+                                    ),
                                 )
                                 Row(
                                     Modifier.fillMaxWidth().toggleable(value = keepOriginal, onValueChange = { keepOriginal = it }, role = Role.Checkbox),
@@ -205,7 +210,7 @@ fun RestorePanel(folderUri: String, onFinished: () -> Unit, vm: RestoreViewModel
                                 ) {
                                     Checkbox(checked = keepOriginal, onCheckedChange = null)
                                     Spacer(Modifier.width(8.dp))
-                                    Text("Danach nicht erneut automatisch verkleinern", style = MaterialTheme.typography.bodyMedium)
+                                    Text(stringResource(R.string.restore_keep_original), style = MaterialTheme.typography.bodyMedium)
                                 }
                             }
                         },
@@ -213,27 +218,28 @@ fun RestorePanel(folderUri: String, onFinished: () -> Unit, vm: RestoreViewModel
                             TextButton(onClick = {
                                 confirm = false
                                 writeRequest.launch(IntentSenderRequest.Builder(vm.writeRequest(o).intentSender).build())
-                            }) { Text("Zurückholen") }
+                            }) { Text(stringResource(R.string.restore_confirm)) }
                         },
-                        dismissButton = { TextButton(onClick = { confirm = false }) { Text("Abbrechen") } },
+                        dismissButton = { TextButton(onClick = { confirm = false }) { Text(stringResource(R.string.action_cancel)) } },
                     )
                 }
             }
 
             is RestoreState.Running -> {
                 Text(
-                    (if (paused) "Pausiert – " else "") +
-                        if (s.total > 0) "Original ${minOf(s.done + 1, s.total)} von ${s.total}" else "Wird gestartet …",
+                    (if (paused) stringResource(R.string.paused_prefix) else "") +
+                        if (s.total > 0) stringResource(R.string.restore_progress, minOf(s.done + 1, s.total), s.total)
+                        else stringResource(R.string.restore_starting),
                 )
                 if (s.total > 0) LinearProgressIndicator(progress = { s.done.toFloat() / s.total }, modifier = Modifier.fillMaxWidth())
                 else LinearProgressIndicator(Modifier.fillMaxWidth())
-                Banner("Speichermedium bitte nicht abziehen.")
+                Banner(stringResource(R.string.dont_unplug))
                 JobControls(paused, vm::setPaused, vm::cancel)
             }
 
             is RestoreState.Error -> {
-                Banner("Fehler: ${s.message}", BannerTone.ERROR)
-                Button(onClick = { vm.load(folderUri) }) { Text("Erneut versuchen") }
+                Banner(stringResource(R.string.error_prefix, s.message), BannerTone.ERROR)
+                Button(onClick = { vm.load(folderUri) }) { Text(stringResource(R.string.action_retry)) }
             }
 
             RestoreState.Loading, RestoreState.Nothing -> Unit

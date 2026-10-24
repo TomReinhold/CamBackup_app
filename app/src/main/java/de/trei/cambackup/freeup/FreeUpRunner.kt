@@ -20,7 +20,13 @@ import de.trei.cambackup.storage.DeviceRegistry
 import de.trei.cambackup.storage.DirCache
 import de.trei.cambackup.storage.DriveRepository
 import de.trei.cambackup.storage.SafIo
-import de.trei.cambackup.util.formatBytes
+import de.trei.cambackup.R
+import de.trei.cambackup.util.AppError
+import de.trei.cambackup.util.L10n
+import de.trei.cambackup.util.Msg
+import de.trei.cambackup.util.formatBytesEn
+import de.trei.cambackup.util.msg
+import de.trei.cambackup.util.toMsg
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
@@ -53,7 +59,7 @@ class FreeUpRunner(private val context: Context) {
 
     private suspend fun open(folderUri: String): Opened = withContext(Dispatchers.IO) {
         val deviceDir = drives.requireFolder(folderUri)
-        val metadata = deviceDir.findFile(DeviceRegistry.METADATA_DIR) ?: throw IOException("Ordner Metadata fehlt")
+        val metadata = deviceDir.findFile(DeviceRegistry.METADATA_DIR) ?: throw AppError(R.string.err_no_metadata)
         Opened(deviceDir, BackupIndex.open(io, metadata))
     }
 
@@ -83,15 +89,15 @@ class FreeUpRunner(private val context: Context) {
         var done = 0
         var saved = 0L
         val skipped = linkedMapOf<String, Int>()
-        val failures = mutableListOf<FreeUpSummary.Failure>()
+        val failures = mutableListOf<Pair<String, Msg>>()
         fun skip(reason: String) { skipped[reason] = (skipped[reason] ?: 0) + 1 }
-        var abort: String? = null
+        var abort: Msg? = null
         var lastShown = 0L
 
         for ((i, c) in candidates.withIndex()) {
             JobControl.waitWhilePaused(JobControl.FREE_UP) { !caller.isActive }
             if (!caller.isActive) {
-                abort = "Abgebrochen"
+                abort = msg(R.string.abort_cancelled)
                 break
             }
             val item = c.item
@@ -102,22 +108,22 @@ class FreeUpRunner(private val context: Context) {
                 continue
             }
             if (!prepareSpaceOk(context.cacheDir.usableSpace, item.sizeBytes)) {
-                abort = "Zu wenig Platz auf dem Smartphone für die verkleinerte Kopie"
+                abort = msg(R.string.abort_phone_full)
                 break
             }
             var file: File? = null
             try {
                 if (!backupPresent(dirs, c.entry)) {
                     if (!opened.deviceDir.exists()) {
-                        abort = "Speichermedium wurde getrennt"
+                        abort = msg(R.string.abort_disconnected)
                         break
                     }
-                    failures += FreeUpSummary.Failure(item.displayName, "Sicherung auf dem Medium fehlt oder ist unvollständig")
+                    failures += item.displayName to msg(R.string.err_backup_missing_or_incomplete)
                     continue
                 }
                 // Sicherheitsregel: nur ein bitgenau gesichertes Original darf ersetzt werden
                 if (hashOf(item.uri) != c.entry.originalSha256) {
-                    skip("Seit der Sicherung verändert")
+                    skip(L10n.str(R.string.skip_changed))
                     continue
                 }
                 when (val r = if (item.isVideo) videos.shrink(item, s, now) else images.shrink(item, s, now)) {
@@ -145,15 +151,15 @@ class FreeUpRunner(private val context: Context) {
                     }
                 }
             } catch (e: CancellationException) {
-                abort = "Abgebrochen"
+                abort = msg(R.string.abort_cancelled)
                 break
             } catch (e: Exception) {
                 if (!opened.deviceDir.exists()) {
-                    abort = "Speichermedium wurde getrennt"
-                    failures += FreeUpSummary.Failure(item.displayName, e.message ?: "Fehler")
+                    abort = msg(R.string.abort_disconnected)
+                    failures += item.displayName to e.toMsg()
                     break
                 }
-                failures += FreeUpSummary.Failure(item.displayName, e.message ?: e.javaClass.simpleName)
+                failures += item.displayName to e.toMsg()
             } finally {
                 file?.delete()
             }
@@ -174,7 +180,7 @@ class FreeUpRunner(private val context: Context) {
             }
         }
         images.clearCache()
-        return FreeUpSummary(Instant.now().toString(), doReplace, done, saved, skipped, failures, abort)
+        return FreeUpSummary(Instant.now().toString(), doReplace, done, saved, skipped, failures.map { FreeUpSummary.Failure(it.first, it.second.ui) }, abort?.ui)
     }
 
     /**
@@ -189,7 +195,7 @@ class FreeUpRunner(private val context: Context) {
             changes.forEach { opened.index.record(it) }
             opened.index.compact()
             val metadata = opened.deviceDir.findFile(DeviceRegistry.METADATA_DIR)
-            val text = if (keep) "vom Verkleinern ausgeschlossen" else "wieder zum Verkleinern freigegeben"
+            val text = if (keep) "excluded from compression" else "allowed for compression again"
             metadata?.let { runCatching { io.appendText(it, "backup_log.txt", "${Instant.now()}  ${changes.size} $text\n") } }
             IndexCache.get(context).update(opened.index.state)
         }
@@ -199,56 +205,56 @@ class FreeUpRunner(private val context: Context) {
     private suspend fun replaceOne(p: PendingReplacement, index: BackupIndex, dirs: DirCache) {
         val uri = Uri.parse(p.uri)
         val entry = index.state.forPhonePath(p.phonePath).lastOrNull { it.originalSha256 == p.originalSha256 }
-            ?: throw IOException("Kein Index-Eintrag")
-        val backup = backupFile(dirs, entry) ?: throw IOException("Sicherung auf dem Medium fehlt")
-        if (backup.length() != entry.originalSize) throw IOException("Sicherung auf dem Medium unvollständig")
+            ?: throw AppError(R.string.err_no_index_entry)
+        val backup = backupFile(dirs, entry) ?: throw AppError(R.string.err_backup_missing)
+        if (backup.length() != entry.originalSize) throw AppError(R.string.err_backup_incomplete)
         val currentSize = resolver.openAssetFileDescriptor(originalUri(uri), "r")?.use { it.length } ?: -1
-        if (currentSize != p.originalSize) throw IOException("Datei wurde während des Verkleinerns verändert")
+        if (currentSize != p.originalSize) throw AppError(R.string.err_changed_while_compressing)
         val newFile = File(p.newFile)
-        if (!newFile.exists() || newFile.length() != p.newSize) throw IOException("Verkleinerte Datei fehlt")
+        if (!newFile.exists() || newFile.length() != p.newSize) throw AppError(R.string.err_compressed_missing)
 
         // Erst den Index (Absicht) schreiben, dann ersetzen: so wird eine verkleinerte Datei
         // nach einem Abbruch nie als neues „Original“ gesichert.
         index.record(entry.asCompressed(p, Instant.now().toString()))
         try {
             io.writeSynced(uri, p.displayName) { out -> newFile.inputStream().use { it.copyTo(out, 1 shl 20) } }
-            if (hashOf(uri) != p.newSha256) throw IOException("Prüfsumme nach dem Ersetzen falsch")
+            if (hashOf(uri) != p.newSha256) throw AppError(R.string.err_checksum_after_replace)
         } catch (e: Exception) {
             // Scheitert schon das Öffnen (z. B. keine Schreibberechtigung), ist das Original noch unverändert
             if (runCatching { hashOf(uri) == entry.originalSha256 }.getOrDefault(false)) {
                 index.record(entry.asVerifiedOnly())
-                throw IOException("Ersetzen fehlgeschlagen (${e.message}) – Original unverändert", e)
+                throw AppError(msg(R.string.err_replace_failed_unchanged, e.toMsg()), e)
             }
             restoreOriginal(uri, p, backup, index, entry)
-            throw IOException("Ersetzen fehlgeschlagen (${e.message}) – Original wiederhergestellt", e)
+            throw AppError(msg(R.string.err_replace_failed_restored, e.toMsg()), e)
         }
     }
 
     /** Spielt das Original vom Medium zurück auf das Smartphone. */
     private suspend fun restoreOriginal(uri: Uri, p: PendingReplacement, backup: DocumentFile, index: BackupIndex, entry: IndexEntry) {
         io.writeSynced(uri, p.displayName) { out ->
-            (resolver.openInputStream(backup.uri) ?: throw IOException("Sicherung nicht lesbar")).use { it.copyTo(out, 1 shl 20) }
+            (resolver.openInputStream(backup.uri) ?: throw AppError(R.string.err_backup_unreadable)).use { it.copyTo(out, 1 shl 20) }
         }
         if (hashOf(uri) != entry.originalSha256) {
-            throw IOException("ACHTUNG: Wiederherstellen fehlgeschlagen – Original liegt unter ${entry.backupPath} auf dem Medium")
+            throw AppError(R.string.err_restore_failed_warning, entry.backupPath)
         }
         index.record(entry.asVerifiedOnly())
     }
 
     /** Protokolliert das Ersetzen in Metadata/backup_log.txt – nachvollziehbar auch am PC. */
-    private fun appendLog(deviceDir: DocumentFile, replaced: Int, saved: Long, failures: List<FreeUpSummary.Failure>, abort: String?) {
+    private fun appendLog(deviceDir: DocumentFile, replaced: Int, saved: Long, failures: List<Pair<String, Msg>>, abort: Msg?) {
         val metadata = deviceDir.findFile(DeviceRegistry.METADATA_DIR) ?: return
         val line = buildString {
-            append("${Instant.now()}  Ersetzt: $replaced auf dem Smartphone verkleinert (${formatBytes(saved)} frei), ${failures.size} Fehler")
-            abort?.let { append(" – abgebrochen: $it") }
+            append("${Instant.now()}  Replaced: $replaced compressed on the phone (${formatBytesEn(saved)} freed), ${failures.size} errors")
+            abort?.let { append(" – aborted: ${it.en}") }
             append("\n")
-            failures.forEach { append("    Fehler: ${it.name}: ${it.reason}\n") }
+            failures.forEach { (name, reason) -> append("    Error: $name: ${reason.en}\n") }
         }
         runCatching { io.appendText(metadata, "backup_log.txt", line) }
     }
 
     private suspend fun hashOf(uri: Uri): String =
-        withContext(Dispatchers.IO) { (resolver.openInputStream(originalUri(uri)) ?: throw IOException("nicht lesbar")).use { sha256(it).sha256 } }
+        withContext(Dispatchers.IO) { (resolver.openInputStream(originalUri(uri)) ?: throw AppError(R.string.err_unreadable)).use { sha256(it).sha256 } }
 
     private fun backupFile(dirs: DirCache, entry: IndexEntry): DocumentFile? {
         val sub = entry.backupPath.substringBeforeLast('/', "")

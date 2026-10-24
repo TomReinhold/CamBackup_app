@@ -1,7 +1,7 @@
 package de.trei.cambackup
 
 import de.trei.cambackup.backup.EtaEstimator
-import de.trei.cambackup.util.formatRemaining
+import de.trei.cambackup.util.remainingHoursMinutes
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -39,10 +39,10 @@ class EtaTest {
 
     @Test
     fun `Restdauer formatieren`() {
-        assertEquals("noch weniger als 1 Min.", formatRemaining(30))
-        assertEquals("noch ca. 1 Min.", formatRemaining(60))
-        assertEquals("noch ca. 2 Min.", formatRemaining(61))
-        assertEquals("noch ca. 1 Std.", formatRemaining(3600))
-        assertEquals("noch ca. 1 Std. 5 Min.", formatRemaining(3900))
+        assertEquals(null, remainingHoursMinutes(30))
+        assertEquals(0L to 1L, remainingHoursMinutes(60))
+        assertEquals(0L to 2L, remainingHoursMinutes(61))
+        assertEquals(1L to 0L, remainingHoursMinutes(3600))
+        assertEquals(1L to 5L, remainingHoursMinutes(3900))
     }
 }

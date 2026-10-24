@@ -1,0 +1,544 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Allgemein -->
+    <plurals name="file_count">
+        <item quantity="one">%d Datei</item>
+        <item quantity="other">%d Dateien</item>
+    </plurals>
+    <string name="remaining_under_minute">noch weniger als 1 Min.</string>
+    <string name="remaining_minutes">noch ca. %d Min.</string>
+    <string name="remaining_hours">noch ca. %d Std.</string>
+    <string name="remaining_hours_minutes">noch ca. %1$d Std. %2$d Min.</string>
+    <string name="action_cancel">Abbrechen</string>
+    <string name="action_pause">Pausieren</string>
+    <string name="action_resume">Fortsetzen</string>
+    <string name="action_retry">Erneut versuchen</string>
+    <string name="action_delete">Löschen</string>
+    <string name="action_back">Zurück</string>
+    <string name="action_close">Schließen</string>
+    <string name="paused_prefix">"Pausiert – "</string>
+    <string name="paused">Pausiert</string>
+    <string name="cancelled">Abgebrochen</string>
+    <string name="error_prefix">Fehler: %s</string>
+    <string name="info_default_title">Hinweis</string>
+    <string name="info_expand">Ausklappen</string>
+    <string name="info_collapse">Einklappen</string>
+    <string name="dont_unplug">Speichermedium bitte nicht abziehen</string>
+    <string name="failures_header">Fehler bei %s:</string>
+
+    <!-- Navigation -->
+    <string name="tab_overview">Übersicht</string>
+    <string name="tab_gallery">Galerie</string>
+    <string name="tab_settings">Einstellungen</string>
+    <string name="tab_info">Info</string>
+    <string name="metadata_title">Metadaten</string>
+
+    <!-- Backup -->
+    <string name="backup_title">Backup</string>
+    <string name="backup_subtitle">Originale bitgenau auf das Speichermedium kopieren</string>
+    <string name="backup_comparing">Vergleiche Medienordner mit dem Speichermedium …</string>
+    <string name="backup_compare_cancelled">Vergleich abgebrochen.</string>
+    <string name="backup_compare_again">Erneut prüfen</string>
+    <string name="missing_progress">Bearbeite gelöschte Dateien: %1$d von %2$d</string>
+    <string name="missing_starting">Gelöschte Dateien werden bearbeitet …</string>
+    <string name="backup_moving_progress">Neue Ordnerstruktur: %1$d von %2$d Dateien verschoben</string>
+    <string name="backup_starting">Backup wird vorbereitet …</string>
+    <string name="backup_file_progress">Datei %1$d von %2$d</string>
+    <string name="backup_eta_pending">Restzeit wird ermittelt …</string>
+    <string name="backup_bytes_progress">%1$s von %2$s kopiert und geprüft</string>
+    <string name="backup_running_info">Läuft auch im Hintergrund weiter. Speichermedium bitte nicht abziehen – falls doch, bleibt alles bereits Geprüfte gesichert und das Backup lässt sich später fortsetzen.</string>
+    <string name="backup_too_large_fat">%1$s größer als 4 GB – passt nicht auf ein FAT32-Medium: %2$s. Bitte ein mit exFAT formatiertes Medium verwenden.</string>
+    <string name="backup_layout_was">" (bisher: %s)"</string>
+    <string name="backup_layout_was_separate">" (bisher: %s, je Medienordner)"</string>
+    <string name="backup_relocate_info">Neue Ordnerstruktur: %1$s liegen noch in der bisherigen Ablage%2$s und werden beim Backup auf dem Medium verschoben. Der Inhalt bleibt unverändert, es wird nichts neu kopiert.</string>
+    <string name="backup_relocate_title">Neue Ordnerstruktur: %s werden verschoben</string>
+    <string name="backup_all_done">Alles gesichert.</string>
+    <string name="backup_all_done_count">Alles gesichert – %s liegen auf dem Medium.</string>
+    <string name="backup_to_copy">Neu zu sichern</string>
+    <string name="backup_already">Bereits gesichert</string>
+    <string name="backup_space_ok">Benötigt inkl. Reserve: %1$s – frei: %2$s</string>
+    <string name="backup_space_low">Zu wenig Platz: benötigt %1$s (inkl. Reserve), frei nur %2$s. Bitte Platz schaffen oder ein größeres Medium verwenden.</string>
+    <string name="backup_space_unknown">Freier Platz unbekannt – benötigt werden ca. %s.</string>
+    <string name="backup_relocate_start">Ordnerstruktur anpassen</string>
+    <string name="backup_start">Backup starten</string>
+    <string name="missing_result">%1$s wiederhergestellt, %2$s im Backup gelöscht</string>
+    <string name="backup_result_moved">Ordnerstruktur angepasst: %s verschoben.</string>
+    <string name="backup_result_nothing">Backup abgeschlossen – es gab nichts Neues zu sichern.</string>
+    <string name="backup_result_done">Backup abgeschlossen: %1$s (%2$s) kopiert und geprüft.</string>
+    <string name="backup_result_incomplete">Backup unvollständig: %s kopiert</string>
+    <string name="backup_result_adopted">Bereits vorhanden und übernommen: %s</string>
+    <string name="backup_result_moved_count">In die neue Ordnerstruktur verschoben: %s</string>
+    <string name="backup_result_resume_info">Alles bis zur Unterbrechung ist geprüft gesichert. Beim Fortsetzen werden nur die fehlenden Dateien kopiert.</string>
+
+    <!-- Bezeichnungen -->
+    <string name="label_original">Original</string>
+    <string name="label_compressed">Verkleinert</string>
+    <string name="label_images">Bilder</string>
+    <string name="label_videos">Videos</string>
+
+    <!-- Einstellungen -->
+    <string name="settings_folders">Medienordner</string>
+    <string name="settings_storage">Ablage auf dem Medium</string>
+    <string name="settings_photos_title">Fotos verkleinern</string>
+    <string name="settings_videos_title">Videos verkleinern</string>
+    <string name="settings_rules">Wann verkleinern</string>
+    <string name="settings_language">Sprache</string>
+    <string name="settings_reset">Auf Standardwerte zurücksetzen</string>
+    <string name="settings_reset_title">Zurücksetzen?</string>
+    <string name="settings_reset_text">Alle Einstellungen außer den Medienordnern werden auf die Standardwerte gesetzt. Der Probelauf ist danach wieder aktiv.</string>
+    <string name="settings_reset_confirm">Zurücksetzen</string>
+    <string name="settings_group_backup">Sicherung</string>
+    <string name="settings_group_shrink">Verkleinern</string>
+    <string name="settings_group_app">App</string>
+    <string name="settings_per_folder_suffix">" · je Medienordner"</string>
+    <string name="settings_photos">Fotos</string>
+    <string name="settings_photos_max">max. %d px</string>
+    <string name="settings_photos_original">Originalgröße</string>
+    <string name="settings_photos_quality">" · Qualität %d"</string>
+    <string name="settings_photos_with_gps">" · mit Standort"</string>
+    <string name="settings_photos_without_gps">" · ohne Standort"</string>
+    <string name="settings_videos">Videos</string>
+    <string name="settings_videos_original">Originalauflösung</string>
+    <string name="settings_rules_now">sofort</string>
+    <string name="settings_rules_from">ab %s</string>
+    <string name="settings_rules_min_saving">" · mind. %d %% kleiner"</string>
+    <string name="settings_dry_run">Probelauf</string>
+    <string name="language_system">Systemsprache</string>
+    <string name="language_german">Deutsch</string>
+    <string name="language_english">English</string>
+    <string name="language_hint">„Systemsprache“ folgt der Einstellung des Smartphones; bei anderen Sprachen als Deutsch verwendet die App Englisch.</string>
+    <string name="preview_title">Vorschau</string>
+    <string name="preview_hint">Echte Kompression eines deiner Fotos</string>
+    <string name="preview_prev">Vorheriges Bild</string>
+    <string name="preview_next">Nächstes Bild</string>
+    <string name="preview_whole">Ganzes Bild</string>
+    <string name="preview_detail" formatted="false">Detail 100 %</string>
+    <string name="preview_no_images">Keine Fotos in den gewählten Ordnern gefunden.</string>
+    <string name="preview_error">Vorschau nicht möglich: %s</string>
+    <string name="preview_position">%1$s · Bild %2$d von %3$d</string>
+    <string name="estimate_title">Voraussichtlicher Speicherplatz</string>
+    <string name="estimate_calculating">Probebilder werden komprimiert …</string>
+    <string name="estimate_nothing">Noch nichts zu verkleinern</string>
+    <string name="estimate_freed">werden frei</string>
+    <string name="estimate_now">Jetzt</string>
+    <string name="estimate_after">Danach</string>
+    <plurals name="estimate_too_recent">
+        <item quantity="one">%1$s (%2$s) ist jünger als %3$s und bleibt in Originalqualität.</item>
+        <item quantity="other">%1$s (%2$s) sind jünger als %3$s und bleiben in Originalqualität.</item>
+    </plurals>
+    <string name="estimate_basis">Schätzung: Bilder anhand von %d Probebildern, Videos anhand Dauer × Bitrate.</string>
+    <string name="estimate_basis_some">Schätzung: Bilder anhand einiger Probebilder, Videos anhand Dauer × Bitrate.</string>
+    <string name="estimate_legend_unchanged">bleibt</string>
+    <string name="estimate_legend_free">frei</string>
+    <string name="folders_subtitle">Welche Ordner gesichert und verkleinert werden</string>
+    <string name="folders_hint_multiple">Mehrere Ordner: Auf dem Speichermedium bekommt jeder einen eigenen Unterordner (z. B. „DCIM/Camera/2026/10“). Bereits gesicherte Dateien werden beim nächsten Backup dorthin verschoben.</string>
+    <string name="folders_hint_single">Bei einem Ordner liegen die Sicherungen direkt im Geräteordner. Bei mehreren bekommt jeder einen eigenen Unterordner.</string>
+    <string name="folder_camera">Kamera</string>
+    <string name="folder_screenshots">Screenshots</string>
+    <string name="folder_movies">Filme</string>
+    <string name="folder_pictures">Bilder</string>
+    <string name="folder_downloads">Downloads</string>
+    <string name="photos_subtitle">Werden als JPEG neu gespeichert</string>
+    <string name="photos_max_edge">Maximale Kantenlänge</string>
+    <string name="photos_edge_2048">≈ 4 MP – gut für Bildschirm und Teilen</string>
+    <string name="photos_edge_3072">≈ 9 MP – auch für Fotoabzüge bis ca. 20 × 30 cm</string>
+    <string name="photos_edge_4096">≈ 16 MP – kaum sichtbarer Unterschied zum Original</string>
+    <string name="photos_edge_original">Auflösung bleibt, nur die JPEG-Qualität wird angepasst</string>
+    <string name="photos_quality">JPEG-Qualität</string>
+    <string name="photos_quality_smaller">kleiner</string>
+    <string name="photos_quality_better">besser</string>
+    <string name="photos_keep_gps">Standort (GPS) behalten</string>
+    <string name="photos_keep_gps_hint">Aufnahmedatum und Kameradaten bleiben immer erhalten</string>
+    <string name="videos_subtitle">Werden neu kodiert – das dauert und braucht Akku</string>
+    <string name="videos_max_resolution">Maximale Auflösung</string>
+    <string name="videos_hevc_hint">Etwa halb so groß bei gleicher Qualität; spielt auf aktuellen Geräten problemlos</string>
+    <string name="videos_h264_hint">Läuft überall, auch auf älteren Geräten und Fernsehern</string>
+    <string name="videos_bitrate">Videobitrate</string>
+    <string name="videos_per_minute">Aktuell ≈ %s pro Minute Video</string>
+    <string name="videos_limit_30">Auf 30 Bilder/s begrenzen</string>
+    <string name="videos_limit_30_hint">Spart bei 60-fps-Videos zusätzlich Platz</string>
+    <string name="rules_title">Wann wird verkleinert?</string>
+    <string name="rules_subtitle">Gilt für Fotos und Videos</string>
+    <string name="rules_min_age">Erst verkleinern ab einem Alter von</string>
+    <string name="rules_min_age_hint">Neuere Fotos und Videos bleiben auf dem Smartphone in Originalqualität</string>
+    <string name="rules_min_saving">Mindest-Ersparnis</string>
+    <string name="rules_min_saving_hint">Dateien, die dadurch nicht mindestens %d %% kleiner werden, bleiben unverändert.</string>
+    <string name="rules_dry_run_hint">Nur sichern – auf dem Smartphone wird nichts ersetzt</string>
+    <string name="rules_dry_run_off_warning">Nach erfolgreicher, geprüfter Sicherung werden Fotos und Videos auf dem Smartphone durch die verkleinerten Versionen ersetzt. Die Originale liegen dann nur noch auf dem Speichermedium.</string>
+    <string name="storage_title">Ablage auf dem Speichermedium</string>
+    <string name="storage_subtitle">Wie die Originale im Backup-Ordner abgelegt werden</string>
+    <string name="storage_subfolders">Unterordner</string>
+    <string name="storage_hint">Bereits gesicherte Dateien werden beim nächsten Backup automatisch in diese Struktur verschoben.</string>
+    <string name="storage_hint_folders">Bei mehreren Medienordnern bekommt jeder zusätzlich einen eigenen Unterordner (z. B. „Pictures/Screenshots“). Den Backup-Ordner selbst wählst du in der Übersicht unter „Speichermedium“.</string>
+    <string name="storage_preview_root">Backup-Ordner</string>
+    <string name="layout_short_flat">Keine</string>
+    <string name="layout_short_year">Jahr</string>
+    <string name="layout_short_year_month">Jahr / Monat</string>
+    <string name="layout_flat">Ohne Unterordner</string>
+    <string name="layout_year">Nach Jahr</string>
+    <string name="layout_year_month">Nach Jahr und Monat</string>
+    <string name="age_short_now">sofort</string>
+    <string name="age_year">1 Jahr</string>
+    <string name="age_short_days">%d T.</string>
+    <plurals name="age_days">
+        <item quantity="one">%d Tag</item>
+        <item quantity="other">%d Tage</item>
+    </plurals>
+
+    <!-- Speichermedium -->
+    <string name="action_save">Speichern</string>
+    <string name="drive_title">Speichermedium</string>
+    <string name="drive_new_volume">Neues Speichermedium „%s“ erkannt. Wähle dort den Backup-Ordner für dieses Smartphone.</string>
+    <string name="drive_new_volume_title">Neues Speichermedium erkannt</string>
+    <string name="drive_pick_on">Backup-Ordner auf %s wählen</string>
+    <string name="drive_not_connected">Das Speichermedium mit dem Backup-Ordner ist nicht verbunden. Bitte einstecken – die App findet ihn automatisch.</string>
+    <string name="drive_connect_hint">Schließe einen USB-Stick oder eine SD-Karte an und wähle einen Ordner für die Sicherung dieses Smartphones.</string>
+    <string name="drive_tip">Tipp: Lege auf dem Medium einen Ordner an (z. B. „Backup Handy“) und wähle ihn. Wählst du einen Ordner, der Backup-Ordner mehrerer Smartphones enthält, findet die App den passenden selbst.</string>
+    <string name="drive_pick">Ordner wählen</string>
+    <string name="drive_pick_other">Anderen Ordner wählen</string>
+    <string name="drive_pick_other_backup">Anderen Backup-Ordner wählen</string>
+    <string name="drive_free_unknown">Freier Speicher: unbekannt</string>
+    <string name="drive_free">%s frei</string>
+    <string name="drive_of_total">von %s</string>
+    <string name="drive_last_backup">Letzte Sicherung: %s</string>
+    <string name="drive_never">noch keine</string>
+    <string name="drive_rename">Namen ändern</string>
+    <string name="drive_phone_name">Name des Smartphones</string>
+    <string name="drive_phone_name_hint">Unter diesem Namen erscheint das Smartphone in den Metadaten des Backup-Ordners.</string>
+    <string name="drive_checking">Ordner wird geprüft …</string>
+    <string name="drive_found_title">Backup-Ordner gefunden</string>
+    <string name="drive_found_text">In „%1$s“ liegt der Backup-Ordner „%2$s“ dieses Smartphones („%3$s“, letzte Sicherung %4$s). Verwenden?</string>
+    <string name="drive_use">Verwenden</string>
+    <string name="drive_same_model_title">Ist das dieses Smartphone?</string>
+    <string name="drive_same_model_text">Der Ordner „%1$s“ gehört zu „%2$s“ – einem Smartphone desselben Modells (%3$s), zuletzt gesehen %4$s. Die Kennung passt nicht (z. B. nach Neuinstallation der App). Nur übernehmen, wenn es wirklich dieses Smartphone ist.</string>
+    <string name="drive_same_model_confirm">Ja, übernehmen</string>
+    <string name="drive_setup_title">Backup-Ordner einrichten</string>
+    <string name="drive_setup_others">Dieser Ordner enthält Backup-Ordner anderer Smartphones: %s.</string>
+    <string name="drive_setup_new">Neuen Unterordner anlegen</string>
+    <string name="drive_setup_new_in">„%1$s“ in „%2$s“</string>
+    <string name="drive_setup_here">Diesen Ordner verwenden</string>
+    <string name="drive_setup_here_blocked">nicht möglich – enthält andere Smartphones</string>
+    <string name="drive_setup_here_empty">„%s“ ist leer</string>
+    <string name="drive_setup_here_files">„%s“ enthält bereits Dateien</string>
+    <string name="drive_setup_confirm">Einrichten</string>
+    <string name="drive_name_label">Name</string>
+
+    <!-- Speicher freigeben -->
+    <string name="freeup_title">Speicher freigeben</string>
+    <string name="freeup_subtitle">Gesicherte Originale auf dem Smartphone verkleinern</string>
+    <string name="freeup_starting">Verkleinern wird gestartet …</string>
+    <string name="freeup_dry_starting">Probelauf wird gestartet …</string>
+    <string name="freeup_progress">Verkleinere %1$d von %2$d</string>
+    <string name="freeup_dry_progress">Probelauf: prüfe %1$d von %2$d</string>
+    <string name="freeup_running_info">Jede Datei wird verkleinert und sofort ersetzt – das Original bleibt auf dem Speichermedium. Speichermedium bitte nicht abziehen.</string>
+    <string name="freeup_dry_running_info">Auf dem Smartphone wird dabei nichts verändert. Videos brauchen etwas Zeit.</string>
+    <string name="freeup_dry_running_title">Probelauf – es wird nichts verändert</string>
+    <string name="freeup_candidates">Gesichert, noch im Original</string>
+    <string name="freeup_already">Bereits verkleinert</string>
+    <string name="freeup_already_value">%1$s · %2$s frei</string>
+    <plurals name="freeup_kept">
+        <item quantity="one">%s bleibt auf Wunsch in Originalgröße (in der Galerie mit Schloss markiert).</item>
+        <item quantity="other">%s bleiben auf Wunsch in Originalgröße (in der Galerie mit Schloss markiert).</item>
+    </plurals>
+    <string name="freeup_not_backed_up">%s noch nicht gesichert – diese werden nicht verändert.</string>
+    <string name="freeup_dry_info">Probelauf ist aktiv: Es wird nur berechnet, wie viel Platz frei würde – ersetzt wird nichts. Einzelne Dateien kannst du in der Galerie auswählen und „Probe verkleinern“, um das Ergebnis anzusehen.</string>
+    <string name="freeup_dry_title">Probelauf ist aktiv</string>
+    <string name="freeup_probes">%1$s zur Probe im Album „%2$s“</string>
+    <string name="freeup_nothing">Nichts zu verkleinern.</string>
+    <string name="freeup_age_all">Alle gesicherten Fotos und Videos werden berücksichtigt (Mindestalter einstellbar).</string>
+    <plurals name="freeup_age">
+        <item quantity="one">Es werden nur Dateien älter als %d Tag berücksichtigt (einstellbar).</item>
+        <item quantity="other">Es werden nur Dateien älter als %d Tage berücksichtigt (einstellbar).</item>
+    </plurals>
+    <string name="freeup_permission_hint">Die Originale bleiben auf dem Speichermedium. Android fragt gleich, ob CamBackup die Dateien ändern darf.</string>
+    <string name="freeup_dry_start">Probelauf: Ersparnis berechnen</string>
+    <string name="freeup_start">Jetzt verkleinern</string>
+    <string name="freeup_result">%1$s verkleinert – %2$s frei geworden</string>
+    <string name="freeup_dry_result">Probelauf: %1$s ließen sich verkleinern – spart %2$s. Auf dem Smartphone wurde nichts verändert.</string>
+    <string name="freeup_skipped_header">Unverändert gelassen:</string>
+
+    <!-- Originale zurückholen -->
+    <string name="restore_title">Originale zurückholen</string>
+    <string name="restore_subtitle">Verkleinerte Dateien wieder in voller Größe</string>
+    <string name="restore_result">%1$s wieder in voller Größe (%2$s)</string>
+    <string name="restore_compressed">Verkleinert auf dem Smartphone</string>
+    <string name="restore_needs">Braucht zusätzlich</string>
+    <string name="restore_phone_free">Frei auf dem Smartphone: %s</string>
+    <string name="restore_space_low">Zu wenig Platz auf dem Smartphone: benötigt %1$s (inkl. Reserve), frei %2$s.</string>
+    <string name="restore_all">Alle Originale zurückholen</string>
+    <string name="restore_confirm_title">Originale zurückholen?</string>
+    <plurals name="restore_confirm_text">
+        <item quantity="one">%1$s wird durch das Original vom Speichermedium ersetzt. Das belegt %2$s mehr auf dem Smartphone.</item>
+        <item quantity="other">%1$s werden durch das Original vom Speichermedium ersetzt. Das belegt %2$s mehr auf dem Smartphone.</item>
+    </plurals>
+    <string name="restore_keep_original">Danach nicht erneut automatisch verkleinern</string>
+    <string name="restore_confirm">Zurückholen</string>
+    <string name="restore_progress">Original %1$d von %2$d</string>
+    <string name="restore_starting">Wird gestartet …</string>
+
+    <!-- Gelöschte Dateien -->
+    <plurals name="missing_banner">
+        <item quantity="one">%1$s (%2$s) wurde auf dem Smartphone gelöscht, ist aber noch gesichert.</item>
+        <item quantity="other">%1$s (%2$s) wurden auf dem Smartphone gelöscht, sind aber noch gesichert.</item>
+    </plurals>
+    <string name="missing_open">Ansehen und entscheiden</string>
+    <string name="missing_dialog_title">Gelöschte Dateien (%d)</string>
+    <string name="missing_dialog_text">Diese Fotos und Videos fehlen auf dem Smartphone, liegen aber auf dem Speichermedium. Wähle für jede Datei oder für alle:</string>
+    <string name="missing_restore_all">Alle zurückholen</string>
+    <string name="missing_delete_all">Alle löschen</string>
+    <string name="missing_none_chosen">Noch nichts ausgewählt</string>
+    <string name="missing_chosen">%1$d zurückholen · %2$d löschen</string>
+    <string name="missing_apply">Ausführen</string>
+    <string name="missing_delete_title">Endgültig löschen?</string>
+    <plurals name="missing_delete_text">
+        <item quantity="one">%s wird vom Speichermedium gelöscht. Da sie auch auf dem Smartphone fehlt, gibt es danach keine Kopie mehr.</item>
+        <item quantity="other">%s werden vom Speichermedium gelöscht. Da sie auch auf dem Smartphone fehlen, gibt es danach keine Kopie mehr.</item>
+    </plurals>
+    <string name="missing_versions">" · %d Versionen"</string>
+    <string name="missing_option_open">Offen</string>
+
+    <!-- Übersicht -->
+    <string name="error_title">Fehler</string>
+    <string name="permission_title">Zugriff auf Fotos und Videos</string>
+    <string name="permission_text">CamBackup sichert deine Fotos und Videos. Dafür wird Zugriff auf alle Fotos und Videos benötigt.</string>
+    <string name="permission_button">Zugriff erlauben</string>
+    <string name="permission_partial_title">Nur ausgewählte Fotos freigegeben</string>
+    <string name="permission_partial_text">Für ein vollständiges Backup bitte in den Einstellungen unter „Fotos und Videos“ → „Immer alle zulassen“ wählen.</string>
+    <string name="permission_partial_button">Einstellungen öffnen</string>
+    <string name="overview_media_title">Fotos und Videos</string>
+    <string name="overview_media_subtitle">%s auf diesem Smartphone</string>
+    <string name="overview_used">belegt</string>
+    <string name="status_backed_up">Gesichert</string>
+    <string name="status_open">Offen</string>
+    <string name="status_unchecked">Nicht geprüft</string>
+    <string name="overview_unchecked_hint">Ob deine Fotos und Videos gesichert sind, zeigt die App nur bei verbundenem Speichermedium.</string>
+    <string name="overview_saved">Bereits %s frei geworden</string>
+
+    <!-- Bildansicht -->
+    <string name="viewer_play">Abspielen</string>
+    <string name="viewer_not_backed_up">Noch nicht gesichert</string>
+    <string name="viewer_backed_up">Original gesichert</string>
+    <string name="viewer_backed_up_kept">Original gesichert · wird nicht verkleinert</string>
+    <string name="viewer_compressed_backed_up">Verkleinert – Original gesichert</string>
+    <string name="viewer_unknown">Sicherung nicht prüfbar – Speichermedium nicht verbunden</string>
+    <string name="viewer_original_size">" (Original %s)"</string>
+    <string name="viewer_on_phone">Auf dem Smartphone: %s</string>
+    <string name="viewer_on_drive">Auf dem Medium: %s</string>
+    <string name="viewer_compressed_with">Verkleinert mit: %s</string>
+
+    <!-- Galerie -->
+    <string name="filter_all">Alle</string>
+    <string name="filter_open">Nicht gesichert</string>
+    <string name="filter_excluded">Nicht verkleinern</string>
+    <string name="gallery_empty">Keine Einträge</string>
+    <string name="gallery_clear_selection">Auswahl aufheben</string>
+    <string name="gallery_selected">%d ausgewählt</string>
+    <string name="gallery_restore">Original zurückholen (%d)</string>
+    <string name="gallery_exclude">Nicht verkleinern (%d)</string>
+    <string name="gallery_include">Verkleinern erlauben (%d)</string>
+    <string name="gallery_trial_running">Probe läuft …</string>
+    <string name="gallery_trial">Probe verkleinern (%d)</string>
+    <string name="gallery_connect_hint">Speichermedium verbinden, um Originale zurückzuholen oder Dateien auszuschließen.</string>
+    <string name="gallery_restore_text">%1$s werden wieder in voller Größe vom Speichermedium geholt. Das belegt zusätzlich %2$s auf dem Smartphone.</string>
+    <string name="gallery_all_backed_up">Alle gesichert</string>
+    <string name="gallery_selected_item">Ausgewählt</string>
+    <string name="gallery_excluded_item">Wird nicht verkleinert</string>
+    <string name="gallery_trial_progress">Probe: %1$d von %2$d</string>
+    <string name="gallery_busy">Gerade läuft ein Vorgang – bitte danach erneut versuchen</string>
+    <string name="gallery_excluded_msg">%s vom Verkleinern ausgeschlossen</string>
+    <string name="gallery_included_msg">%s wieder zum Verkleinern freigegeben</string>
+    <string name="gallery_trial_limited">Probe nur für die ersten %d Dateien</string>
+    <string name="gallery_trial_done">%1$s zur Probe verkleinert: %2$s → %3$s.</string>
+    <string name="gallery_trial_where">Zum Vergleichen im Album „%s“ der Galerie-App.</string>
+    <string name="gallery_trial_none">Keine Probe erstellt.</string>
+    <string name="gallery_trial_cancelled">Probe abgebrochen</string>
+    <string name="gallery_restore_started">%s werden zurückgeholt – Fortschritt in der Benachrichtigung</string>
+
+    <!-- Info -->
+    <string name="about_version">Version %1$s (%2$d)</string>
+    <string name="about_tagline">Sichert Fotos und Videos in Originalqualität auf USB-Stick oder SD-Karte und schafft Platz auf dem Smartphone.</string>
+    <string name="about_how">So funktioniert\'s</string>
+    <string name="about_step1_title">Sichern</string>
+    <string name="about_step1">Neue Fotos und Videos werden bitgenau in den Backup-Ordner auf dem Speichermedium kopiert.</string>
+    <string name="about_step2_title">Prüfen</string>
+    <string name="about_step2">Jede Kopie wird zurückgelesen und per SHA-256-Prüfsumme mit dem Original verglichen.</string>
+    <string name="about_step3_title">Verkleinern</string>
+    <string name="about_step3">Auf Wunsch ersetzt die App ältere Originale auf dem Smartphone durch kleinere Versionen.</string>
+    <string name="about_step4_title">Zurückholen</string>
+    <string name="about_step4">Gelöschte oder verkleinerte Dateien lassen sich jederzeit in Originalqualität zurückholen.</string>
+    <string name="about_safety">Sicherheit</string>
+    <string name="about_safety1">Ersetzt wird nur, was nachweislich bitgenau gesichert ist – und nur bei eingestecktem Medium.</string>
+    <string name="about_safety2">Android fragt vor jedem Ersetzen um deine Zustimmung; im Probelauf wird nie etwas ersetzt.</string>
+    <string name="about_safety3">Nach dem Ersetzen wird erneut geprüft; bei einem Fehler wird das Original zurückgespielt.</string>
+    <string name="about_safety4">Aufnahmedatum, Kameradaten und (wahlweise) der Standort bleiben erhalten.</string>
+    <string name="about_this_phone">Dieses Smartphone</string>
+    <string name="about_device">Gerät</string>
+    <string name="about_name">Name im Backup</string>
+    <string name="about_not_connected">Speichermedium nicht verbunden</string>
+    <string name="about_id">Kennung</string>
+    <string name="about_permissions">Berechtigungen verwalten</string>
+    <string name="about_libraries">Open-Source-Bibliotheken</string>
+    <string name="about_libraries_license">Alle unter Apache License 2.0</string>
+    <string name="about_lib_ui">Oberfläche</string>
+    <string name="about_lib_video">Videos verkleinern</string>
+    <string name="about_lib_work">Arbeit im Hintergrund</string>
+    <string name="about_lib_exif">Foto-Metadaten</string>
+    <string name="about_lib_saf">Zugriff auf das Speichermedium</string>
+    <string name="about_lib_kotlin">Abläufe und Metadaten</string>
+    <string name="about_package">Paket %s</string>
+    <string name="about_show_metadata">Metadaten anzeigen</string>
+
+    <!-- Metadaten -->
+    <string name="meta_not_connected">Speichermedium nicht verbunden.</string>
+    <string name="meta_no_folder">Kein Ordner Metadata im Backup-Ordner.</string>
+    <string name="meta_folder">Ordner Metadata</string>
+    <string name="meta_index">Index</string>
+    <string name="meta_index_hint">backup_index.json und Journal zusammen</string>
+    <string name="meta_entries">Einträge</string>
+    <string name="meta_verified">Nur gesichert</string>
+    <string name="meta_kept">Original behalten</string>
+    <string name="meta_original_total">Originale gesamt</string>
+    <string name="meta_index_updated">Stand des Index</string>
+    <string name="meta_journal">Offene Journal-Einträge</string>
+    <string name="meta_journal_none">keine</string>
+    <string name="meta_journal_one">1 Eintrag</string>
+    <string name="meta_journal_many">%d Einträge</string>
+    <string name="meta_device_hint">device.json – so erkennt die App dieses Smartphone wieder</string>
+    <string name="meta_device_missing">device.json fehlt.</string>
+    <string name="meta_device_broken">device.json ist beschädigt und lässt sich nicht lesen.</string>
+    <string name="meta_created">Eingerichtet</string>
+    <string name="meta_last_seen">Zuletzt gesehen</string>
+    <string name="meta_last_backup">Letzte Sicherung</string>
+    <string name="meta_app_version">App-Version</string>
+    <string name="meta_device_id">Geräte-Kennung</string>
+    <string name="meta_previous_ids">Frühere Kennungen</string>
+    <string name="meta_format">Formatversion</string>
+    <string name="meta_raw_hide">Rohdaten ausblenden</string>
+    <string name="meta_raw_show">Rohdaten anzeigen</string>
+    <string name="meta_log">Protokoll</string>
+    <string name="meta_log_hint">backup_log.txt – neueste Einträge zuerst</string>
+    <string name="meta_log_empty">Noch keine Einträge.</string>
+
+    <!-- Abbruchgründe -->
+    <string name="abort_cancelled">Abgebrochen</string>
+    <string name="abort_disconnected">Speichermedium wurde getrennt</string>
+    <string name="abort_ejecting">Speichermedium wird ausgeworfen</string>
+    <string name="abort_not_responding">Speichermedium antwortet nicht mehr</string>
+    <string name="abort_drive_full">Zu wenig Platz auf dem Speichermedium</string>
+    <string name="abort_phone_full">Zu wenig Platz auf dem Smartphone für die verkleinerte Kopie</string>
+    <string name="abort_finish_failed">Abschluss fehlgeschlagen: %s</string>
+    <string name="restore_phone_full">Zu wenig Platz auf dem Smartphone</string>
+
+    <!-- Gründe, nicht zu verkleinern -->
+    <string name="skip_format">Format wird nicht verkleinert (nur JPEG und MP4)</string>
+    <string name="skip_hdr">HDR-Video – nur mit Codec HEVC verkleinerbar</string>
+    <string name="skip_motion_photo">Bewegtes Foto – eingebettetes Video bliebe nicht erhalten</string>
+    <string name="skip_too_recent">Jünger als das Mindestalter</string>
+    <string name="skip_already_compressed">Bereits von CamBackup verkleinert</string>
+    <string name="skip_too_little_saving">Ersparnis unter dem Mindestwert</string>
+    <string name="skip_changed">Seit der Sicherung verändert</string>
+
+    <!-- Fehler -->
+    <string name="err_no_metadata">Ordner Metadata fehlt</string>
+    <string name="err_no_index_entry">Kein Index-Eintrag</string>
+    <string name="err_backup_missing">Sicherung auf dem Medium fehlt</string>
+    <string name="err_backup_missing_path">Sicherung fehlt auf dem Medium (%s)</string>
+    <string name="err_backup_incomplete">Sicherung auf dem Medium unvollständig</string>
+    <string name="err_backup_missing_or_incomplete">Sicherung auf dem Medium fehlt oder ist unvollständig</string>
+    <string name="err_backup_unreadable">Sicherung nicht lesbar</string>
+    <string name="err_unreadable">nicht lesbar</string>
+    <string name="err_changed_while_compressing">Datei wurde während des Verkleinerns verändert</string>
+    <string name="err_compressed_missing">Verkleinerte Datei fehlt</string>
+    <string name="err_checksum_after_replace">Prüfsumme nach dem Ersetzen falsch</string>
+    <string name="err_replace_failed_unchanged">Ersetzen fehlgeschlagen (%s) – Original unverändert</string>
+    <string name="err_replace_failed_restored">Ersetzen fehlgeschlagen (%s) – Original wiederhergestellt</string>
+    <string name="err_restore_failed_warning">ACHTUNG: Wiederherstellen fehlgeschlagen – Original liegt unter %s auf dem Medium</string>
+    <string name="err_original_missing">Original auf dem Medium fehlt</string>
+    <string name="err_original_incomplete">Original auf dem Medium unvollständig</string>
+    <string name="err_changed_after_compress">Datei wurde nach dem Verkleinern verändert – bleibt unangetastet</string>
+    <string name="err_phone_full_file">Zu wenig Platz auf dem Smartphone für diese Datei</string>
+    <string name="err_original_unreadable">Original nicht lesbar</string>
+    <string name="err_original_damaged">Original auf dem Medium beschädigt (Prüfsumme falsch)</string>
+    <string name="err_checksum_after_restore">Prüfsumme nach dem Zurückholen falsch</string>
+    <string name="err_restore_failed_retry">Zurückholen fehlgeschlagen (%s) – Original bleibt auf dem Medium, bitte erneut versuchen</string>
+    <string name="err_create_on_phone">Datei konnte auf dem Smartphone nicht angelegt werden</string>
+    <string name="err_source_unreadable">Quelle nicht lesbar</string>
+    <string name="err_copy_checksum">Prüfsumme der Kopie stimmt nicht überein</string>
+    <string name="err_copy_unreadable">Kopie nicht lesbar</string>
+    <string name="err_rename_failed">Umbenennen nach „%s“ fehlgeschlagen</string>
+    <string name="err_move_failed">Verschieben nach „%s“ fehlgeschlagen</string>
+    <string name="err_size_mismatch">Größe auf dem Medium stimmt nicht – bleibt unverändert</string>
+
+    <!-- Benachrichtigungen -->
+    <string name="channel_progress">Backup-Fortschritt</string>
+    <string name="channel_events">Backup-Ergebnisse und Speichermedium</string>
+    <string name="notif_backup_running">Backup läuft</string>
+    <string name="notif_preparing">Wird vorbereitet …</string>
+    <string name="notif_bytes_of">%1$s von %2$s</string>
+    <string name="notif_backup_done">Backup abgeschlossen</string>
+    <string name="notif_backup_incomplete">Backup unvollständig</string>
+    <string name="notif_backed_up">%1$s gesichert (%2$s)</string>
+    <string name="notif_relocated">Ordnerstruktur angepasst</string>
+    <string name="notif_nothing_new">Nichts Neues zu sichern</string>
+    <string name="notif_moved_suffix">", %d umsortiert"</string>
+    <string name="notif_errors_suffix">", %d Fehler"</string>
+    <string name="notif_freeup_aborted">Speicher freigeben: abgebrochen</string>
+    <string name="notif_freeup_done">Speicher freigegeben</string>
+    <string name="notif_dry_run_done">Probelauf abgeschlossen</string>
+    <string name="notif_freeup_text">%1$s ersetzt, %2$s frei</string>
+    <string name="notif_dry_run_text">%1$s ließen sich verkleinern, spart %2$s</string>
+    <string name="notif_drive_detected">Speichermedium erkannt</string>
+    <string name="notif_restoring">Originale werden zurückgeholt</string>
+    <string name="notif_n_of_total">%1$d von %2$d</string>
+    <string name="notif_restored">Originale zurückgeholt</string>
+    <string name="notif_restored_text">%s wieder in voller Größe</string>
+    <string name="notif_missing">Gelöschte Dateien bearbeiten</string>
+    <string name="notif_missing_done">Gelöschte Dateien bearbeitet</string>
+    <string name="notif_compressing">Dateien werden verkleinert</string>
+    <string name="notif_dry_running">Probelauf: Ersparnis wird berechnet</string>
+    <string name="notif_resume_hint">Das letzte Backup wurde unterbrochen – tippen, um es fortzusetzen.</string>
+    <string name="notif_folder_connected">Backup-Ordner „%s“ ist verbunden.</string>
+    <string name="notif_folder_found">Backup-Ordner „%1$s“ auf %2$s gefunden.</string>
+    <string name="notif_new_volume">Neues Speichermedium „%s“ – tippen, um den Backup-Ordner zu wählen.</string>
+
+    <!-- Galerie: Tage -->
+    <string name="day_today">Heute</string>
+    <string name="day_yesterday">Gestern</string>
+
+    <!-- Ordner wählen -->
+    <string name="auto_found">Backup-Ordner „%1$s“ auf %2$s automatisch erkannt</string>
+    <string name="pick_internal_title">Interner Speicher</string>
+    <string name="pick_internal_text">Dieser Ordner liegt im internen Speicher des Smartphones und ist als Backup-Ziel ungeeignet. Bitte einen Ordner auf dem USB-Stick oder der SD-Karte wählen.</string>
+    <string name="pick_foreign_title">Ordner gehört zu einem anderen Smartphone</string>
+    <string name="pick_foreign_text">„%1$s“ (%2$s) sichert in diesen Ordner. Bitte einen anderen Ordner wählen oder einen neuen anlegen.</string>
+    <string name="pick_unusable">Ordner nicht verwendbar</string>
+    <string name="pick_setup_failed">Einrichten fehlgeschlagen</string>
+    <string name="name_empty">Bitte einen Namen eingeben.</string>
+    <string name="name_too_long">Höchstens %d Zeichen.</string>
+    <string name="name_forbidden_chars">Nicht erlaubt sind: %s</string>
+    <string name="name_trailing_dot">Der Name darf nicht mit einem Punkt enden.</string>
+    <string name="name_invalid">Ungültiger Name.</string>
+    <string name="name_exists">Ein Ordner mit diesem Namen existiert bereits.</string>
+
+    <!-- Weitere Fehler -->
+    <string name="err_already_backup_folder">Ordner ist bereits ein Backup-Ordner</string>
+    <string name="err_create_folder">Ordner „%s“ konnte nicht angelegt werden</string>
+    <string name="err_folder_exists">Ordner „%s“ existiert bereits</string>
+    <string name="err_folder_unreadable">Ordner nicht lesbar</string>
+    <string name="err_device_file_missing">%s fehlt</string>
+    <string name="err_device_file_broken">%s fehlt oder ist beschädigt</string>
+    <string name="err_file_unreadable">%s nicht lesbar</string>
+    <string name="err_create_file">„%s“ konnte nicht angelegt werden</string>
+    <string name="err_file_not_writable">%s nicht beschreibbar</string>
+    <string name="err_replace_file">„%s“ konnte nicht ersetzt werden</string>
+    <string name="err_rename_file">„%s“ konnte nicht umbenannt werden</string>
+    <string name="err_not_a_folder">„%s“ ist eine Datei, kein Ordner</string>
+    <string name="err_video_duration">Dauer weicht ab (%1$d statt %2$d ms)</string>
+    <string name="err_video_audio">Tonspur fehlt</string>
+    <string name="err_video_resolution">Auflösung %1$s statt %2$s (Encoder unterstützt sie nicht)</string>
+    <string name="err_video_broken">Video-Kodierung fehlerhaft: %s</string>
+    <string name="err_video_failed">Video-Kodierung fehlgeschlagen: %s</string>
+    <string name="err_trial_create">Probe-Datei konnte nicht angelegt werden</string>
+    <string name="err_trial_write">Probe-Datei nicht beschreibbar</string>
+    <string name="err_jpeg_decode">JPEG nicht dekodierbar</string>
+</resources>

@@ -20,6 +20,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.material3.TextButton
 import de.trei.cambackup.compress.TrialCompressor
 import androidx.lifecycle.Lifecycle
@@ -70,8 +72,8 @@ fun FreeUpPanel(folderUri: String, onFinished: () -> Unit, vm: FreeUpViewModel =
 
     FeatureCard(
         icon = R.drawable.ic_compress,
-        title = "Speicher freigeben",
-        subtitle = "Gesicherte Originale auf dem Smartphone verkleinern",
+        title = stringResource(R.string.freeup_title),
+        subtitle = stringResource(R.string.freeup_subtitle),
     ) {
         if (state !is FreeUpState.Working) result?.let { SummaryView(it) }
         when (val s = state) {
@@ -100,10 +102,10 @@ fun FreeUpPanel(folderUri: String, onFinished: () -> Unit, vm: FreeUpViewModel =
             is FreeUpState.Working -> {
                 val p = s.progress
                 Text(
-                    (if (paused) "Pausiert – " else "") + when {
-                        p == null -> if (s.replacing) "Verkleinern wird gestartet …" else "Probelauf wird gestartet …"
-                        s.replacing -> "Verkleinere ${p.done + 1} von ${p.total}"
-                        else -> "Probelauf: prüfe ${p.done + 1} von ${p.total}"
+                    (if (paused) stringResource(R.string.paused_prefix) else "") + when {
+                        p == null -> stringResource(if (s.replacing) R.string.freeup_starting else R.string.freeup_dry_starting)
+                        s.replacing -> stringResource(R.string.freeup_progress, p.done + 1, p.total)
+                        else -> stringResource(R.string.freeup_dry_progress, p.done + 1, p.total)
                     },
                 )
                 if (p == null || p.total == 0) {
@@ -112,17 +114,15 @@ fun FreeUpPanel(folderUri: String, onFinished: () -> Unit, vm: FreeUpViewModel =
                     LinearProgressIndicator(progress = { p.done.toFloat() / p.total }, modifier = Modifier.fillMaxWidth())
                 }
                 Banner(
-                    if (s.replacing) "Jede Datei wird verkleinert und sofort ersetzt – das Original bleibt auf dem Speichermedium. " +
-                        "Speichermedium bitte nicht abziehen."
-                    else "Auf dem Smartphone wird dabei nichts verändert. Videos brauchen etwas Zeit.",
-                    title = if (s.replacing) "Speichermedium bitte nicht abziehen" else "Probelauf – es wird nichts verändert",
+                    stringResource(if (s.replacing) R.string.freeup_running_info else R.string.freeup_dry_running_info),
+                    title = stringResource(if (s.replacing) R.string.dont_unplug else R.string.freeup_dry_running_title),
                 )
                 JobControls(paused, vm::setPaused, vm::cancel)
             }
 
             is FreeUpState.Error -> {
-                Banner("Fehler: ${s.message}", BannerTone.ERROR)
-                Button(onClick = { vm.load(folderUri) }) { Text("Erneut versuchen") }
+                Banner(stringResource(R.string.error_prefix, s.message), BannerTone.ERROR)
+                Button(onClick = { vm.load(folderUri) }) { Text(stringResource(R.string.action_retry)) }
             }
         }
     }
@@ -139,70 +139,67 @@ private fun OverviewView(
 ) {
     val candidateBytes = o.candidates.sumOf { it.item.sizeBytes }
     Row {
-        Text("Gesichert, noch im Original", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+        Text(stringResource(R.string.freeup_candidates), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
         Text("${fileCount(o.candidates.size)} · ${formatBytes(candidateBytes)}", style = MaterialTheme.typography.titleSmall)
     }
     if (o.alreadyCompressed > 0) {
         Row {
-            Text("Bereits verkleinert", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
-            Text("${fileCount(o.alreadyCompressed)} · ${formatBytes(o.alreadyCompressedSaved)} frei", style = MaterialTheme.typography.bodyMedium)
+            Text(stringResource(R.string.freeup_already), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+            Text(stringResource(R.string.freeup_already_value, fileCount(o.alreadyCompressed), formatBytes(o.alreadyCompressedSaved)), style = MaterialTheme.typography.bodyMedium)
         }
     }
     if (o.keptOriginal > 0) {
         Text(
-            "${fileCount(o.keptOriginal)} " + (if (o.keptOriginal == 1) "bleibt" else "bleiben") +
-                " auf Wunsch in Originalgröße (in der Galerie mit Schloss markiert).",
+            pluralStringResource(R.plurals.freeup_kept, o.keptOriginal, fileCount(o.keptOriginal)),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
     if (o.notBackedUp > 0) {
         Text(
-            "${fileCount(o.notBackedUp)} noch nicht gesichert – diese werden nicht verändert.",
+            stringResource(R.string.freeup_not_backed_up, fileCount(o.notBackedUp)),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
     if (dryRun) {
         Banner(
-            "Probelauf ist aktiv: Es wird nur berechnet, wie viel Platz frei würde – ersetzt wird nichts. " +
-                "Einzelne Dateien kannst du in der Galerie auswählen und „Probe verkleinern“, um das Ergebnis anzusehen.",
-            title = "Probelauf ist aktiv",
+            stringResource(R.string.freeup_dry_info),
+            title = stringResource(R.string.freeup_dry_title),
         )
     }
     if (probeCount > 0) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
-                "${fileCount(probeCount)} zur Probe im Album „${TrialCompressor.ALBUM}“",
+                stringResource(R.string.freeup_probes, fileCount(probeCount), TrialCompressor.ALBUM),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.weight(1f),
             )
-            TextButton(onClick = onDeleteProbes) { Text("Löschen") }
+            TextButton(onClick = onDeleteProbes) { Text(stringResource(R.string.action_delete)) }
         }
     }
     if (o.candidates.isEmpty()) {
-        Text("Nichts zu verkleinern.", style = MaterialTheme.typography.bodyMedium)
+        Text(stringResource(R.string.freeup_nothing), style = MaterialTheme.typography.bodyMedium)
         return
     }
     Text(
         when (minAgeDays) {
-            0 -> "Alle gesicherten Fotos und Videos werden berücksichtigt (Mindestalter einstellbar)."
-            1 -> "Es werden nur Dateien älter als 1 Tag berücksichtigt (einstellbar)."
-            else -> "Es werden nur Dateien älter als $minAgeDays Tage berücksichtigt (einstellbar)."
+            0 -> stringResource(R.string.freeup_age_all)
+            else -> pluralStringResource(R.plurals.freeup_age, minAgeDays, minAgeDays)
         },
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
     if (!dryRun) {
         Text(
-            "Die Originale bleiben auf dem Speichermedium. Android fragt gleich, ob CamBackup die Dateien ändern darf.",
+            stringResource(R.string.freeup_permission_hint),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
     Button(onClick = onStart, modifier = Modifier.fillMaxWidth()) {
-        Text(if (dryRun) "Probelauf: Ersparnis berechnen" else "Jetzt verkleinern")
+        Text(stringResource(if (dryRun) R.string.freeup_dry_start else R.string.freeup_start))
     }
 }
 
@@ -211,17 +208,17 @@ private fun SummaryView(s: FreeUpSummary) {
     val ok = s.abortReason == null && s.failures.isEmpty()
     Banner(
         when {
-            s.replacing -> "${fileCount(s.done)} verkleinert – ${formatBytes(s.bytesSaved)} frei geworden"
-            else -> "Probelauf: ${fileCount(s.done)} ließen sich verkleinern – spart ${formatBytes(s.bytesSaved)}. Auf dem Smartphone wurde nichts verändert."
+            s.replacing -> stringResource(R.string.freeup_result, fileCount(s.done), formatBytes(s.bytesSaved))
+            else -> stringResource(R.string.freeup_dry_result, fileCount(s.done), formatBytes(s.bytesSaved))
         } + (s.abortReason?.let { " · $it" } ?: ""),
         if (ok) BannerTone.SUCCESS else BannerTone.WARNING,
     )
     if (s.skipped.isNotEmpty()) {
-        Text("Unverändert gelassen:", style = MaterialTheme.typography.labelLarge)
+        Text(stringResource(R.string.freeup_skipped_header), style = MaterialTheme.typography.labelLarge)
         s.skipped.forEach { (reason, count) -> Text("• $reason: $count", style = MaterialTheme.typography.bodySmall) }
     }
     if (s.failures.isNotEmpty()) {
-        Text("Fehler bei ${fileCount(s.failures.size)}:", color = MaterialTheme.colorScheme.error)
+        Text(stringResource(R.string.failures_header, fileCount(s.failures.size)), color = MaterialTheme.colorScheme.error)
         s.failures.take(10).forEach { Text("• ${it.name}: ${it.reason}", style = MaterialTheme.typography.bodySmall) }
     }
 }

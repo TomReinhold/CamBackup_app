@@ -8,6 +8,7 @@ import de.trei.cambackup.media.MediaItem
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
+import java.util.Locale
 
 enum class MediaStatus {
     NOT_BACKED_UP,
@@ -86,16 +87,31 @@ fun groupByDay(items: List<LibraryItem>, zone: ZoneId = ZoneId.systemDefault()):
         .groupBy { Instant.ofEpochMilli(it.media.dateTakenMillis).atZone(zone).toLocalDate() }
         .toList()
 
-/** Überschrift wie in Google Fotos: „Heute“, „Gestern“, „Mi., 21. Okt.“, in anderen Jahren mit Jahreszahl. */
-fun dayLabel(day: LocalDate, today: LocalDate): String {
-    val weekdays = listOf("Mo.", "Di.", "Mi.", "Do.", "Fr.", "Sa.", "So.")
-    val months = listOf("Jan.", "Feb.", "März", "Apr.", "Mai", "Juni", "Juli", "Aug.", "Sept.", "Okt.", "Nov.", "Dez.")
+/**
+ * Überschrift wie in Google Fotos: „Heute“, „Gestern“, „Mi., 21. Okt.“ bzw. „Wed, Oct 21“, in anderen
+ * Jahren mit Jahreszahl. [todayText]/[yesterdayText] kommen aus den Ressourcen der App-Sprache.
+ */
+fun dayLabel(
+    day: LocalDate,
+    today: LocalDate,
+    todayText: String,
+    yesterdayText: String,
+    german: Boolean = Locale.getDefault().language == "de",
+): String {
     return when (day) {
-        today -> "Heute"
-        today.minusDays(1) -> "Gestern"
+        today -> todayText
+        today.minusDays(1) -> yesterdayText
         else -> buildString {
-            append("${weekdays[day.dayOfWeek.value - 1]}, ${day.dayOfMonth}. ${months[day.monthValue - 1]}")
-            if (day.year != today.year) append(" ${day.year}")
+            if (german) {
+                val weekdays = listOf("Mo.", "Di.", "Mi.", "Do.", "Fr.", "Sa.", "So.")
+                val months = listOf("Jan.", "Feb.", "März", "Apr.", "Mai", "Juni", "Juli", "Aug.", "Sept.", "Okt.", "Nov.", "Dez.")
+                append("${weekdays[day.dayOfWeek.value - 1]}, ${day.dayOfMonth}. ${months[day.monthValue - 1]}")
+            } else {
+                val weekdays = listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
+                val months = listOf("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+                append("${weekdays[day.dayOfWeek.value - 1]}, ${months[day.monthValue - 1]} ${day.dayOfMonth}")
+            }
+            if (day.year != today.year) append(if (german) " ${day.year}" else ", ${day.year}")
         }
     }
 }

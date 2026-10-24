@@ -17,6 +17,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.IOException
 import java.time.Instant
+import de.trei.cambackup.R
+import de.trei.cambackup.util.AppError
+import de.trei.cambackup.util.Msg
+import de.trei.cambackup.util.msg
+import de.trei.cambackup.util.toMsg
 
 data class BackupProgress(
     val fileIndex: Int,
@@ -30,7 +35,7 @@ data class BackupProgress(
     val moving: Boolean = false,
 )
 
-data class BackupFailure(val item: MediaItem, val reason: String)
+data class BackupFailure(val item: MediaItem, val reason: Msg)
 
 data class BackupResult(
     val copied: Int,
@@ -39,7 +44,7 @@ data class BackupResult(
     val bytesCopied: Long,
     val failures: List<BackupFailure>,
     /** Gesetzt, wenn der Lauf vorzeitig endete (Medium getrennt, abgebrochen). */
-    val abortReason: String?,
+    val abortReason: Msg?,
 )
 
 /**
@@ -71,8 +76,8 @@ class BackupEngine(private val context: Context) {
         index: BackupIndex,
         /** Zielordner auf dem Medium je Datei (siehe backupDirFor). */
         targetDir: (MediaItem) -> String,
-        /** Liefert einen Abbruchgrund (z. B. "Abgebrochen"), sobald der Lauf enden soll. */
-        abortReason: () -> String?,
+        /** Liefert einen Abbruchgrund (z. B. „Abgebrochen“), sobald der Lauf enden soll. */
+        abortReason: () -> Msg?,
         onProgress: (BackupProgress) -> Unit,
     ): BackupResult = withContext(Dispatchers.IO) {
         val dirs = DirCache(deviceDir)
@@ -83,7 +88,7 @@ class BackupEngine(private val context: Context) {
         var adopted = 0
         var bytesCopied = 0L
         val failures = mutableListOf<BackupFailure>()
-        var abortReason: String? = null
+        var abortReason: Msg? = null
         var failedInRow = 0
 
         for ((i, item) in plan.toCopy.withIndex()) {
@@ -110,11 +115,11 @@ class BackupEngine(private val context: Context) {
                     abortReason = MEDIUM_DISCONNECTED
                     break
                 }
-                failures += BackupFailure(item, e.message ?: e.javaClass.simpleName)
+                failures += BackupFailure(item, e.toMsg())
                 // Mehrere Fehler in Folge: das Medium antwortet nicht mehr (Wackelkontakt, Stromsparmodus) –
                 // lieber sauber anhalten, als den Rest der Liste als fehlerhaft zu melden
                 if (++failedInRow >= MAX_FAILURES_IN_ROW) {
-                    abortReason = "Speichermedium antwortet nicht mehr"
+                    abortReason = msg(R.string.abort_not_responding)
                     break
                 }
             }
@@ -126,14 +131,14 @@ class BackupEngine(private val context: Context) {
 
     private enum class Outcome { COPIED, ADOPTED }
 
-    private class Aborted(val reason: String) : Exception(reason)
+    private class Aborted(val reason: Msg) : Exception(reason.en)
 
     companion object {
         /** Zwischenordner für Dateien, die gerade geschrieben und geprüft werden. */
         const val STAGING_DIR = "_incoming"
 
         /** Abbruchgrund, wenn das Medium während des Laufs verschwindet. */
-        const val MEDIUM_DISCONNECTED = "Speichermedium wurde getrennt"
+        val MEDIUM_DISCONNECTED: Msg get() = msg(R.string.abort_disconnected)
         private const val MAX_FAILURES_IN_ROW = 3
         private const val STAGING_PATH = "${DeviceRegistry.METADATA_DIR}/$STAGING_DIR"
     }
@@ -170,19 +175,19 @@ class BackupEngine(private val context: Context) {
         val part = io.createFile(staging, "$finalName.part")
         var moved = false
         try {
-            val source = resolver.openInputStream(item.readUri) ?: throw IOException("Quelle nicht lesbar")
+            val source = resolver.openInputStream(item.readUri) ?: throw AppError(R.string.err_source_unreadable)
             val copy = source.use { input ->
                 io.writeSynced(part) { out -> copyWithSha256(input, out) { report(it) } }
             }
             val check = hashDocument(part) { report(copy.bytes + it) }
             if (check != copy) {
-                throw IOException("Prüfsumme der Kopie stimmt nicht überein")
+                throw AppError(R.string.err_copy_checksum)
             }
             if (!part.renameTo(finalName) || part.name != finalName) {
-                throw IOException("Umbenennen nach „$finalName“ fehlgeschlagen")
+                throw AppError(R.string.err_rename_failed, finalName)
             }
             val target = DocumentsContract.moveDocument(resolver, part.uri, staging.uri, dir.uri)
-                ?: throw IOException("Verschieben nach „$subPath“ fehlgeschlagen")
+                ?: throw AppError(R.string.err_move_failed, subPath)
             moved = true
             files[finalName] = DocumentFile.fromSingleUri(context, target)!!
             index.record(entryFor(item, copy, joinPath(subPath, finalName)))
@@ -196,10 +201,10 @@ class BackupEngine(private val context: Context) {
     }
 
     private suspend fun hashSource(item: MediaItem, onBytes: (Long) -> Unit): StreamResult =
-        (resolver.openInputStream(item.readUri) ?: throw IOException("Quelle nicht lesbar")).use { sha256(it, onBytes) }
+        (resolver.openInputStream(item.readUri) ?: throw AppError(R.string.err_source_unreadable)).use { sha256(it, onBytes) }
 
     private suspend fun hashDocument(file: DocumentFile, onBytes: (Long) -> Unit): StreamResult =
-        (resolver.openInputStream(file.uri) ?: throw IOException("Kopie nicht lesbar")).use { sha256(it, onBytes) }
+        (resolver.openInputStream(file.uri) ?: throw AppError(R.string.err_copy_unreadable)).use { sha256(it, onBytes) }
 
     private fun entryFor(item: MediaItem, hash: StreamResult, backupPath: String) = IndexEntry(
         phonePath = item.phonePath,

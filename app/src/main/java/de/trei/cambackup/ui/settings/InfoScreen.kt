@@ -1,5 +1,8 @@
 package de.trei.cambackup.ui.settings
 
+import de.trei.cambackup.R
+
+import androidx.compose.ui.res.stringResource
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -42,9 +45,9 @@ fun InfoScreen(bottomPadding: Dp) {
         contentWindowInsets = WindowInsets(0),
         topBar = {
             TopAppBar(
-                title = { Text(if (showMetadata) "Metadaten" else "Info") },
+                title = { Text(stringResource(if (showMetadata) R.string.metadata_title else R.string.tab_info)) },
                 navigationIcon = {
-                    if (showMetadata) IconButton(onClick = { showMetadata = false }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Zurück") }
+                    if (showMetadata) IconButton(onClick = { showMetadata = false }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.action_back)) }
                 },
                 scrollBehavior = scrollBehavior,
             )

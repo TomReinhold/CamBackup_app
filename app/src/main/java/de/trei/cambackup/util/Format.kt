@@ -1,26 +1,31 @@
 package de.trei.cambackup.util
 
+import de.trei.cambackup.R
 import java.util.Locale
 
-/** "1 Datei", "2 Dateien" */
-fun fileCount(n: Int): String = if (n == 1) "1 Datei" else "$n Dateien"
+/** "1 Datei", "2 Dateien" (in der App-Sprache) */
+fun fileCount(n: Int): String = L10n.plural(R.plurals.file_count, n, n)
 
 /** Restdauer für Fortschrittsanzeigen: "noch ca. 1 Std. 5 Min.", "noch ca. 7 Min.", "noch weniger als 1 Min." */
 fun formatRemaining(seconds: Long): String {
-    if (seconds < 60) return "noch weniger als 1 Min."
-    // Auf volle Minuten aufrunden: lieber etwas früher fertig als angekündigt
-    val minutes = (seconds + 59) / 60
-    val h = minutes / 60
-    val m = minutes % 60
+    val (h, m) = remainingHoursMinutes(seconds) ?: return L10n.str(R.string.remaining_under_minute)
     return when {
-        h == 0L -> "noch ca. $m Min."
-        m == 0L -> "noch ca. $h Std."
-        else -> "noch ca. $h Std. $m Min."
+        h == 0L -> L10n.str(R.string.remaining_minutes, m)
+        m == 0L -> L10n.str(R.string.remaining_hours, h)
+        else -> L10n.str(R.string.remaining_hours_minutes, h, m)
     }
 }
 
-/** Formatiert eine Byte-Anzahl menschenlesbar (Basis 1024), z. B. "1,5 GB". */
-fun formatBytes(bytes: Long, locale: Locale = Locale.GERMANY): String {
+/** Restdauer als (Stunden, Minuten), auf volle Minuten aufgerundet; null unter einer Minute. */
+fun remainingHoursMinutes(seconds: Long): Pair<Long, Long>? {
+    if (seconds < 60) return null
+    // Aufrunden: lieber etwas früher fertig als angekündigt
+    val minutes = (seconds + 59) / 60
+    return minutes / 60 to minutes % 60
+}
+
+/** Formatiert eine Byte-Anzahl menschenlesbar (Basis 1024), z. B. "1,5 GB" bzw. "1.5 GB". */
+fun formatBytes(bytes: Long, locale: Locale = Locale.getDefault()): String {
     if (bytes < 1024) return "$bytes B"
     val units = listOf("KB", "MB", "GB", "TB")
     var value = bytes / 1024.0
@@ -31,3 +36,6 @@ fun formatBytes(bytes: Long, locale: Locale = Locale.GERMANY): String {
     }
     return String.format(locale, "%.1f %s", value, units[unit])
 }
+
+/** Größe für Protokoll und Dateiliste auf dem Medium (immer englisch). */
+fun formatBytesEn(bytes: Long): String = formatBytes(bytes, Locale.US)

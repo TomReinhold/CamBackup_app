@@ -26,6 +26,7 @@ import de.trei.cambackup.settings.SettingsRepository
 import de.trei.cambackup.storage.DriveStatus
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import de.trei.cambackup.util.toMsg
 
 sealed interface LibraryState {
     data object Loading : LibraryState
@@ -105,7 +106,7 @@ class LibraryViewModel(app: Application) : AndroidViewModel(app) {
                     scan.value = try {
                         ScanState.Done(scanner.scan(settings.current().mediaFolders))
                     } catch (e: Exception) {
-                        ScanState.Failed(e.message ?: e.javaClass.simpleName)
+                        ScanState.Failed(e.toMsg().ui)
                     }
                 }
             }

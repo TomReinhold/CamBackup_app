@@ -20,6 +20,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
+import de.trei.cambackup.util.L10n
+import de.trei.cambackup.R
 
 /**
  * Meldet sich, wenn ein Datenträger angeschlossen wird, und sucht dort den Backup-Ordner dieses
@@ -81,16 +83,16 @@ private fun notifyResult(context: Context, result: DetectResult) {
     Notifications.createChannels(context)
     // Wurde das letzte Backup unterbrochen (z. B. Medium abgezogen), gleich das Fortsetzen anbieten
     val interrupted = LastRunStore(context).unseen()?.abortReason != null
-    val resumeHint = if (interrupted) " Das letzte Backup wurde unterbrochen – tippen, um es fortzusetzen." else ""
+    val resumeHint = if (interrupted) " " + L10n.str(R.string.notif_resume_hint) else ""
     val notification = when (result) {
         is DetectResult.Active -> Notifications.driveDetected(
-            context, "Backup-Ordner „${result.folder.record.displayName}“ ist verbunden.$resumeHint",
+            context, L10n.str(R.string.notif_folder_connected, result.folder.record.displayName) + resumeHint,
         )
         is DetectResult.Activated -> Notifications.driveDetected(
-            context, "Backup-Ordner „${result.folder.record.displayName}“ auf ${result.volumeLabel} gefunden.$resumeHint",
+            context, L10n.str(R.string.notif_folder_found, result.folder.record.displayName, result.volumeLabel) + resumeHint,
         )
         is DetectResult.NotFound -> result.newVolume?.let {
-            Notifications.driveDetected(context, "Neues Speichermedium „${it.label}“ – tippen, um den Backup-Ordner zu wählen.")
+            Notifications.driveDetected(context, L10n.str(R.string.notif_new_volume, it.label))
         }
     } ?: return
     context.getSystemService(NotificationManager::class.java).notify(Notifications.ID_DRIVE, notification)

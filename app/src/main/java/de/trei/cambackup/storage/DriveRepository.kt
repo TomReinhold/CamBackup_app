@@ -10,6 +10,11 @@ import android.os.storage.StorageVolume
 import android.provider.DocumentsContract
 import androidx.documentfile.provider.DocumentFile
 import java.io.File
+import de.trei.cambackup.util.toMsg
+import de.trei.cambackup.util.msg
+import de.trei.cambackup.util.L10n
+import de.trei.cambackup.util.AppError
+import de.trei.cambackup.R
 
 data class DriveSpace(val freeBytes: Long, val totalBytes: Long)
 
@@ -84,8 +89,8 @@ class DriveRepository(private val context: Context) {
 
     /** Öffnet einen Backup-Ordner für Backup/Verkleinern – mit verständlicher Meldung, wenn das nicht geht. */
     fun requireFolder(folderUri: String): DocumentFile {
-        val dir = open(Uri.parse(folderUri)) ?: throw java.io.IOException("Speichermedium nicht verbunden")
-        if (dir.findFile(DeviceRegistry.METADATA_DIR) == null) throw java.io.IOException("Ordner Metadata fehlt im Backup-Ordner")
+        val dir = open(Uri.parse(folderUri)) ?: throw AppError(R.string.about_not_connected)
+        if (dir.findFile(DeviceRegistry.METADATA_DIR) == null) throw AppError(R.string.err_no_metadata)
         return dir
     }
 

@@ -28,6 +28,7 @@ import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -66,56 +67,56 @@ fun AboutScreen(onShowMetadata: () -> Unit) {
         }
         Text("CamBackup", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
         Text(
-            "Version ${info.versionName} (${info.longVersionCode})",
+            stringResource(R.string.about_version, info.versionName.orEmpty(), info.longVersionCode),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Text(
-            "Sichert Fotos und Videos in Originalqualität auf USB-Stick oder SD-Karte und schafft Platz auf dem Smartphone.",
+            stringResource(R.string.about_tagline),
             style = MaterialTheme.typography.bodyMedium,
             modifier = Modifier.padding(horizontal = 16.dp),
             textAlign = androidx.compose.ui.text.style.TextAlign.Center,
         )
     }
 
-    SettingsSection("So funktioniert's") {
-        Step(1, "Sichern", "Neue Fotos und Videos werden bitgenau in den Backup-Ordner auf dem Speichermedium kopiert.")
-        Step(2, "Prüfen", "Jede Kopie wird zurückgelesen und per SHA-256-Prüfsumme mit dem Original verglichen.")
-        Step(3, "Verkleinern", "Auf Wunsch ersetzt die App ältere Originale auf dem Smartphone durch kleinere Versionen.")
-        Step(4, "Zurückholen", "Gelöschte oder verkleinerte Dateien lassen sich jederzeit in Originalqualität zurückholen.")
+    SettingsSection(stringResource(R.string.about_how)) {
+        Step(1, stringResource(R.string.about_step1_title), stringResource(R.string.about_step1))
+        Step(2, stringResource(R.string.about_step2_title), stringResource(R.string.about_step2))
+        Step(3, stringResource(R.string.about_step3_title), stringResource(R.string.about_step3))
+        Step(4, stringResource(R.string.about_step4_title), stringResource(R.string.about_step4))
     }
 
-    SettingsSection("Sicherheit") {
-        Bullet("Ersetzt wird nur, was nachweislich bitgenau gesichert ist – und nur bei eingestecktem Medium.")
-        Bullet("Android fragt vor jedem Ersetzen um deine Zustimmung; im Probelauf wird nie etwas ersetzt.")
-        Bullet("Nach dem Ersetzen wird erneut geprüft; bei einem Fehler wird das Original zurückgespielt.")
-        Bullet("Aufnahmedatum, Kameradaten und (wahlweise) der Standort bleiben erhalten.")
+    SettingsSection(stringResource(R.string.about_safety)) {
+        Bullet(stringResource(R.string.about_safety1))
+        Bullet(stringResource(R.string.about_safety2))
+        Bullet(stringResource(R.string.about_safety3))
+        Bullet(stringResource(R.string.about_safety4))
     }
 
-    SettingsSection("Dieses Smartphone") {
-        InfoRow("Gerät", "${identity.manufacturer} ${identity.model}")
-        InfoRow("Name im Backup", folder?.first ?: "–")
-        InfoRow("Backup-Ordner", folder?.second ?: "Speichermedium nicht verbunden")
-        InfoRow("Kennung", identity.deviceUuid.take(8))
+    SettingsSection(stringResource(R.string.about_this_phone)) {
+        InfoRow(stringResource(R.string.about_device), "${identity.manufacturer} ${identity.model}")
+        InfoRow(stringResource(R.string.about_name), folder?.first ?: "–")
+        InfoRow(stringResource(R.string.storage_preview_root), folder?.second ?: stringResource(R.string.about_not_connected))
+        InfoRow(stringResource(R.string.about_id), identity.deviceUuid.take(8))
         OutlinedButton(onClick = {
             context.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", context.packageName, null)))
-        }) { Text("Berechtigungen verwalten") }
+        }) { Text(stringResource(R.string.about_permissions)) }
     }
 
-    SettingsSection("Open-Source-Bibliotheken", "Alle unter Apache License 2.0") {
+    SettingsSection(stringResource(R.string.about_libraries), stringResource(R.string.about_libraries_license)) {
         listOf(
-            "Jetpack Compose & Material 3" to "Oberfläche",
-            "AndroidX Media3 Transformer" to "Videos verkleinern",
-            "AndroidX WorkManager" to "Arbeit im Hintergrund",
-            "AndroidX ExifInterface" to "Foto-Metadaten",
-            "AndroidX DataStore" to "Einstellungen",
-            "AndroidX DocumentFile" to "Zugriff auf das Speichermedium",
-            "Kotlin Coroutines & Serialization" to "Abläufe und Metadaten",
+            "Jetpack Compose & Material 3" to stringResource(R.string.about_lib_ui),
+            "AndroidX Media3 Transformer" to stringResource(R.string.about_lib_video),
+            "AndroidX WorkManager" to stringResource(R.string.about_lib_work),
+            "AndroidX ExifInterface" to stringResource(R.string.about_lib_exif),
+            "AndroidX DataStore" to stringResource(R.string.tab_settings),
+            "AndroidX DocumentFile" to stringResource(R.string.about_lib_saf),
+            "Kotlin Coroutines & Serialization" to stringResource(R.string.about_lib_kotlin),
         ).forEach { (name, use) -> InfoRow(name, use) }
     }
 
     Text(
-        "Paket ${context.packageName}",
+        stringResource(R.string.about_package, context.packageName),
         style = MaterialTheme.typography.labelSmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier.fillMaxWidth(),
@@ -123,7 +124,7 @@ fun AboutScreen(onShowMetadata: () -> Unit) {
     )
     // Unauffälliger Zugang zur technischen Ansicht
     TextButton(onClick = onShowMetadata, modifier = Modifier.fillMaxWidth()) {
-        Text("Metadaten anzeigen", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
+        Text(stringResource(R.string.about_show_metadata), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
     }
 }
 

@@ -41,6 +41,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
+import de.trei.cambackup.R
 import androidx.compose.ui.unit.dp
 
 /** Farben für den Sicherungsstatus – überall gleich (Übersicht, Fotos, Legenden). */
@@ -95,7 +97,7 @@ enum class BannerTone { INFO, SUCCESS, WARNING, ERROR }
 @Composable
 fun Banner(text: String, tone: BannerTone = BannerTone.INFO, modifier: Modifier = Modifier, title: String? = null) {
     if (tone == BannerTone.INFO && (title != null || text.length > SHORT_INFO)) {
-        InfoBanner(title ?: "Hinweis", text, modifier)
+        InfoBanner(title ?: stringResource(R.string.info_default_title), text, modifier)
         return
     }
     val (bg, fg) = when (tone) {
@@ -134,7 +136,7 @@ private fun InfoBanner(title: String, text: String, modifier: Modifier) {
                 Text(title, style = MaterialTheme.typography.labelLarge, modifier = Modifier.weight(1f))
                 Icon(
                     if (open) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                    if (open) "Einklappen" else "Ausklappen",
+                    stringResource(if (open) R.string.info_collapse else R.string.info_expand),
                     modifier = Modifier.size(20.dp),
                 )
             }
@@ -150,9 +152,9 @@ private fun InfoBanner(title: String, text: String, modifier: Modifier) {
 fun JobControls(paused: Boolean, onPause: ((Boolean) -> Unit)?, onCancel: () -> Unit) {
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         onPause?.let { toggle ->
-            FilledTonalButton(onClick = { toggle(!paused) }) { Text(if (paused) "Fortsetzen" else "Pausieren") }
+            FilledTonalButton(onClick = { toggle(!paused) }) { Text(stringResource(if (paused) R.string.action_resume else R.string.action_pause)) }
         }
-        OutlinedButton(onClick = onCancel) { Text("Abbrechen") }
+        OutlinedButton(onClick = onCancel) { Text(stringResource(R.string.action_cancel)) }
     }
 }
 

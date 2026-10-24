@@ -25,6 +25,11 @@ import de.trei.cambackup.storage.DriveRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.sync.withLock
 import java.time.Instant
+import de.trei.cambackup.R
+import de.trei.cambackup.util.msg
+import de.trei.cambackup.util.toMsg
+import de.trei.cambackup.util.fileCount
+import de.trei.cambackup.util.L10n
 
 /**
  * Führt das Backup als Vordergrunddienst aus, damit es auch bei ausgeschaltetem Bildschirm
@@ -68,8 +73,8 @@ class BackupWorker(context: Context, params: WorkerParameters) : CoroutineWorker
                     // execute() schließt auch bei Abbruch sauber ab und liefert eine Zusammenfassung
                     val abortReason = {
                         when {
-                            eject.ejecting -> "Speichermedium wird ausgeworfen"
-                            isStopped -> "Abgebrochen"
+                            eject.ejecting -> msg(R.string.abort_ejecting)
+                            isStopped -> msg(R.string.abort_cancelled)
                             else -> null
                         }
                     }
@@ -96,7 +101,7 @@ class BackupWorker(context: Context, params: WorkerParameters) : CoroutineWorker
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            RunSummary(Instant.now().toString(), 0, 0, 0, emptyList(), e.message ?: e.javaClass.simpleName)
+            RunSummary(Instant.now().toString(), 0, 0, 0, emptyList(), e.toMsg().ui)
         }
 
         if (summary.abortReason == null) session.complete()

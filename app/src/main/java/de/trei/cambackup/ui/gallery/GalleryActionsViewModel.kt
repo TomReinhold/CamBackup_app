@@ -11,7 +11,10 @@ import de.trei.cambackup.compress.TrialCompressor
 import de.trei.cambackup.util.formatBytes
 import de.trei.cambackup.freeup.FreeUpRunner
 import de.trei.cambackup.library.LibraryItem
+import de.trei.cambackup.R
+import de.trei.cambackup.util.L10n
 import de.trei.cambackup.util.fileCount
+import de.trei.cambackup.util.toMsg
 import de.trei.cambackup.work.RestoreWorker
 import de.trei.cambackup.work.JobControl
 import kotlinx.coroutines.CancellationException
@@ -38,14 +41,14 @@ class GalleryActionsViewModel(app: Application, private val saved: SavedStateHan
         viewModelScope.launch {
             // Nicht parallel zu einem laufenden Backup oder Ersetzen in den Index schreiben
             if (!BackupRunner.lock.tryLock()) {
-                _message.value = "Gerade läuft ein Vorgang – bitte danach erneut versuchen"
+                _message.value = L10n.str(R.string.gallery_busy)
                 return@launch
             }
             _message.value = try {
                 val n = freeUp.setKeepOriginal(folderUri, paths, keep)
-                if (keep) "${fileCount(n)} vom Verkleinern ausgeschlossen" else "${fileCount(n)} wieder zum Verkleinern freigegeben"
+                L10n.str(if (keep) R.string.gallery_excluded_msg else R.string.gallery_included_msg, fileCount(n))
             } catch (e: Exception) {
-                "Fehler: ${e.message ?: e.javaClass.simpleName}"
+                L10n.str(R.string.error_prefix, e.toMsg().ui)
             } finally {
                 BackupRunner.lock.unlock()
             }
@@ -63,25 +66,25 @@ class GalleryActionsViewModel(app: Application, private val saved: SavedStateHan
         _trialRunning.value = true
         JobControl.setPaused(JobControl.TRIAL, false)
         _trialProgress.value = 0 to media.size
-        if (items.size > MAX_TRIAL) _message.value = "Probe nur für die ersten $MAX_TRIAL Dateien"
+        if (items.size > MAX_TRIAL) _message.value = L10n.str(R.string.gallery_trial_limited, MAX_TRIAL)
         trialJob = viewModelScope.launch {
             _message.value = try {
                 val r = TrialCompressor(getApplication()).run(media) { done, total -> _trialProgress.value = done to total }
                 buildString {
                     if (r.created > 0) {
-                        append("${fileCount(r.created)} zur Probe verkleinert: ${formatBytes(r.bytesBefore)} → ${formatBytes(r.bytesAfter)}. ")
-                        append("Zum Vergleichen im Album „${TrialCompressor.ALBUM}“ der Galerie-App.")
+                        append(L10n.str(R.string.gallery_trial_done, fileCount(r.created), formatBytes(r.bytesBefore), formatBytes(r.bytesAfter)))
+                        append(" ").append(L10n.str(R.string.gallery_trial_where, TrialCompressor.ALBUM))
                     } else {
-                        append("Keine Probe erstellt.")
+                        append(L10n.str(R.string.gallery_trial_none))
                     }
                     r.skipped.forEach { (reason, n) -> append(" $reason: $n.") }
-                    if (r.failures > 0) append(" Fehler bei ${fileCount(r.failures)}.")
+                    if (r.failures > 0) append(" ").append(L10n.str(R.string.failures_header, fileCount(r.failures)))
                 }
             } catch (e: CancellationException) {
                 // Bereits erstellte Proben bleiben im Album
-                "Probe abgebrochen"
+                L10n.str(R.string.gallery_trial_cancelled)
             } catch (e: Exception) {
-                "Fehler: ${e.message ?: e.javaClass.simpleName}"
+                L10n.str(R.string.error_prefix, e.toMsg().ui)
             } finally {
                 _trialRunning.value = false
                 _trialProgress.value = null
@@ -117,7 +120,7 @@ class GalleryActionsViewModel(app: Application, private val saved: SavedStateHan
         val folder = saved.get<String>(KEY_FOLDER) ?: return
         val ids = saved.get<LongArray>(KEY_IDS) ?: return
         RestoreWorker.start(getApplication(), folder, saved.get<Boolean>(KEY_KEEP) ?: true, ids)
-        _message.value = "${fileCount(ids.size)} werden zurückgeholt – Fortschritt in der Benachrichtigung"
+        _message.value = L10n.str(R.string.gallery_restore_started, fileCount(ids.size))
     }
 
     private companion object {

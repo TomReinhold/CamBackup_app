@@ -20,6 +20,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -34,6 +35,11 @@ import de.trei.cambackup.ui.settings.SettingsScreen
 import de.trei.cambackup.ui.theme.CamBackupTheme
 
 class MainActivity : ComponentActivity() {
+    // Vor Android 13 setzt die App die gewählte Sprache selbst (ab 13 übernimmt das System)
+    override fun attachBaseContext(newBase: android.content.Context) {
+        super.attachBaseContext(de.trei.cambackup.util.AppLanguage.wrap(newBase))
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -43,11 +49,11 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-private enum class Tab(val label: String, val icon: Int) {
-    OVERVIEW("Übersicht", R.drawable.ic_dashboard),
-    GALLERY("Galerie", R.drawable.ic_photo_library),
-    SETTINGS("Einstellungen", R.drawable.ic_settings),
-    INFO("Info", R.drawable.ic_info),
+private enum class Tab(val label: Int, val icon: Int) {
+    OVERVIEW(R.string.tab_overview, R.drawable.ic_dashboard),
+    GALLERY(R.string.tab_gallery, R.drawable.ic_photo_library),
+    SETTINGS(R.string.tab_settings, R.drawable.ic_settings),
+    INFO(R.string.tab_info, R.drawable.ic_info),
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -70,7 +76,7 @@ private fun MainScaffold() {
         modifier = Modifier.fillMaxSize(),
         topBar = {
             // Einstellungen und Info haben eine eigene Titelleiste (mit Zurück auf Unterseiten)
-            if (tab != Tab.SETTINGS && tab != Tab.INFO) CenterAlignedTopAppBar(title = { Text(tab.label) })
+            if (tab != Tab.SETTINGS && tab != Tab.INFO) CenterAlignedTopAppBar(title = { Text(stringResource(tab.label)) })
         },
         bottomBar = {
             NavigationBar {
@@ -79,7 +85,7 @@ private fun MainScaffold() {
                         selected = tab == t,
                         onClick = { tab = t },
                         icon = { Icon(painterResource(t.icon), null) },
-                        label = { Text(t.label) },
+                        label = { Text(stringResource(t.label)) },
                     )
                 }
             }

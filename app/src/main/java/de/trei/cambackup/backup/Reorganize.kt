@@ -13,6 +13,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.IOException
 import java.time.ZoneId
+import de.trei.cambackup.R
+import de.trei.cambackup.util.AppError
+import de.trei.cambackup.util.Msg
+import de.trei.cambackup.util.msg
+import de.trei.cambackup.util.toMsg
 
 /** Eine gesicherte Datei, die in einen anderen Ordner auf dem Medium gehört. */
 data class Relocation(val entry: IndexEntry, val targetDir: String) {
@@ -55,7 +60,7 @@ fun detectLayout(index: IndexState, zone: ZoneId = ZoneId.systemDefault()): Dete
     return options.maxBy { o -> index.entries.count { placedFor(it, o.layout, o.separateFolders, zone) } }
 }
 
-data class RelocationResult(val moved: Int, val failures: List<RunSummary.Failure>, val abortReason: String?)
+data class RelocationResult(val moved: Int, val failures: List<Pair<String, Msg>>, val abortReason: Msg?)
 
 /**
  * Verschiebt Sicherungen innerhalb des Mediums in die eingestellte Ordnerstruktur. Der Inhalt
@@ -73,14 +78,14 @@ class Relocator(private val context: Context) {
         deviceDir: DocumentFile,
         index: BackupIndex,
         moves: List<Relocation>,
-        abortReason: () -> String?,
+        abortReason: () -> Msg?,
         onProgress: (done: Int, total: Int) -> Unit,
     ): RelocationResult = withContext(Dispatchers.IO) {
         val dirs = DirCache(deviceDir)
         val touched = linkedSetOf<String>()
-        val failures = mutableListOf<RunSummary.Failure>()
+        val failures = mutableListOf<Pair<String, Msg>>()
         var moved = 0
-        var abort: String? = null
+        var abort: Msg? = null
         var failedInRow = 0
         for ((i, m) in moves.withIndex()) {
             JobControl.waitWhilePaused(JobControl.BACKUP) { abortReason() != null }
@@ -98,9 +103,9 @@ class Relocator(private val context: Context) {
                     abort = BackupEngine.MEDIUM_DISCONNECTED
                     break
                 }
-                failures += RunSummary.Failure(m.name, e.message ?: e.javaClass.simpleName)
+                failures += m.name to e.toMsg()
                 if (++failedInRow >= 3) {
-                    abort = "Speichermedium antwortet nicht mehr"
+                    abort = msg(R.string.abort_not_responding)
                     break
                 }
             }
@@ -118,7 +123,7 @@ class Relocator(private val context: Context) {
             repair(m, dirs, index)
             return false
         }
-        if (source.length() != entry.originalSize) throw IOException("Größe auf dem Medium stimmt nicht – bleibt unverändert")
+        if (source.length() != entry.originalSize) throw AppError(R.string.err_size_mismatch)
 
         val targetFiles = dirs.files(m.targetDir)
         val currentFiles = dirs.files(m.currentDir)
@@ -127,13 +132,13 @@ class Relocator(private val context: Context) {
         var file = source
         if (finalName != m.name) {
             val renamed = DocumentsContract.renameDocument(resolver, source.uri, finalName)
-                ?: throw IOException("Umbenennen nach „$finalName“ fehlgeschlagen")
+                ?: throw AppError(R.string.err_rename_failed, finalName)
             currentFiles.remove(m.name)
             file = DocumentFile.fromSingleUri(context, renamed)!!
             currentFiles[finalName] = file
         }
         val target = DocumentsContract.moveDocument(resolver, file.uri, dirs.dir(m.currentDir).uri, dirs.dir(m.targetDir).uri)
-            ?: throw IOException("Verschieben nach „${m.targetDir.ifEmpty { "/" }}“ fehlgeschlagen")
+            ?: throw AppError(R.string.err_move_failed, m.targetDir.ifEmpty { "/" })
         currentFiles.remove(finalName)
         targetFiles[finalName] = DocumentFile.fromSingleUri(context, target)!!
 
@@ -170,7 +175,7 @@ class Relocator(private val context: Context) {
                 return
             }
         }
-        throw IOException("Sicherung fehlt auf dem Medium (${entry.backupPath})")
+        throw AppError(R.string.err_backup_missing_path, entry.backupPath)
     }
 
     /** Entfernt leer gewordene alte Ordner (z. B. "2024"), von innen nach außen. */

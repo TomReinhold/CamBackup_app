@@ -36,6 +36,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.math.min
 import kotlin.math.roundToInt
+import de.trei.cambackup.util.toMsg
 
 /** Vorschau-Bilder: jeweils Original und verkleinerte Version, als Gesamtbild und als 100-%-Ausschnitt. */
 data class PreviewImages(
@@ -121,7 +122,7 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
                 try {
                     PreviewState.Ready(buildPreview(imgs[i], params.first, params.second), i, imgs.size)
                 } catch (e: Exception) {
-                    PreviewState.Error(e.message ?: e.javaClass.simpleName)
+                    PreviewState.Error(e.toMsg().ui)
                 },
             )
         }

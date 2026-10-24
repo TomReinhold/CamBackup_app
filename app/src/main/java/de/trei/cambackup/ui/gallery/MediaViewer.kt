@@ -30,6 +30,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -38,10 +39,12 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import de.trei.cambackup.R
 import de.trei.cambackup.library.LibraryItem
 import de.trei.cambackup.library.MediaStatus
 import de.trei.cambackup.library.formatDuration
 import de.trei.cambackup.ui.components.StatusColors
+import de.trei.cambackup.util.L10n
 import de.trei.cambackup.util.formatBytes
 import java.text.DateFormat
 import java.util.Date
@@ -68,7 +71,7 @@ fun MediaViewer(items: List<LibraryItem>, startIndex: Int, onClose: () -> Unit) 
                     .padding(start = 4.dp, end = 4.dp, top = 4.dp, bottom = 24.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                IconButton(onClick = onClose) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Schließen", tint = Color.White) }
+                IconButton(onClick = onClose) { Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.action_close), tint = Color.White) }
                 Text(
                     current.media.displayName,
                     color = Color.White,
@@ -102,7 +105,7 @@ private fun ViewerPage(item: LibraryItem) {
                 shape = CircleShape,
                 colors = IconButtonDefaults.filledIconButtonColors(containerColor = Color.Black.copy(alpha = 0.5f)),
             ) {
-                Icon(Icons.Default.PlayArrow, "Abspielen", tint = Color.White, modifier = Modifier.size(40.dp))
+                Icon(Icons.Default.PlayArrow, stringResource(R.string.viewer_play), tint = Color.White, modifier = Modifier.size(40.dp))
             }
         }
     }
@@ -113,12 +116,12 @@ private fun InfoPanel(item: LibraryItem, modifier: Modifier) {
     val m = item.media
     val date = DateFormat.getDateTimeInstance(DateFormat.LONG, DateFormat.SHORT).format(Date(m.dateTakenMillis))
     val (statusText, color) = when (item.status) {
-        MediaStatus.NOT_BACKED_UP -> "Noch nicht gesichert" to Color.White.copy(alpha = 0.7f)
+        MediaStatus.NOT_BACKED_UP -> stringResource(R.string.viewer_not_backed_up) to Color.White.copy(alpha = 0.7f)
         MediaStatus.BACKED_UP ->
-            (if (item.excluded) "Original gesichert · wird nicht verkleinert" else "Original gesichert") to Color(0xFF9EC5FF)
+            stringResource(if (item.excluded) R.string.viewer_backed_up_kept else R.string.viewer_backed_up) to Color(0xFF9EC5FF)
         MediaStatus.COMPRESSED ->
-            (if (item.driveConnected) "Verkleinert – Original gesichert" else "Verkleinert") to StatusColors.compressed
-        MediaStatus.UNKNOWN -> "Sicherung nicht prüfbar – Speichermedium nicht verbunden" to Color.White.copy(alpha = 0.7f)
+            stringResource(if (item.driveConnected) R.string.viewer_compressed_backed_up else R.string.label_compressed) to StatusColors.compressed
+        MediaStatus.UNKNOWN -> stringResource(R.string.viewer_unknown) to Color.White.copy(alpha = 0.7f)
     }
     Column(
         modifier
@@ -135,7 +138,7 @@ private fun InfoPanel(item: LibraryItem, modifier: Modifier) {
                 append(formatBytes(m.sizeBytes))
                 if (m.isVideo) append(" · ${formatDuration(m.durationMs)}")
                 val entry = item.entry
-                if (item.status == MediaStatus.COMPRESSED && entry != null) append(" (Original ${formatBytes(entry.originalSize)})")
+                if (item.status == MediaStatus.COMPRESSED && entry != null) append(originalSizeLabel(formatBytes(entry.originalSize)))
             },
             color = Color.White.copy(alpha = 0.8f),
             style = MaterialTheme.typography.bodySmall,
@@ -145,12 +148,15 @@ private fun InfoPanel(item: LibraryItem, modifier: Modifier) {
             if (item.status == MediaStatus.BACKED_UP || item.status == MediaStatus.COMPRESSED) Spacer(Modifier.width(8.dp))
             Text(statusText, color = color, style = MaterialTheme.typography.labelLarge)
         }
-        Text("Auf dem Smartphone: ${m.relativePath.trimEnd('/')}", color = Color.White.copy(alpha = 0.6f), style = MaterialTheme.typography.bodySmall)
+        Text(stringResource(R.string.viewer_on_phone, m.relativePath.trimEnd('/')), color = Color.White.copy(alpha = 0.6f), style = MaterialTheme.typography.bodySmall)
         item.entry?.backupPath?.let {
-            Text("Auf dem Medium: $it", color = Color.White.copy(alpha = 0.6f), style = MaterialTheme.typography.bodySmall)
+            Text(stringResource(R.string.viewer_on_drive, it), color = Color.White.copy(alpha = 0.6f), style = MaterialTheme.typography.bodySmall)
         }
         item.entry?.compressionParams?.takeIf { item.status == MediaStatus.COMPRESSED }?.let {
-            Text("Verkleinert mit: $it", color = Color.White.copy(alpha = 0.6f), style = MaterialTheme.typography.bodySmall)
+            Text(stringResource(R.string.viewer_compressed_with, it), color = Color.White.copy(alpha = 0.6f), style = MaterialTheme.typography.bodySmall)
         }
     }
 }
+
+/** " (Original 3,2 MB)" hinter der Größe einer verkleinerten Datei. */
+private fun originalSizeLabel(size: String) = L10n.str(R.string.viewer_original_size, size)

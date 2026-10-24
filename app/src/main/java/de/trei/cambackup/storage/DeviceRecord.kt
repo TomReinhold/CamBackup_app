@@ -2,6 +2,8 @@ package de.trei.cambackup.storage
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import de.trei.cambackup.R
+import androidx.annotation.StringRes
 
 /** Identität dieses Smartphones, wie die App sie lokal kennt. */
 data class LocalIdentity(
@@ -65,7 +67,8 @@ fun relationOf(identity: LocalIdentity, record: DeviceRecord): DeviceRelation = 
 
 sealed interface FolderNameCheck {
     data class Ok(val name: String) : FolderNameCheck
-    data class Invalid(val reason: String) : FolderNameCheck
+    /** [reason]: Text-Ressource, [args] ihre Platzhalter (Anzeige in der App-Sprache). */
+    data class Invalid(@StringRes val reason: Int, val args: List<Any> = emptyList()) : FolderNameCheck
 }
 
 private val forbiddenChars = Regex("""[\\/:*?"<>|\x00-\x1F]""")
@@ -78,15 +81,15 @@ const val MAX_FOLDER_NAME_LENGTH = 64
 fun validateFolderName(raw: String, existingNames: Set<String>): FolderNameCheck {
     val name = raw.trim()
     return when {
-        name.isEmpty() -> FolderNameCheck.Invalid("Bitte einen Namen eingeben.")
+        name.isEmpty() -> FolderNameCheck.Invalid(R.string.name_empty)
         name.length > MAX_FOLDER_NAME_LENGTH ->
-            FolderNameCheck.Invalid("Höchstens $MAX_FOLDER_NAME_LENGTH Zeichen.")
+            FolderNameCheck.Invalid(R.string.name_too_long, listOf(MAX_FOLDER_NAME_LENGTH))
         forbiddenChars.containsMatchIn(name) ->
-            FolderNameCheck.Invalid("Nicht erlaubt sind: \\ / : * ? \" < > |")
-        name.endsWith('.') -> FolderNameCheck.Invalid("Der Name darf nicht mit einem Punkt enden.")
-        name == "." || name == ".." -> FolderNameCheck.Invalid("Ungültiger Name.")
+            FolderNameCheck.Invalid(R.string.name_forbidden_chars, listOf("\\ / : * ? \" < > |"))
+        name.endsWith('.') -> FolderNameCheck.Invalid(R.string.name_trailing_dot)
+        name == "." || name == ".." -> FolderNameCheck.Invalid(R.string.name_invalid)
         existingNames.any { it.equals(name, ignoreCase = true) } ->
-            FolderNameCheck.Invalid("Ein Ordner mit diesem Namen existiert bereits.")
+            FolderNameCheck.Invalid(R.string.name_exists)
         else -> FolderNameCheck.Ok(name)
     }
 }

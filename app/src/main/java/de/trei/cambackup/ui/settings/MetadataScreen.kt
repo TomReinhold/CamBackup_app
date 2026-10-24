@@ -23,11 +23,13 @@ import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import de.trei.cambackup.R
 import de.trei.cambackup.index.BackupIndex
 import de.trei.cambackup.index.BackupIndexFile
 import de.trei.cambackup.index.EntryStatus
@@ -36,12 +38,14 @@ import de.trei.cambackup.storage.DeviceRegistry
 import de.trei.cambackup.storage.DriveRepository
 import de.trei.cambackup.storage.SafIo
 import de.trei.cambackup.storage.metadataJson
+import de.trei.cambackup.util.L10n
 import de.trei.cambackup.util.formatBytes
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.text.DateFormat
 import java.time.Instant
 import java.util.Date
+import de.trei.cambackup.util.toMsg
 
 /** Inhalt des Ordners Metadata im Backup-Ordner, aufbereitet zur Anzeige. */
 private data class MetadataInfo(
@@ -73,9 +77,9 @@ fun MetadataScreen() {
         value = withContext(Dispatchers.IO) {
             runCatching {
                 val drives = DriveRepository(context)
-                val dir = drives.openActive() ?: return@runCatching MetadataState.Unavailable("Speichermedium nicht verbunden.")
+                val dir = drives.openActive() ?: return@runCatching MetadataState.Unavailable(L10n.str(R.string.meta_not_connected))
                 val metadata = dir.findFile(DeviceRegistry.METADATA_DIR)
-                    ?: return@runCatching MetadataState.Unavailable("Kein Ordner Metadata im Backup-Ordner.")
+                    ?: return@runCatching MetadataState.Unavailable(L10n.str(R.string.meta_no_folder))
                 val io = SafIo(context.contentResolver)
                 val state = BackupIndex.open(io, metadata).state
                 val entries = state.entries
@@ -99,7 +103,7 @@ fun MetadataScreen() {
                         log = metadata.findFile("backup_log.txt")?.let { io.readText(it).lines().filter(String::isNotBlank).takeLast(200).reversed() }.orEmpty(),
                     ),
                 )
-            }.getOrElse { MetadataState.Unavailable(it.message ?: it.javaClass.simpleName) }
+            }.getOrElse { MetadataState.Unavailable(it.toMsg().ui) }
         }
     }
 
@@ -112,54 +116,54 @@ fun MetadataScreen() {
 
 @Composable
 private fun MetadataContent(m: MetadataInfo) {
-    SettingsSection("Ordner Metadata", m.folder) {
+    SettingsSection(stringResource(R.string.meta_folder), m.folder) {
         m.files.forEach { (name, size) -> KeyValue(name, formatBytes(size)) }
     }
 
-    SettingsSection("Index", "backup_index.json und Journal zusammen") {
-        KeyValue("Einträge", "${m.entries}")
-        KeyValue("Nur gesichert", "${m.verified}")
-        KeyValue("Verkleinert", "${m.compressed}")
-        KeyValue("Original behalten", "${m.kept}")
-        KeyValue("Originale gesamt", formatBytes(m.originalBytes))
-        KeyValue("Stand des Index", m.indexUpdatedAt?.let(::formatTimestamp) ?: "–")
+    SettingsSection(stringResource(R.string.meta_index), stringResource(R.string.meta_index_hint)) {
+        KeyValue(stringResource(R.string.meta_entries), "${m.entries}")
+        KeyValue(stringResource(R.string.meta_verified), "${m.verified}")
+        KeyValue(stringResource(R.string.label_compressed), "${m.compressed}")
+        KeyValue(stringResource(R.string.meta_kept), "${m.kept}")
+        KeyValue(stringResource(R.string.meta_original_total), formatBytes(m.originalBytes))
+        KeyValue(stringResource(R.string.meta_index_updated), m.indexUpdatedAt?.let(::formatTimestamp) ?: "–")
         KeyValue(
-            "Offene Journal-Einträge",
+            stringResource(R.string.meta_journal),
             when (m.journalLines) {
-                0 -> "keine"
-                1 -> "1 Eintrag"
-                else -> "${m.journalLines} Einträge"
+                0 -> stringResource(R.string.meta_journal_none)
+                1 -> stringResource(R.string.meta_journal_one)
+                else -> stringResource(R.string.meta_journal_many, m.journalLines)
             },
         )
     }
 
-    SettingsSection("Gerät", "device.json – so erkennt die App dieses Smartphone wieder") {
+    SettingsSection(stringResource(R.string.about_device), stringResource(R.string.meta_device_hint)) {
         val d = m.device
         if (d == null) {
-            Hint(if (m.deviceJson == null) "device.json fehlt." else "device.json ist beschädigt und lässt sich nicht lesen.")
+            Hint(stringResource(if (m.deviceJson == null) R.string.meta_device_missing else R.string.meta_device_broken))
         } else {
-            KeyValue("Name", d.displayName)
-            KeyValue("Gerät", "${d.manufacturer.replaceFirstChar { it.uppercase() }} ${d.model}")
-            KeyValue("Eingerichtet", formatTimestamp(d.createdAt))
-            KeyValue("Zuletzt gesehen", formatTimestamp(d.lastSeenAt))
-            KeyValue("Letzte Sicherung", d.lastBackupAt?.let(::formatTimestamp) ?: "noch keine")
-            KeyValue("App-Version", d.appVersion)
-            KeyValue("Geräte-Kennung", d.deviceUuid, monospace = true)
+            KeyValue(stringResource(R.string.drive_name_label), d.displayName)
+            KeyValue(stringResource(R.string.about_device), "${d.manufacturer.replaceFirstChar { it.uppercase() }} ${d.model}")
+            KeyValue(stringResource(R.string.meta_created), formatTimestamp(d.createdAt))
+            KeyValue(stringResource(R.string.meta_last_seen), formatTimestamp(d.lastSeenAt))
+            KeyValue(stringResource(R.string.meta_last_backup), d.lastBackupAt?.let(::formatTimestamp) ?: stringResource(R.string.drive_never))
+            KeyValue(stringResource(R.string.meta_app_version), d.appVersion)
+            KeyValue(stringResource(R.string.meta_device_id), d.deviceUuid, monospace = true)
             KeyValue("Android-ID", d.androidId ?: "–", monospace = true)
-            if (d.previousUuids.isNotEmpty()) KeyValue("Frühere Kennungen", d.previousUuids.joinToString("\n"), monospace = true)
-            KeyValue("Formatversion", "${d.formatVersion}")
+            if (d.previousUuids.isNotEmpty()) KeyValue(stringResource(R.string.meta_previous_ids), d.previousUuids.joinToString("\n"), monospace = true)
+            KeyValue(stringResource(R.string.meta_format), "${d.formatVersion}")
         }
         if (m.deviceJson != null) {
             var raw by remember { mutableStateOf(false) }
             TextButton(onClick = { raw = !raw }, contentPadding = PaddingValues(0.dp)) {
-                Text(if (raw) "Rohdaten ausblenden" else "Rohdaten anzeigen")
+                Text(stringResource(if (raw) R.string.meta_raw_hide else R.string.meta_raw_show))
             }
             if (raw) Code(m.deviceJson)
         }
     }
 
-    SettingsSection("Protokoll", "backup_log.txt – neueste Einträge zuerst") {
-        if (m.log.isEmpty()) Hint("Noch keine Einträge.") else Code(m.log.joinToString("\n"))
+    SettingsSection(stringResource(R.string.meta_log), stringResource(R.string.meta_log_hint)) {
+        if (m.log.isEmpty()) Hint(stringResource(R.string.meta_log_empty)) else Code(m.log.joinToString("\n"))
     }
 }
 

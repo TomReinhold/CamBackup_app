@@ -23,6 +23,10 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import de.trei.cambackup.util.toMsg
+import de.trei.cambackup.util.L10n
+import de.trei.cambackup.util.AppError
+import de.trei.cambackup.R
 
 sealed interface DriveState {
     data object Loading : DriveState
@@ -83,7 +87,7 @@ class DriveViewModel(app: Application) : AndroidViewModel(app) {
                 when (val r = detector.detect()) {
                     is DetectResult.Active -> ready(r.folder)
                     is DetectResult.Activated -> {
-                        _autoFound.value = "Backup-Ordner „${r.folder.record.displayName}“ auf ${r.volumeLabel} automatisch erkannt"
+                        _autoFound.value = L10n.str(R.string.auto_found, r.folder.record.displayName, r.volumeLabel)
                         ready(r.folder)
                     }
                     is DetectResult.NotFound -> DriveState.NoFolder(hadFolder = drives.activeFolder != null, newVolume = r.newVolume)
@@ -91,7 +95,7 @@ class DriveViewModel(app: Application) : AndroidViewModel(app) {
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                DriveState.Error(e.message ?: e.javaClass.simpleName)
+                DriveState.Error(e.toMsg().ui)
             }
             DriveStatus.set(_state.value is DriveState.Ready)
         }
@@ -111,14 +115,10 @@ class DriveViewModel(app: Application) : AndroidViewModel(app) {
             _pick.value = try {
                 drives.takePermission(tree)
                 pendingTree = tree
-                val dir = DocumentFile.fromTreeUri(getApplication(), tree) ?: error("Ordner nicht lesbar")
+                val dir = DocumentFile.fromTreeUri(getApplication(), tree) ?: throw AppError(R.string.err_folder_unreadable)
                 val identity = identities.get()
                 if (drives.info(tree).isInternal) {
-                    reject(
-                        "Interner Speicher",
-                        "Dieser Ordner liegt im internen Speicher des Smartphones und ist als Backup-Ziel ungeeignet. " +
-                            "Bitte einen Ordner auf dem USB-Stick oder der SD-Karte wählen.",
-                    )
+                    reject(L10n.str(R.string.pick_internal_title), L10n.str(R.string.pick_internal_text))
                 } else when (val c = registry.check(dir, identity)) {
                     is FolderCheck.Own -> {
                         use(c.folder)
@@ -126,9 +126,8 @@ class DriveViewModel(app: Application) : AndroidViewModel(app) {
                     }
                     is FolderCheck.SameModel -> PickDialog.ConfirmSameModel(c.folder)
                     is FolderCheck.Foreign -> reject(
-                        "Ordner gehört zu einem anderen Smartphone",
-                        "„${c.record.displayName}“ (${c.record.manufacturer} ${c.record.model}) sichert in diesen Ordner. " +
-                            "Bitte einen anderen Ordner wählen oder einen neuen anlegen.",
+                        L10n.str(R.string.pick_foreign_title),
+                        L10n.str(R.string.pick_foreign_text, c.record.displayName, "${c.record.manufacturer} ${c.record.model}"),
                     )
                     is FolderCheck.ContainsMatch ->
                         if (c.relation == DeviceRelation.SAME) PickDialog.FoundInside(c.folder, dir.name ?: "")
@@ -136,7 +135,7 @@ class DriveViewModel(app: Application) : AndroidViewModel(app) {
                     is FolderCheck.Unused -> PickDialog.Setup(c.dir, c.isEmpty, c.otherDevices, c.existingNames, identity.suggestedFolderName)
                 }
             } catch (e: Exception) {
-                reject("Ordner nicht verwendbar", e.message ?: e.javaClass.simpleName)
+                reject(L10n.str(R.string.pick_unusable), e.toMsg().ui)
             }
         }
     }
@@ -191,7 +190,7 @@ class DriveViewModel(app: Application) : AndroidViewModel(app) {
                 block()
                 null
             } catch (e: Exception) {
-                reject("Einrichten fehlgeschlagen", e.message ?: e.javaClass.simpleName)
+                reject(L10n.str(R.string.pick_setup_failed), e.toMsg().ui)
             }
         }
     }

@@ -22,6 +22,10 @@ import de.trei.cambackup.freeup.FreeUpSummary
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.sync.withLock
 import java.time.Instant
+import de.trei.cambackup.util.fileCount
+import de.trei.cambackup.util.toMsg
+import de.trei.cambackup.util.L10n
+import de.trei.cambackup.R
 
 /** Verkleinert und ersetzt die Dateien bzw. rechnet den Probelauf – im Vordergrunddienst, da Videos lange dauern. */
 class FreeUpWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
@@ -37,8 +41,8 @@ class FreeUpWorker(context: Context, params: WorkerParameters) : CoroutineWorker
         Notifications.ID_PROGRESS,
         Notifications.simpleProgress(
             applicationContext,
-            title = if (replacing) "Dateien werden verkleinert" else "Probelauf: Ersparnis wird berechnet",
-            text = p?.let { "${it.done + 1} von ${it.total}" } ?: "Wird gestartet …",
+            title = L10n.str(if (replacing) R.string.notif_compressing else R.string.notif_dry_running),
+            text = p?.let { L10n.str(R.string.notif_n_of_total, it.done + 1, it.total) } ?: L10n.str(R.string.restore_starting),
             percent = p?.let { if (it.total > 0) it.done * 100 / it.total else 0 },
             cancelIntent = WorkManager.getInstance(applicationContext).createCancelPendingIntent(id),
         ),
@@ -64,7 +68,7 @@ class FreeUpWorker(context: Context, params: WorkerParameters) : CoroutineWorker
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            FreeUpSummary(Instant.now().toString(), replacing, 0, 0, emptyMap(), emptyList(), e.message ?: e.javaClass.simpleName)
+            FreeUpSummary(Instant.now().toString(), replacing, 0, 0, emptyMap(), emptyList(), e.toMsg().ui)
         }
         store.saveSummary(summary)
         notifications.cancel(Notifications.ID_PROGRESS)

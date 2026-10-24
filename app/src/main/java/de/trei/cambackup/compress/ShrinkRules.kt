@@ -1,16 +1,22 @@
 package de.trei.cambackup.compress
 
+import androidx.annotation.StringRes
+import de.trei.cambackup.R
 import de.trei.cambackup.media.MediaItem
+import de.trei.cambackup.util.L10n
 import de.trei.cambackup.settings.CompressionSettings
 
 /** Gründe, ein Bild nicht zu verkleinern; die Datei bleibt dann unverändert (gesichert ist sie trotzdem). */
-enum class SkipReason(val text: String) {
-    UNSUPPORTED_FORMAT("Format wird nicht verkleinert (nur JPEG und MP4)"),
-    HDR_VIDEO("HDR-Video – nur mit Codec HEVC verkleinerbar"),
-    MOTION_PHOTO("Bewegtes Foto – eingebettetes Video bliebe nicht erhalten"),
-    TOO_RECENT("Jünger als das Mindestalter"),
-    ALREADY_COMPRESSED("Bereits von CamBackup verkleinert"),
-    TOO_LITTLE_SAVING("Ersparnis unter dem Mindestwert"),
+enum class SkipReason(@StringRes private val textRes: Int) {
+    UNSUPPORTED_FORMAT(R.string.skip_format),
+    HDR_VIDEO(R.string.skip_hdr),
+    MOTION_PHOTO(R.string.skip_motion_photo),
+    TOO_RECENT(R.string.skip_too_recent),
+    ALREADY_COMPRESSED(R.string.skip_already_compressed),
+    TOO_LITTLE_SAVING(R.string.skip_too_little_saving);
+
+    /** Grund in der App-Sprache. */
+    val text: String get() = L10n.str(textRes)
 }
 
 /** Kennzeichnung im EXIF-Feld „Software“ verkleinerter Bilder. */

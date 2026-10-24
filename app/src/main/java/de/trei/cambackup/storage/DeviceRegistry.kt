@@ -7,6 +7,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.IOException
 import java.time.Instant
+import de.trei.cambackup.util.toMsg
+import de.trei.cambackup.util.msg
+import de.trei.cambackup.util.L10n
+import de.trei.cambackup.util.AppError
+import de.trei.cambackup.R
 
 /** Ein Backup-Ordner samt seiner device.json. */
 data class BackupFolder(val dir: DocumentFile, val record: DeviceRecord)
@@ -68,9 +73,9 @@ class DeviceRegistry(private val context: Context, private val appVersion: Strin
 
     /** Richtet [dir] als Backup-Ordner dieses Smartphones ein (Metadata/device.json, .nomedia). */
     suspend fun setup(dir: DocumentFile, identity: LocalIdentity, displayName: String): BackupFolder = withContext(Dispatchers.IO) {
-        if (read(dir) != null) throw IOException("Ordner ist bereits ein Backup-Ordner")
+        if (read(dir) != null) throw AppError(R.string.err_already_backup_folder)
         val metadata = dir.findFile(METADATA_DIR) ?: dir.createDirectory(METADATA_DIR)
-            ?: throw IOException("Ordner „$METADATA_DIR“ konnte nicht angelegt werden")
+            ?: throw AppError(R.string.err_create_folder, METADATA_DIR)
         val now = Instant.now().toString()
         val record = DeviceRecord(
             deviceUuid = identity.deviceUuid,
@@ -90,8 +95,8 @@ class DeviceRegistry(private val context: Context, private val appVersion: Strin
     /** Legt in [parent] einen neuen Unterordner [folderName] an und richtet ihn ein. */
     suspend fun createAndSetup(parent: DocumentFile, folderName: String, identity: LocalIdentity, displayName: String): BackupFolder =
         withContext(Dispatchers.IO) {
-            if (parent.findFile(folderName) != null) throw IOException("Ordner „$folderName“ existiert bereits")
-            val dir = parent.createDirectory(folderName) ?: throw IOException("Ordner „$folderName“ konnte nicht angelegt werden")
+            if (parent.findFile(folderName) != null) throw AppError(R.string.err_folder_exists, folderName)
+            val dir = parent.createDirectory(folderName) ?: throw AppError(R.string.err_create_folder, folderName)
             setup(dir, identity, displayName)
         }
 
@@ -100,7 +105,7 @@ class DeviceRegistry(private val context: Context, private val appVersion: Strin
      * aktualisiert lastSeenAt. Die bisherige UUID wird in previousUuids aufbewahrt.
      */
     suspend fun claim(folder: BackupFolder, identity: LocalIdentity): BackupFolder = withContext(Dispatchers.IO) {
-        val metadata = folder.dir.findFile(METADATA_DIR) ?: throw IOException("Metadaten nicht gefunden")
+        val metadata = folder.dir.findFile(METADATA_DIR) ?: throw AppError(R.string.err_no_metadata)
         val old = folder.record
         val previous = if (old.deviceUuid != identity.deviceUuid) (old.previousUuids + old.deviceUuid).distinct() else old.previousUuids
         val updated = old.copy(
@@ -140,14 +145,14 @@ class DeviceRegistry(private val context: Context, private val appVersion: Strin
             appVersion = appVersion,
         )
         writeRecord(metadata, record)
-        runCatching { io.appendText(metadata, "backup_log.txt", "$now  $DEVICE_FILE war beschädigt und wurde neu angelegt\n") }
+        runCatching { io.appendText(metadata, "backup_log.txt", "$now  $DEVICE_FILE was damaged and has been recreated\n") }
         BackupFolder(dir, record)
     }
 
     /** Ändert den in device.json gespeicherten Namen des Smartphones. */
     suspend fun rename(dir: DocumentFile, displayName: String) = withContext(Dispatchers.IO) {
-        val metadata = dir.findFile(METADATA_DIR) ?: throw IOException("Metadaten nicht gefunden")
-        val record = read(dir) ?: throw IOException("$DEVICE_FILE fehlt")
+        val metadata = dir.findFile(METADATA_DIR) ?: throw AppError(R.string.err_no_metadata)
+        val record = read(dir) ?: throw AppError(R.string.err_device_file_missing, DEVICE_FILE)
         writeRecord(metadata, record.copy(displayName = displayName))
     }
 
@@ -161,8 +166,8 @@ class DeviceRegistry(private val context: Context, private val appVersion: Strin
 
     /** Trägt den Zeitpunkt der letzten erfolgreichen Sicherung in device.json ein. */
     suspend fun markBackup(deviceDir: DocumentFile, at: Instant) = withContext(Dispatchers.IO) {
-        val metadata = deviceDir.findFile(METADATA_DIR) ?: throw IOException("Ordner „$METADATA_DIR“ fehlt")
-        val record = readRecordOrNull(metadata) ?: throw IOException("$DEVICE_FILE fehlt oder ist beschädigt")
+        val metadata = deviceDir.findFile(METADATA_DIR) ?: throw AppError(R.string.err_no_metadata)
+        val record = readRecordOrNull(metadata) ?: throw AppError(R.string.err_device_file_broken, DEVICE_FILE)
         writeRecord(metadata, record.copy(lastBackupAt = at.toString(), lastSeenAt = at.toString()))
     }
 

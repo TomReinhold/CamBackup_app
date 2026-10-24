@@ -37,7 +37,10 @@ class BackupIndex private constructor(
         // harmlos: das Journal wird beim nächsten Laden erneut eingespielt (gleiche backupPaths).
         metadataDir.findFile(JOURNAL_FILE)?.delete()
         // Nur zum Nachschlagen – ein Fehler hier darf den Index nicht gefährden
-        runCatching { io.replaceAtomically(metadataDir, FILE_LIST, fileListCsv(state.entries)) }
+        runCatching {
+            io.replaceAtomically(metadataDir, FILE_LIST, fileListCsv(state.entries))
+            metadataDir.findFile(LEGACY_FILE_LIST)?.delete()
+        }
     }
 
     companion object {

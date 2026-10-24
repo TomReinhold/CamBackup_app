@@ -10,6 +10,11 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.IOException
+import de.trei.cambackup.util.toMsg
+import de.trei.cambackup.util.msg
+import de.trei.cambackup.util.L10n
+import de.trei.cambackup.util.AppError
+import de.trei.cambackup.R
 
 /** Ergebnis einer Probe-Verkleinerung. */
 data class TrialResult(
@@ -92,9 +97,9 @@ class TrialCompressor(private val context: Context) {
             put(MediaStore.MediaColumns.DATE_TAKEN, item.dateTakenMillis)
             put(MediaStore.MediaColumns.IS_PENDING, 1)
         }
-        val uri = resolver.insert(collection, values) ?: throw IOException("Probe-Datei konnte nicht angelegt werden")
+        val uri = resolver.insert(collection, values) ?: throw AppError(R.string.err_trial_create)
         try {
-            (resolver.openOutputStream(uri) ?: throw IOException("Probe-Datei nicht beschreibbar")).use { out ->
+            (resolver.openOutputStream(uri) ?: throw AppError(R.string.err_trial_write)).use { out ->
                 r.file.inputStream().use { it.copyTo(out, 1 shl 20) }
             }
             resolver.update(uri, ContentValues().apply { put(MediaStore.MediaColumns.IS_PENDING, 0) }, null, null)

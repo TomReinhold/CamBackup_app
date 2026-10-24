@@ -30,6 +30,9 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import de.trei.cambackup.util.toMsg
+import de.trei.cambackup.util.AppError
+import de.trei.cambackup.R
 
 sealed interface FreeUpState {
     data object Loading : FreeUpState
@@ -59,7 +62,7 @@ class FreeUpViewModel(app: Application) : AndroidViewModel(app) {
             ov == null -> FreeUpState.Loading
             else -> ov.fold(
                 onSuccess = { FreeUpState.Overview(it, s.dryRun, s.minAgeDays) },
-                onFailure = { FreeUpState.Error(it.message ?: it.javaClass.simpleName) },
+                onFailure = { FreeUpState.Error(it.toMsg().ui) },
             )
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), FreeUpState.Loading)
@@ -121,7 +124,7 @@ class FreeUpViewModel(app: Application) : AndroidViewModel(app) {
     /** Laden des Überblicks abbrechen. */
     fun cancelLoad() {
         loadJob?.cancel()
-        overview.value = Result.failure(Exception("Abgebrochen"))
+        overview.value = Result.failure(AppError(R.string.cancelled))
     }
 
     /** Ergebnis des letzten Laufs – steht über dem Überblick, bis die App verlassen wird. */

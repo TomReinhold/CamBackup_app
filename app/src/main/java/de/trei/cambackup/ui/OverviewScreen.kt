@@ -26,6 +26,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -85,18 +86,18 @@ fun LibraryGate(
         when (state) {
             LibraryState.Loading, is LibraryState.Loaded -> CircularProgressIndicator(Modifier.align(Alignment.Center))
             LibraryState.NeedsPermission -> CenteredMessage(
-                title = "Zugriff auf Fotos und Videos",
-                text = "CamBackup sichert deine Fotos und Videos. Dafür wird Zugriff auf alle Fotos und Videos benötigt.",
-                button = "Zugriff erlauben",
+                title = stringResource(R.string.permission_title),
+                text = stringResource(R.string.permission_text),
+                button = stringResource(R.string.permission_button),
                 onClick = { permissionLauncher.launch(MediaPermissions.required) },
             )
             LibraryState.PartialAccess -> CenteredMessage(
-                title = "Nur ausgewählte Fotos freigegeben",
-                text = "Für ein vollständiges Backup bitte in den Einstellungen unter „Fotos und Videos“ → „Immer alle zulassen“ wählen.",
-                button = "Einstellungen öffnen",
+                title = stringResource(R.string.permission_partial_title),
+                text = stringResource(R.string.permission_partial_text),
+                button = stringResource(R.string.permission_partial_button),
                 onClick = openAppSettings,
             )
-            is LibraryState.Error -> CenteredMessage("Fehler", state.message, "Erneut versuchen", refresh)
+            is LibraryState.Error -> CenteredMessage(stringResource(R.string.error_title), state.message, stringResource(R.string.action_retry), refresh)
         }
     }
 }
@@ -119,13 +120,13 @@ private fun CenteredMessage(title: String, text: String, button: String, onClick
 private fun CameraFolderCard(s: LibraryStats, driveConnected: Boolean) {
     FeatureCard(
         icon = R.drawable.ic_smartphone,
-        title = "Fotos und Videos",
-        subtitle = "${fileCount(s.totalCount)} auf diesem Smartphone",
+        title = stringResource(R.string.overview_media_title),
+        subtitle = stringResource(R.string.overview_media_subtitle, fileCount(s.totalCount)),
     ) {
         Row(verticalAlignment = Alignment.Bottom) {
             Text(formatBytes(s.totalBytes), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.SemiBold)
             Spacer(Modifier.width(8.dp))
-            Text("belegt", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(bottom = 4.dp))
+            Text(stringResource(R.string.overview_used), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(bottom = 4.dp))
         }
         StackedBar(
             listOf(
@@ -135,17 +136,17 @@ private fun CameraFolderCard(s: LibraryStats, driveConnected: Boolean) {
             ),
         )
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            LegendStat(StatusColors.compressed, "Verkleinert", "${s.compressedCount}", formatBytes(s.compressedBytes), Modifier.weight(1f))
+            LegendStat(StatusColors.compressed, stringResource(R.string.label_compressed),"${s.compressedCount}", formatBytes(s.compressedBytes), Modifier.weight(1f))
             if (driveConnected) {
-                LegendStat(StatusColors.backedUp(), "Gesichert", "${s.backedUpCount}", formatBytes(s.backedUpBytes), Modifier.weight(1f))
-                LegendStat(StatusColors.open(), "Offen", "${s.openCount}", formatBytes(s.openBytes), Modifier.weight(1f))
+                LegendStat(StatusColors.backedUp(), stringResource(R.string.status_backed_up), "${s.backedUpCount}", formatBytes(s.backedUpBytes), Modifier.weight(1f))
+                LegendStat(StatusColors.open(), stringResource(R.string.status_open),"${s.openCount}", formatBytes(s.openBytes), Modifier.weight(1f))
             } else {
-                LegendStat(StatusColors.open(), "Nicht geprüft", "${s.unknownCount}", formatBytes(s.unknownBytes), Modifier.weight(2f))
+                LegendStat(StatusColors.open(), stringResource(R.string.status_unchecked),"${s.unknownCount}", formatBytes(s.unknownBytes), Modifier.weight(2f))
             }
         }
         if (!driveConnected) {
             Text(
-                "Ob deine Fotos und Videos gesichert sind, zeigt die App nur bei verbundenem Speichermedium.",
+                stringResource(R.string.overview_unchecked_hint),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -154,7 +155,7 @@ private fun CameraFolderCard(s: LibraryStats, driveConnected: Boolean) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(painterResource(R.drawable.ic_compress), null, tint = StatusColors.compressed, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
-                Text("Bereits ${formatBytes(s.savedBytes)} frei geworden", style = MaterialTheme.typography.bodyMedium)
+                Text(stringResource(R.string.overview_saved, formatBytes(s.savedBytes)), style = MaterialTheme.typography.bodyMedium)
             }
         }
     }

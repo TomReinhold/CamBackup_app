@@ -40,6 +40,11 @@ import java.io.IOException
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlin.math.abs
+import de.trei.cambackup.util.toMsg
+import de.trei.cambackup.util.msg
+import de.trei.cambackup.util.L10n
+import de.trei.cambackup.util.AppError
+import de.trei.cambackup.R
 
 /** Eckdaten eines Videos, gelesen mit MediaMetadataRetriever. */
 data class VideoInfo(
@@ -92,15 +97,15 @@ class VideoShrinker(private val context: Context) {
             // (Kann ein Encoder die Auflösung nicht, weicht Transformer sonst unbemerkt auf eine kleinere aus.)
             val problem = when {
                 abs(result.durationMs - info.durationMs) > DURATION_TOLERANCE_MS ->
-                    "Dauer weicht ab (${result.durationMs} statt ${info.durationMs} ms)"
-                info.hasAudio && !result.hasAudio -> "Tonspur fehlt"
+                    msg(R.string.err_video_duration, result.durationMs, info.durationMs)
+                info.hasAudio && !result.hasAudio -> msg(R.string.err_video_audio)
                 abs(result.displayWidth - w) > 2 || abs(result.displayHeight - h) > 2 ->
-                    "Auflösung ${result.displayWidth}×${result.displayHeight} statt $w×$h (Encoder unterstützt sie nicht)"
+                    msg(R.string.err_video_resolution, "${result.displayWidth}×${result.displayHeight}", "$w×$h")
                 else -> null
             }
             if (problem != null) {
                 out.delete()
-                throw IOException("Video-Kodierung fehlerhaft: $problem")
+                throw AppError(R.string.err_video_broken, problem)
             }
             if (!worthReplacing(item.sizeBytes, out.length(), settings.minSavingsPercent)) {
                 out.delete()
@@ -187,7 +192,7 @@ class VideoShrinker(private val context: Context) {
                             }
 
                             override fun onError(composition: Composition, exportResult: ExportResult, exportException: ExportException) {
-                                cont.resumeWithException(IOException("Video-Kodierung fehlgeschlagen: ${exportException.message}", exportException))
+                                cont.resumeWithException(AppError(msg(R.string.err_video_failed, exportException.toMsg()), exportException))
                             }
                         })
                         .build()

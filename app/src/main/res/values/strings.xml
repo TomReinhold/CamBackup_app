@@ -1,3 +1,547 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Englisch: Standardsprache (auch für alle Systemsprachen außer Deutsch). Deutsch: values-de -->
 <resources>
     <string name="app_name">CamBackup</string>
+
+    <!-- Allgemein -->
+    <plurals name="file_count">
+        <item quantity="one">%d file</item>
+        <item quantity="other">%d files</item>
+    </plurals>
+    <string name="remaining_under_minute">less than 1 min left</string>
+    <string name="remaining_minutes">about %d min left</string>
+    <string name="remaining_hours">about %d h left</string>
+    <string name="remaining_hours_minutes">about %1$d h %2$d min left</string>
+    <string name="action_cancel">Cancel</string>
+    <string name="action_pause">Pause</string>
+    <string name="action_resume">Resume</string>
+    <string name="action_retry">Try again</string>
+    <string name="action_delete">Delete</string>
+    <string name="action_back">Back</string>
+    <string name="action_close">Close</string>
+    <string name="paused_prefix">"Paused – "</string>
+    <string name="paused">Paused</string>
+    <string name="cancelled">Cancelled</string>
+    <string name="error_prefix">Error: %s</string>
+    <string name="info_default_title">Note</string>
+    <string name="info_expand">Expand</string>
+    <string name="info_collapse">Collapse</string>
+    <string name="dont_unplug">Please don\'t unplug the storage device</string>
+    <string name="failures_header">Errors in %s:</string>
+
+    <!-- Navigation -->
+    <string name="tab_overview">Overview</string>
+    <string name="tab_gallery">Gallery</string>
+    <string name="tab_settings">Settings</string>
+    <string name="tab_info">Info</string>
+    <string name="metadata_title">Metadata</string>
+
+    <!-- Backup -->
+    <string name="backup_title">Backup</string>
+    <string name="backup_subtitle">Copy originals bit-for-bit to the storage device</string>
+    <string name="backup_comparing">Comparing media folders with the storage device …</string>
+    <string name="backup_compare_cancelled">Comparison cancelled.</string>
+    <string name="backup_compare_again">Check again</string>
+    <string name="missing_progress">Processing deleted files: %1$d of %2$d</string>
+    <string name="missing_starting">Processing deleted files …</string>
+    <string name="backup_moving_progress">New folder structure: %1$d of %2$d files moved</string>
+    <string name="backup_starting">Preparing backup …</string>
+    <string name="backup_file_progress">File %1$d of %2$d</string>
+    <string name="backup_eta_pending">Estimating time left …</string>
+    <string name="backup_bytes_progress">%1$s of %2$s copied and verified</string>
+    <string name="backup_running_info">Keeps running in the background. Please don\'t unplug the storage device – if you do, everything verified so far stays backed up and the backup can be resumed later.</string>
+    <string name="backup_too_large_fat">%1$s larger than 4 GB – won\'t fit on a FAT32 device: %2$s. Please use a device formatted with exFAT.</string>
+    <string name="backup_layout_was">" (so far: %s)"</string>
+    <string name="backup_layout_was_separate">" (so far: %s, per media folder)"</string>
+    <string name="backup_relocate_info">New folder structure: %1$s are still in the previous layout%2$s and will be moved on the storage device during the backup. Their content stays unchanged, nothing is copied again.</string>
+    <string name="backup_relocate_title">New folder structure: %s will be moved</string>
+    <string name="backup_all_done">Everything is backed up.</string>
+    <string name="backup_all_done_count">Everything is backed up – %s on the storage device.</string>
+    <string name="backup_to_copy">To back up</string>
+    <string name="backup_already">Already backed up</string>
+    <string name="backup_space_ok">Required incl. reserve: %1$s – free: %2$s</string>
+    <string name="backup_space_low">Not enough space: %1$s required (incl. reserve), only %2$s free. Please free up space or use a larger device.</string>
+    <string name="backup_space_unknown">Free space unknown – about %s required.</string>
+    <string name="backup_relocate_start">Adjust folder structure</string>
+    <string name="backup_start">Start backup</string>
+    <string name="missing_result">%1$s restored, %2$s deleted from the backup</string>
+    <string name="backup_result_moved">Folder structure adjusted: %s moved.</string>
+    <string name="backup_result_nothing">Backup finished – there was nothing new to back up.</string>
+    <string name="backup_result_done">Backup finished: %1$s (%2$s) copied and verified.</string>
+    <string name="backup_result_incomplete">Backup incomplete: %s copied</string>
+    <string name="backup_result_adopted">Already present and taken over: %s</string>
+    <string name="backup_result_moved_count">Moved to the new folder structure: %s</string>
+    <string name="backup_result_resume_info">Everything up to the interruption is verified and backed up. When resuming, only the missing files are copied.</string>
+
+    <!-- Bezeichnungen -->
+    <string name="label_original">Original</string>
+    <string name="label_compressed">Compressed</string>
+    <string name="label_images">Images</string>
+    <string name="label_videos">Videos</string>
+
+    <!-- Einstellungen -->
+    <string name="settings_folders">Media folders</string>
+    <string name="settings_storage">Layout on the device</string>
+    <string name="settings_photos_title">Compress photos</string>
+    <string name="settings_videos_title">Compress videos</string>
+    <string name="settings_rules">When to compress</string>
+    <string name="settings_language">Language</string>
+    <string name="settings_reset">Reset to defaults</string>
+    <string name="settings_reset_title">Reset?</string>
+    <string name="settings_reset_text">All settings except the media folders are reset to their defaults. Dry run is switched on again.</string>
+    <string name="settings_reset_confirm">Reset</string>
+    <string name="settings_group_backup">Backup</string>
+    <string name="settings_group_shrink">Compression</string>
+    <string name="settings_group_app">App</string>
+    <string name="settings_per_folder_suffix">" · per media folder"</string>
+    <string name="settings_photos">Photos</string>
+    <string name="settings_photos_max">max. %d px</string>
+    <string name="settings_photos_original">Original size</string>
+    <string name="settings_photos_quality">" · quality %d"</string>
+    <string name="settings_photos_with_gps">" · with location"</string>
+    <string name="settings_photos_without_gps">" · without location"</string>
+    <string name="settings_videos">Videos</string>
+    <string name="settings_videos_original">Original resolution</string>
+    <string name="settings_rules_now">immediately</string>
+    <string name="settings_rules_from">from %s</string>
+    <string name="settings_rules_min_saving">" · at least %d %% smaller"</string>
+    <string name="settings_dry_run">Dry run</string>
+    <string name="language_system">System language</string>
+    <string name="language_german">Deutsch</string>
+    <string name="language_english">English</string>
+    <string name="language_hint">“System language” follows the phone setting; for languages other than German, the app uses English.</string>
+    <string name="preview_title">Preview</string>
+    <string name="preview_hint">Real compression of one of your photos</string>
+    <string name="preview_prev">Previous image</string>
+    <string name="preview_next">Next image</string>
+    <string name="preview_whole">Whole image</string>
+    <string name="preview_detail" formatted="false">Detail 100 %</string>
+    <string name="preview_no_images">No photos found in the selected folders.</string>
+    <string name="preview_error">Preview not possible: %s</string>
+    <string name="preview_position">%1$s · image %2$d of %3$d</string>
+    <string name="estimate_title">Expected storage</string>
+    <string name="estimate_calculating">Compressing sample images …</string>
+    <string name="estimate_nothing">Nothing to compress yet</string>
+    <string name="estimate_freed">will be freed</string>
+    <string name="estimate_now">Now</string>
+    <string name="estimate_after">After</string>
+    <plurals name="estimate_too_recent">
+        <item quantity="one">%1$s (%2$s) is younger than %3$s and stays in original quality.</item>
+        <item quantity="other">%1$s (%2$s) are younger than %3$s and stay in original quality.</item>
+    </plurals>
+    <string name="estimate_basis">Estimate: images based on %d sample images, videos based on duration × bitrate.</string>
+    <string name="estimate_basis_some">Estimate: images based on a few sample images, videos based on duration × bitrate.</string>
+    <string name="estimate_legend_unchanged">unchanged</string>
+    <string name="estimate_legend_free">free</string>
+    <string name="folders_subtitle">Which folders are backed up and compressed</string>
+    <string name="folders_hint_multiple">Several folders: each one gets its own subfolder on the storage device (e.g. “DCIM/Camera/2026/10”). Files already backed up are moved there during the next backup.</string>
+    <string name="folders_hint_single">With one folder, backups are stored directly in the device folder. With several, each one gets its own subfolder.</string>
+    <string name="folder_camera">Camera</string>
+    <string name="folder_screenshots">Screenshots</string>
+    <string name="folder_movies">Movies</string>
+    <string name="folder_pictures">Pictures</string>
+    <string name="folder_downloads">Downloads</string>
+    <string name="photos_subtitle">Saved again as JPEG</string>
+    <string name="photos_max_edge">Maximum edge length</string>
+    <string name="photos_edge_2048">≈ 4 MP – good for screens and sharing</string>
+    <string name="photos_edge_3072">≈ 9 MP – also for prints up to about 20 × 30 cm</string>
+    <string name="photos_edge_4096">≈ 16 MP – hardly any visible difference to the original</string>
+    <string name="photos_edge_original">Resolution stays, only the JPEG quality is adjusted</string>
+    <string name="photos_quality">JPEG quality</string>
+    <string name="photos_quality_smaller">smaller</string>
+    <string name="photos_quality_better">better</string>
+    <string name="photos_keep_gps">Keep location (GPS)</string>
+    <string name="photos_keep_gps_hint">Capture date and camera data are always kept</string>
+    <string name="videos_subtitle">Re-encoded – this takes time and battery</string>
+    <string name="videos_max_resolution">Maximum resolution</string>
+    <string name="videos_hevc_hint">About half the size at the same quality; plays fine on current devices</string>
+    <string name="videos_h264_hint">Plays everywhere, also on older devices and TVs</string>
+    <string name="videos_bitrate">Video bitrate</string>
+    <string name="videos_per_minute">Currently ≈ %s per minute of video</string>
+    <string name="videos_limit_30">Limit to 30 frames/s</string>
+    <string name="videos_limit_30_hint">Saves extra space for 60 fps videos</string>
+    <string name="rules_title">When is compression done?</string>
+    <string name="rules_subtitle">Applies to photos and videos</string>
+    <string name="rules_min_age">Only compress from an age of</string>
+    <string name="rules_min_age_hint">Newer photos and videos stay in original quality on the phone</string>
+    <string name="rules_min_saving">Minimum saving</string>
+    <string name="rules_min_saving_hint">Files that don\'t get at least %d %% smaller stay unchanged.</string>
+    <string name="rules_dry_run_hint">Only back up – nothing is replaced on the phone</string>
+    <string name="rules_dry_run_off_warning">After a successful, verified backup, photos and videos on the phone are replaced by their compressed versions. The originals then only exist on the storage device.</string>
+    <string name="storage_title">Layout on the storage device</string>
+    <string name="storage_subtitle">How originals are stored in the backup folder</string>
+    <string name="storage_subfolders">Subfolders</string>
+    <string name="storage_hint">Files already backed up are moved into this structure automatically during the next backup.</string>
+    <string name="storage_hint_folders">With several media folders, each one additionally gets its own subfolder (e.g. “Pictures/Screenshots”). You choose the backup folder itself in the overview under “Storage device”.</string>
+    <string name="storage_preview_root">Backup folder</string>
+    <string name="layout_short_flat">None</string>
+    <string name="layout_short_year">Year</string>
+    <string name="layout_short_year_month">Year / month</string>
+    <string name="layout_flat">No subfolders</string>
+    <string name="layout_year">By year</string>
+    <string name="layout_year_month">By year and month</string>
+    <string name="age_short_now">now</string>
+    <string name="age_year">1 year</string>
+    <string name="age_short_days">%d d</string>
+    <plurals name="age_days">
+        <item quantity="one">%d day</item>
+        <item quantity="other">%d days</item>
+    </plurals>
+
+    <!-- Speichermedium -->
+    <string name="action_save">Save</string>
+    <string name="drive_title">Storage device</string>
+    <string name="drive_new_volume">New storage device “%s” detected. Choose the backup folder for this phone on it.</string>
+    <string name="drive_new_volume_title">New storage device detected</string>
+    <string name="drive_pick_on">Choose backup folder on %s</string>
+    <string name="drive_not_connected">The storage device with the backup folder is not connected. Please plug it in – the app finds it automatically.</string>
+    <string name="drive_connect_hint">Connect a USB stick or an SD card and choose a folder for backing up this phone.</string>
+    <string name="drive_tip">Tip: create a folder on the device (e.g. “Phone backup”) and choose it. If you choose a folder that contains backup folders of several phones, the app finds the right one itself.</string>
+    <string name="drive_pick">Choose folder</string>
+    <string name="drive_pick_other">Choose another folder</string>
+    <string name="drive_pick_other_backup">Choose another backup folder</string>
+    <string name="drive_free_unknown">Free space: unknown</string>
+    <string name="drive_free">%s free</string>
+    <string name="drive_of_total">of %s</string>
+    <string name="drive_last_backup">Last backup: %s</string>
+    <string name="drive_never">none yet</string>
+    <string name="drive_rename">Rename</string>
+    <string name="drive_phone_name">Name of the phone</string>
+    <string name="drive_phone_name_hint">The phone appears under this name in the metadata of the backup folder.</string>
+    <string name="drive_checking">Checking folder …</string>
+    <string name="drive_found_title">Backup folder found</string>
+    <string name="drive_found_text">“%1$s” contains the backup folder “%2$s” of this phone (“%3$s”, last backup %4$s). Use it?</string>
+    <string name="drive_use">Use</string>
+    <string name="drive_same_model_title">Is it the same phone?</string>
+    <string name="drive_same_model_text">The folder “%1$s” belongs to “%2$s” – a phone of the same model (%3$s), last seen %4$s. The ID doesn\'t match (e.g. after reinstalling the app). Only take it over if it really is this phone.</string>
+    <string name="drive_same_model_confirm">Yes, take over</string>
+    <string name="drive_setup_title">Set up backup folder</string>
+    <string name="drive_setup_others">This folder contains backup folders of other phones: %s.</string>
+    <string name="drive_setup_new">Create new subfolder</string>
+    <string name="drive_setup_new_in">“%1$s” in “%2$s”</string>
+    <string name="drive_setup_here">Use this folder</string>
+    <string name="drive_setup_here_blocked">not possible – contains other phones</string>
+    <string name="drive_setup_here_empty">“%s” is empty</string>
+    <string name="drive_setup_here_files">“%s” already contains files</string>
+    <string name="drive_setup_confirm">Set up</string>
+    <string name="drive_name_label">Name</string>
+
+    <!-- Speicher freigeben -->
+    <string name="freeup_title">Free up space</string>
+    <string name="freeup_subtitle">Compress backed-up originals on the phone</string>
+    <string name="freeup_starting">Starting compression …</string>
+    <string name="freeup_dry_starting">Starting dry run …</string>
+    <string name="freeup_progress">Compressing %1$d of %2$d</string>
+    <string name="freeup_dry_progress">Dry run: checking %1$d of %2$d</string>
+    <string name="freeup_running_info">Each file is compressed and replaced right away – the original stays on the storage device. Please don\'t unplug the storage device.</string>
+    <string name="freeup_dry_running_info">Nothing on the phone is changed. Videos take a while.</string>
+    <string name="freeup_dry_running_title">Dry run – nothing is changed</string>
+    <string name="freeup_candidates">Backed up, still original</string>
+    <string name="freeup_already">Already compressed</string>
+    <string name="freeup_already_value">%1$s · %2$s freed</string>
+    <plurals name="freeup_kept">
+        <item quantity="one">%s stays in original size by choice (marked with a lock in the gallery).</item>
+        <item quantity="other">%s stay in original size by choice (marked with a lock in the gallery).</item>
+    </plurals>
+    <string name="freeup_not_backed_up">%s not backed up yet – these are not changed.</string>
+    <string name="freeup_dry_info">Dry run is on: only the space that would be freed is calculated – nothing is replaced. You can select individual files in the gallery and use “Trial compression” to look at the result.</string>
+    <string name="freeup_dry_title">Dry run is on</string>
+    <string name="freeup_probes">%1$s as trials in the album “%2$s”</string>
+    <string name="freeup_nothing">Nothing to compress.</string>
+    <string name="freeup_age_all">All backed-up photos and videos are included (minimum age adjustable).</string>
+    <plurals name="freeup_age">
+        <item quantity="one">Only files older than %d day are included (adjustable).</item>
+        <item quantity="other">Only files older than %d days are included (adjustable).</item>
+    </plurals>
+    <string name="freeup_permission_hint">The originals stay on the storage device. Android will ask whether CamBackup may change the files.</string>
+    <string name="freeup_dry_start">Dry run: calculate savings</string>
+    <string name="freeup_start">Compress now</string>
+    <string name="freeup_result">%1$s compressed – %2$s freed</string>
+    <string name="freeup_dry_result">Dry run: %1$s could be compressed – saves %2$s. Nothing on the phone was changed.</string>
+    <string name="freeup_skipped_header">Left unchanged:</string>
+
+    <!-- Originale zurückholen -->
+    <string name="restore_title">Restore originals</string>
+    <string name="restore_subtitle">Compressed files back in full size</string>
+    <string name="restore_result">%1$s back in full size (%2$s)</string>
+    <string name="restore_compressed">Compressed on the phone</string>
+    <string name="restore_needs">Needs additionally</string>
+    <string name="restore_phone_free">Free on the phone: %s</string>
+    <string name="restore_space_low">Not enough space on the phone: %1$s required (incl. reserve), %2$s free.</string>
+    <string name="restore_all">Restore all originals</string>
+    <string name="restore_confirm_title">Restore originals?</string>
+    <plurals name="restore_confirm_text">
+        <item quantity="one">%1$s is replaced by the original from the storage device. This uses %2$s more on the phone.</item>
+        <item quantity="other">%1$s are replaced by the originals from the storage device. This uses %2$s more on the phone.</item>
+    </plurals>
+    <string name="restore_keep_original">Don\'t compress again automatically afterwards</string>
+    <string name="restore_confirm">Restore</string>
+    <string name="restore_progress">Original %1$d of %2$d</string>
+    <string name="restore_starting">Starting …</string>
+
+    <!-- Gelöschte Dateien -->
+    <plurals name="missing_banner">
+        <item quantity="one">%1$s (%2$s) was deleted on the phone but is still backed up.</item>
+        <item quantity="other">%1$s (%2$s) were deleted on the phone but are still backed up.</item>
+    </plurals>
+    <string name="missing_open">Review and decide</string>
+    <string name="missing_dialog_title">Deleted files (%d)</string>
+    <string name="missing_dialog_text">These photos and videos are missing on the phone but are on the storage device. Choose for each file or for all:</string>
+    <string name="missing_restore_all">Restore all</string>
+    <string name="missing_delete_all">Delete all</string>
+    <string name="missing_none_chosen">Nothing selected yet</string>
+    <string name="missing_chosen">%1$d restore · %2$d delete</string>
+    <string name="missing_apply">Apply</string>
+    <string name="missing_delete_title">Delete permanently?</string>
+    <plurals name="missing_delete_text">
+        <item quantity="one">%s is deleted from the storage device. Since it is also missing on the phone, there is no copy left afterwards.</item>
+        <item quantity="other">%s are deleted from the storage device. Since they are also missing on the phone, there is no copy left afterwards.</item>
+    </plurals>
+    <string name="missing_versions">" · %d versions"</string>
+    <string name="missing_option_open">Undecided</string>
+
+    <!-- Übersicht -->
+    <string name="error_title">Error</string>
+    <string name="permission_title">Access to photos and videos</string>
+    <string name="permission_text">CamBackup backs up your photos and videos. For this it needs access to all photos and videos.</string>
+    <string name="permission_button">Allow access</string>
+    <string name="permission_partial_title">Only selected photos shared</string>
+    <string name="permission_partial_text">For a complete backup, please choose “Photos and videos” → “Always allow all” in the settings.</string>
+    <string name="permission_partial_button">Open settings</string>
+    <string name="overview_media_title">Photos and videos</string>
+    <string name="overview_media_subtitle">%s on this phone</string>
+    <string name="overview_used">used</string>
+    <string name="status_backed_up">Backed up</string>
+    <string name="status_open">Open</string>
+    <string name="status_unchecked">Not checked</string>
+    <string name="overview_unchecked_hint">Whether your photos and videos are backed up is only shown while the storage device is connected.</string>
+    <string name="overview_saved">%s freed so far</string>
+
+    <!-- Bildansicht -->
+    <string name="viewer_play">Play</string>
+    <string name="viewer_not_backed_up">Not backed up yet</string>
+    <string name="viewer_backed_up">Original backed up</string>
+    <string name="viewer_backed_up_kept">Original backed up · won\'t be compressed</string>
+    <string name="viewer_compressed_backed_up">Compressed – original backed up</string>
+    <string name="viewer_unknown">Backup can\'t be checked – storage device not connected</string>
+    <string name="viewer_original_size">" (original %s)"</string>
+    <string name="viewer_on_phone">On the phone: %s</string>
+    <string name="viewer_on_drive">On the storage device: %s</string>
+    <string name="viewer_compressed_with">Compressed with: %s</string>
+
+    <!-- Galerie -->
+    <string name="filter_all">All</string>
+    <string name="filter_open">Not backed up</string>
+    <string name="filter_excluded">Don\'t compress</string>
+    <string name="gallery_empty">No entries</string>
+    <string name="gallery_clear_selection">Clear selection</string>
+    <string name="gallery_selected">%d selected</string>
+    <string name="gallery_restore">Restore original (%d)</string>
+    <string name="gallery_exclude">Don\'t compress (%d)</string>
+    <string name="gallery_include">Allow compression (%d)</string>
+    <string name="gallery_trial_running">Trial running …</string>
+    <string name="gallery_trial">Trial compression (%d)</string>
+    <string name="gallery_connect_hint">Connect the storage device to restore originals or exclude files.</string>
+    <string name="gallery_restore_text">%1$s are fetched from the storage device in full size again. This uses an additional %2$s on the phone.</string>
+    <string name="gallery_all_backed_up">All backed up</string>
+    <string name="gallery_selected_item">Selected</string>
+    <string name="gallery_excluded_item">Won\'t be compressed</string>
+    <string name="gallery_trial_progress">Trial: %1$d of %2$d</string>
+    <string name="gallery_busy">An operation is running – please try again afterwards</string>
+    <string name="gallery_excluded_msg">%s excluded from compression</string>
+    <string name="gallery_included_msg">%s allowed for compression again</string>
+    <string name="gallery_trial_limited">Trial only for the first %d files</string>
+    <string name="gallery_trial_done">%1$s compressed as a trial: %2$s → %3$s.</string>
+    <string name="gallery_trial_where">To compare, see the album “%s” in your gallery app.</string>
+    <string name="gallery_trial_none">No trial created.</string>
+    <string name="gallery_trial_cancelled">Trial cancelled</string>
+    <string name="gallery_restore_started">%s are being restored – progress in the notification</string>
+
+    <!-- Info -->
+    <string name="about_version">Version %1$s (%2$d)</string>
+    <string name="about_tagline">Backs up photos and videos in original quality to a USB stick or SD card and frees up space on the phone.</string>
+    <string name="about_how">How it works</string>
+    <string name="about_step1_title">Back up</string>
+    <string name="about_step1">New photos and videos are copied bit-for-bit to the backup folder on the storage device.</string>
+    <string name="about_step2_title">Verify</string>
+    <string name="about_step2">Each copy is read back and compared with the original using a SHA-256 checksum.</string>
+    <string name="about_step3_title">Compress</string>
+    <string name="about_step3">If you want, the app replaces older originals on the phone with smaller versions.</string>
+    <string name="about_step4_title">Restore</string>
+    <string name="about_step4">Deleted or compressed files can be restored in original quality at any time.</string>
+    <string name="about_safety">Safety</string>
+    <string name="about_safety1">Only files that are provably backed up bit-for-bit are replaced – and only while the device is plugged in.</string>
+    <string name="about_safety2">Android asks for your consent before anything is replaced; a dry run never replaces anything.</string>
+    <string name="about_safety3">After replacing, the file is checked again; if anything goes wrong, the original is put back.</string>
+    <string name="about_safety4">Capture date, camera data and (optionally) the location are kept.</string>
+    <string name="about_this_phone">This phone</string>
+    <string name="about_device">Device</string>
+    <string name="about_name">Name in the backup</string>
+    <string name="about_not_connected">Storage device not connected</string>
+    <string name="about_id">ID</string>
+    <string name="about_permissions">Manage permissions</string>
+    <string name="about_libraries">Open-source libraries</string>
+    <string name="about_libraries_license">All under the Apache License 2.0</string>
+    <string name="about_lib_ui">User interface</string>
+    <string name="about_lib_video">Compressing videos</string>
+    <string name="about_lib_work">Background work</string>
+    <string name="about_lib_exif">Photo metadata</string>
+    <string name="about_lib_saf">Access to the storage device</string>
+    <string name="about_lib_kotlin">Workflows and metadata</string>
+    <string name="about_package">Package %s</string>
+    <string name="about_show_metadata">Show metadata</string>
+
+    <!-- Metadaten -->
+    <string name="meta_not_connected">Storage device not connected.</string>
+    <string name="meta_no_folder">No Metadata folder in the backup folder.</string>
+    <string name="meta_folder">Metadata folder</string>
+    <string name="meta_index">Index</string>
+    <string name="meta_index_hint">backup_index.json and journal combined</string>
+    <string name="meta_entries">Entries</string>
+    <string name="meta_verified">Backed up only</string>
+    <string name="meta_kept">Keep original</string>
+    <string name="meta_original_total">Originals total</string>
+    <string name="meta_index_updated">Index updated</string>
+    <string name="meta_journal">Pending journal entries</string>
+    <string name="meta_journal_none">none</string>
+    <string name="meta_journal_one">1 entry</string>
+    <string name="meta_journal_many">%d entries</string>
+    <string name="meta_device_hint">device.json – how the app recognizes this phone</string>
+    <string name="meta_device_missing">device.json is missing.</string>
+    <string name="meta_device_broken">device.json is damaged and can\'t be read.</string>
+    <string name="meta_created">Set up</string>
+    <string name="meta_last_seen">Last seen</string>
+    <string name="meta_last_backup">Last backup</string>
+    <string name="meta_app_version">App version</string>
+    <string name="meta_device_id">Device ID</string>
+    <string name="meta_previous_ids">Previous IDs</string>
+    <string name="meta_format">Format version</string>
+    <string name="meta_raw_hide">Hide raw data</string>
+    <string name="meta_raw_show">Show raw data</string>
+    <string name="meta_log">Log</string>
+    <string name="meta_log_hint">backup_log.txt – newest entries first</string>
+    <string name="meta_log_empty">No entries yet.</string>
+
+    <!-- Abbruchgründe -->
+    <string name="abort_cancelled">Cancelled</string>
+    <string name="abort_disconnected">Storage device was disconnected</string>
+    <string name="abort_ejecting">Storage device is being ejected</string>
+    <string name="abort_not_responding">Storage device stopped responding</string>
+    <string name="abort_drive_full">Not enough space on the storage device</string>
+    <string name="abort_phone_full">Not enough space on the phone for the compressed copy</string>
+    <string name="abort_finish_failed">Finishing failed: %s</string>
+    <string name="restore_phone_full">Not enough space on the phone</string>
+
+    <!-- Gründe, nicht zu verkleinern -->
+    <string name="skip_format">Format is not compressed (JPEG and MP4 only)</string>
+    <string name="skip_hdr">HDR video – can only be compressed with the HEVC codec</string>
+    <string name="skip_motion_photo">Motion photo – the embedded video would not be kept</string>
+    <string name="skip_too_recent">Younger than the minimum age</string>
+    <string name="skip_already_compressed">Already compressed by CamBackup</string>
+    <string name="skip_too_little_saving">Saving below the minimum</string>
+    <string name="skip_changed">Changed since the backup</string>
+
+    <!-- Fehler -->
+    <string name="err_no_metadata">Metadata folder is missing</string>
+    <string name="err_no_index_entry">No index entry</string>
+    <string name="err_backup_missing">Backup is missing on the storage device</string>
+    <string name="err_backup_missing_path">Backup is missing on the storage device (%s)</string>
+    <string name="err_backup_incomplete">Backup on the storage device is incomplete</string>
+    <string name="err_backup_missing_or_incomplete">Backup on the storage device is missing or incomplete</string>
+    <string name="err_backup_unreadable">Backup can\'t be read</string>
+    <string name="err_unreadable">can\'t be read</string>
+    <string name="err_changed_while_compressing">File was changed while compressing</string>
+    <string name="err_compressed_missing">Compressed file is missing</string>
+    <string name="err_checksum_after_replace">Checksum wrong after replacing</string>
+    <string name="err_replace_failed_unchanged">Replacing failed (%s) – original unchanged</string>
+    <string name="err_replace_failed_restored">Replacing failed (%s) – original restored</string>
+    <string name="err_restore_failed_warning">WARNING: restoring failed – the original is at %s on the storage device</string>
+    <string name="err_original_missing">Original is missing on the storage device</string>
+    <string name="err_original_incomplete">Original on the storage device is incomplete</string>
+    <string name="err_changed_after_compress">File was changed after compressing – left untouched</string>
+    <string name="err_phone_full_file">Not enough space on the phone for this file</string>
+    <string name="err_original_unreadable">Original can\'t be read</string>
+    <string name="err_original_damaged">Original on the storage device is damaged (wrong checksum)</string>
+    <string name="err_checksum_after_restore">Checksum wrong after restoring</string>
+    <string name="err_restore_failed_retry">Restoring failed (%s) – the original stays on the storage device, please try again</string>
+    <string name="err_create_on_phone">File could not be created on the phone</string>
+    <string name="err_source_unreadable">Source can\'t be read</string>
+    <string name="err_copy_checksum">Checksum of the copy doesn\'t match</string>
+    <string name="err_copy_unreadable">Copy can\'t be read</string>
+    <string name="err_rename_failed">Renaming to “%s” failed</string>
+    <string name="err_move_failed">Moving to “%s” failed</string>
+    <string name="err_size_mismatch">Size on the storage device doesn\'t match – left unchanged</string>
+
+    <!-- Benachrichtigungen -->
+    <string name="channel_progress">Backup progress</string>
+    <string name="channel_events">Backup results and storage device</string>
+    <string name="notif_backup_running">Backup running</string>
+    <string name="notif_preparing">Preparing …</string>
+    <string name="notif_bytes_of">%1$s of %2$s</string>
+    <string name="notif_backup_done">Backup finished</string>
+    <string name="notif_backup_incomplete">Backup incomplete</string>
+    <string name="notif_backed_up">%1$s backed up (%2$s)</string>
+    <string name="notif_relocated">Folder structure adjusted</string>
+    <string name="notif_nothing_new">Nothing new to back up</string>
+    <string name="notif_moved_suffix">", %d moved"</string>
+    <string name="notif_errors_suffix">", %d errors"</string>
+    <string name="notif_freeup_aborted">Free up space: aborted</string>
+    <string name="notif_freeup_done">Space freed</string>
+    <string name="notif_dry_run_done">Dry run finished</string>
+    <string name="notif_freeup_text">%1$s replaced, %2$s freed</string>
+    <string name="notif_dry_run_text">%1$s could be compressed, saves %2$s</string>
+    <string name="notif_drive_detected">Storage device detected</string>
+    <string name="notif_restoring">Restoring originals</string>
+    <string name="notif_n_of_total">%1$d of %2$d</string>
+    <string name="notif_restored">Originals restored</string>
+    <string name="notif_restored_text">%s back in full size</string>
+    <string name="notif_missing">Processing deleted files</string>
+    <string name="notif_missing_done">Deleted files processed</string>
+    <string name="notif_compressing">Compressing files</string>
+    <string name="notif_dry_running">Dry run: calculating savings</string>
+    <string name="notif_resume_hint">The last backup was interrupted – tap to resume.</string>
+    <string name="notif_folder_connected">Backup folder “%s” is connected.</string>
+    <string name="notif_folder_found">Backup folder “%1$s” found on %2$s.</string>
+    <string name="notif_new_volume">New storage device “%s” – tap to choose the backup folder.</string>
+
+    <!-- Galerie: Tage -->
+    <string name="day_today">Today</string>
+    <string name="day_yesterday">Yesterday</string>
+
+    <!-- Ordner wählen -->
+    <string name="auto_found">Backup folder “%1$s” on %2$s detected automatically</string>
+    <string name="pick_internal_title">Internal storage</string>
+    <string name="pick_internal_text">This folder is in the phone\'s internal storage and is not suitable as a backup target. Please choose a folder on the USB stick or SD card.</string>
+    <string name="pick_foreign_title">Folder belongs to another phone</string>
+    <string name="pick_foreign_text">“%1$s” (%2$s) backs up into this folder. Please choose another folder or create a new one.</string>
+    <string name="pick_unusable">Folder can\'t be used</string>
+    <string name="pick_setup_failed">Setup failed</string>
+    <string name="name_empty">Please enter a name.</string>
+    <string name="name_too_long">At most %d characters.</string>
+    <string name="name_forbidden_chars">Not allowed: %s</string>
+    <string name="name_trailing_dot">The name must not end with a dot.</string>
+    <string name="name_invalid">Invalid name.</string>
+    <string name="name_exists">A folder with this name already exists.</string>
+
+    <!-- Weitere Fehler -->
+    <string name="err_already_backup_folder">Folder is already a backup folder</string>
+    <string name="err_create_folder">Folder “%s” could not be created</string>
+    <string name="err_folder_exists">Folder “%s” already exists</string>
+    <string name="err_folder_unreadable">Folder can\'t be read</string>
+    <string name="err_device_file_missing">%s is missing</string>
+    <string name="err_device_file_broken">%s is missing or damaged</string>
+    <string name="err_file_unreadable">%s can\'t be read</string>
+    <string name="err_create_file">“%s” could not be created</string>
+    <string name="err_file_not_writable">%s can\'t be written</string>
+    <string name="err_replace_file">“%s” could not be replaced</string>
+    <string name="err_rename_file">“%s” could not be renamed</string>
+    <string name="err_not_a_folder">“%s” is a file, not a folder</string>
+    <string name="err_video_duration">duration differs (%1$d instead of %2$d ms)</string>
+    <string name="err_video_audio">audio track missing</string>
+    <string name="err_video_resolution">resolution %1$s instead of %2$s (not supported by the encoder)</string>
+    <string name="err_video_broken">Video encoding faulty: %s</string>
+    <string name="err_video_failed">Video encoding failed: %s</string>
+    <string name="err_trial_create">Trial file could not be created</string>
+    <string name="err_trial_write">Trial file can\'t be written</string>
+    <string name="err_jpeg_decode">JPEG can\'t be decoded</string>
 </resources>
