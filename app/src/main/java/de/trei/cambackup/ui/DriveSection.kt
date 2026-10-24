@@ -4,6 +4,8 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.os.storage.StorageManager
+import android.os.storage.StorageVolume
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -340,8 +342,11 @@ private fun NameDialog(title: String, text: String, initial: String, confirm: St
     )
 }
 
-/** Ruft [onChange] auf, solange sichtbar, wenn ein Datenträger eingehängt oder entfernt wird. */
-/** Meldet das Ein- und Ausstecken von Datenträgern, solange die Oberfläche sichtbar ist. */
+/**
+ * Ruft [onChange] auf, solange die Oberfläche besteht, wenn ein Datenträger eingehängt oder entfernt
+ * wird. Die MEDIA_*-Broadcasts kommen nur für für Apps sichtbare Datenträger; Samsung hängt USB-
+ * Datenträger unsichtbar ein – deren Zustand meldet nur der StorageVolumeCallback.
+ */
 @Composable
 fun MediaChangeListener(onChange: () -> Unit) {
     val context = LocalContext.current
@@ -359,7 +364,19 @@ fun MediaChangeListener(onChange: () -> Unit) {
             addDataScheme("file")
         }
         ContextCompat.registerReceiver(context, receiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED)
-        onDispose { context.unregisterReceiver(receiver) }
+
+        val storage = context.getSystemService(StorageManager::class.java)
+        val volumeCallback = object : StorageManager.StorageVolumeCallback() {
+            override fun onStateChanged(volume: StorageVolume) {
+                if (volume.isRemovable) currentOnChange()
+            }
+        }
+        storage.registerStorageVolumeCallback(ContextCompat.getMainExecutor(context), volumeCallback)
+
+        onDispose {
+            context.unregisterReceiver(receiver)
+            storage.unregisterStorageVolumeCallback(volumeCallback)
+        }
     }
 }
 

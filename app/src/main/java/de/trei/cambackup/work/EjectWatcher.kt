@@ -4,6 +4,9 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.os.Environment
+import android.os.storage.StorageManager
+import android.os.storage.StorageVolume
 import androidx.core.content.ContextCompat
 import java.io.Closeable
 
@@ -18,6 +21,15 @@ class EjectWatcher(private val context: Context, private val volumeId: String) :
     @Volatile
     var ejecting = false
         private set
+
+    // Samsung hängt USB-Datenträger unsichtbar ein und schickt dafür keine MEDIA_*-Broadcasts -
+    // den Zustandswechsel (z. B. „Sicher entfernen“) meldet dann nur der StorageVolumeCallback
+    private val storage = context.getSystemService(StorageManager::class.java)
+    private val volumeCallback = object : StorageManager.StorageVolumeCallback() {
+        override fun onStateChanged(volume: StorageVolume) {
+            if (volume.uuid.equals(volumeId, ignoreCase = true) && volume.state != Environment.MEDIA_MOUNTED) ejecting = true
+        }
+    }
 
     private val receiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
@@ -36,9 +48,11 @@ class EjectWatcher(private val context: Context, private val volumeId: String) :
             addDataScheme("file")
         }
         ContextCompat.registerReceiver(context, receiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED)
+        storage.registerStorageVolumeCallback(ContextCompat.getMainExecutor(context), volumeCallback)
     }
 
     override fun close() {
         runCatching { context.unregisterReceiver(receiver) }
+        runCatching { storage.unregisterStorageVolumeCallback(volumeCallback) }
     }
 }
