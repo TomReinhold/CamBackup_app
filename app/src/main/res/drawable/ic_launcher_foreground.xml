@@ -1,22 +1,27 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Vordergrund des App-Icons, bewusst minimal: ein Foto (Berg und Sonne als Aussparung) vor einem
-  versetzten Rahmen – die gesicherte Kopie. Nur Weiß auf dem einfarbigen Hintergrund.
+  Vordergrund des App-Icons, bewusst minimal: ein Foto (Berg und Sonne als Aussparung),
+  umlaufen von einem kreisförmigen Pfeil als Zeichen für Backup. Nur Weiß auf einfarbigem Blau.
 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- Rahmen der Kopie (hinten, versetzt) -->
+    <!-- Kreisförmiger Pfeil (Radius 24 um die Mitte, Lücke oben rechts für die Pfeilspitze) -->
     <path
         android:fillColor="#00000000"
-        android:strokeColor="#B3FFFFFF"
-        android:strokeWidth="3.5"
-        android:pathData="M46,30H70A6,6 0 0 1 76,36V60A6,6 0 0 1 70,66" />
-    <!-- Foto (vorn) mit ausgesparter Sonne und Berg -->
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="4"
+        android:strokeLineCap="round"
+        android:pathData="M58.17,30.36A24,24 0 1,0 74.78,42" />
+    <!-- Pfeilspitze -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M72.6,37.9L81.4,42L71.2,47.8Z" />
+    <!-- Foto mit ausgesparter Sonne und Berg -->
     <path
         android:fillColor="#FFFFFFFF"
         android:fillType="evenOdd"
-        android:pathData="M38,40H62A6,6 0 0 1 68,46V70A6,6 0 0 1 62,76H38A6,6 0 0 1 32,70V46A6,6 0 0 1 38,40ZM39,49.5a3.5,3.5 0 1,0 7,0a3.5,3.5 0 1,0 -7,0ZM36.5,71L46,58.5L52,65.5L56,61L63.5,71Z" />
+        android:pathData="M45,43H63A4,4 0 0 1 67,47V61A4,4 0 0 1 63,65H45A4,4 0 0 1 41,61V47A4,4 0 0 1 45,43ZM44.5,49.5a2.5,2.5 0 1,0 5,0a2.5,2.5 0 1,0 -5,0ZM43.5,62L50,54L54,58.5L57,55.5L64.5,62Z" />
 </vector>
