@@ -2,6 +2,7 @@ package de.trei.cambackup.storage
 
 import android.content.Context
 import androidx.documentfile.provider.DocumentFile
+import de.trei.cambackup.index.BackupIndex
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.IOException
@@ -33,9 +34,11 @@ sealed interface FolderCheck {
  */
 class DeviceRegistry(private val context: Context, private val appVersion: String) {
 
+    private val io = SafIo(context.contentResolver)
+
     /** device.json eines Ordners, oder null, wenn er kein Backup-Ordner ist. */
     suspend fun read(dir: DocumentFile): DeviceRecord? = withContext(Dispatchers.IO) {
-        dir.findFile(METADATA_DIR)?.findFile(DEVICE_FILE)?.let { runCatching { readRecord(it) }.getOrNull() }
+        dir.findFile(METADATA_DIR)?.let(::readRecordOrNull)
     }
 
     /** Prüft einen gewählten Ordner – und ggf. seine direkten Unterordner – auf Zugehörigkeit. */
@@ -113,6 +116,34 @@ class DeviceRegistry(private val context: Context, private val appVersion: Strin
         folder.copy(record = updated)
     }
 
+    /**
+     * Stellt eine leere oder beschädigte device.json wieder her. Nur für den aktiven Backup-Ordner
+     * dieses Smartphones gedacht: Die App hat ihn früher selbst eingerichtet bzw. geprüft – und der
+     * Index im Ordner Metadata belegt, dass es ein Backup-Ordner ist.
+     */
+    suspend fun repair(dir: DocumentFile, identity: LocalIdentity): BackupFolder? = withContext(Dispatchers.IO) {
+        val metadata = dir.findFile(METADATA_DIR) ?: return@withContext null
+        if (readRecordOrNull(metadata) != null) return@withContext null
+        if (metadata.findFile(BackupIndex.INDEX_FILE) == null && metadata.findFile(BackupIndex.JOURNAL_FILE) == null) return@withContext null
+        val now = Instant.now().toString()
+        // Zeitpunkt der letzten Sicherung lässt sich aus dem Index ablesen
+        val lastBackup = runCatching { BackupIndex.open(io, metadata).state.entries.maxOfOrNull { it.backedUpAt } }.getOrNull()
+        val record = DeviceRecord(
+            deviceUuid = identity.deviceUuid,
+            androidId = identity.androidId,
+            manufacturer = identity.manufacturer,
+            model = identity.model,
+            displayName = "${identity.manufacturer} ${identity.model}",
+            createdAt = now,
+            lastSeenAt = now,
+            lastBackupAt = lastBackup,
+            appVersion = appVersion,
+        )
+        writeRecord(metadata, record)
+        runCatching { io.appendText(metadata, "backup_log.txt", "$now  $DEVICE_FILE war beschädigt und wurde neu angelegt\n") }
+        BackupFolder(dir, record)
+    }
+
     /** Ändert den in device.json gespeicherten Namen des Smartphones. */
     suspend fun rename(dir: DocumentFile, displayName: String) = withContext(Dispatchers.IO) {
         val metadata = dir.findFile(METADATA_DIR) ?: throw IOException("Metadaten nicht gefunden")
@@ -131,25 +162,24 @@ class DeviceRegistry(private val context: Context, private val appVersion: Strin
     /** Trägt den Zeitpunkt der letzten erfolgreichen Sicherung in device.json ein. */
     suspend fun markBackup(deviceDir: DocumentFile, at: Instant) = withContext(Dispatchers.IO) {
         val metadata = deviceDir.findFile(METADATA_DIR) ?: throw IOException("Ordner „$METADATA_DIR“ fehlt")
-        val file = metadata.findFile(DEVICE_FILE) ?: throw IOException("$DEVICE_FILE fehlt")
-        val record = readRecord(file)
+        val record = readRecordOrNull(metadata) ?: throw IOException("$DEVICE_FILE fehlt oder ist beschädigt")
         writeRecord(metadata, record.copy(lastBackupAt = at.toString(), lastSeenAt = at.toString()))
     }
 
-    private fun readRecord(file: DocumentFile): DeviceRecord {
-        val text = context.contentResolver.openInputStream(file.uri)?.use { it.readBytes().decodeToString() }
-            ?: throw IOException("${file.name} nicht lesbar")
-        return metadataJson.decodeFromString(DeviceRecord.serializer(), text)
-    }
+    /**
+     * Liest device.json. Ist sie leer oder beschädigt (z. B. Medium beim Schreiben abgezogen), gilt die
+     * vollständig geschriebene Zwischenkopie "device.json.tmp" aus [SafIo.replaceAtomically].
+     */
+    private fun readRecordOrNull(metadataDir: DocumentFile): DeviceRecord? =
+        listOf(DEVICE_FILE, "$DEVICE_FILE.tmp").firstNotNullOfOrNull { name ->
+            metadataDir.findFile(name)?.let { file ->
+                runCatching { metadataJson.decodeFromString(DeviceRecord.serializer(), io.readText(file)) }.getOrNull()
+            }
+        }
 
+    /** Schreibt device.json atomar und per fsync – nie eine halb geschriebene oder leere Datei. */
     private fun writeRecord(metadataDir: DocumentFile, record: DeviceRecord) {
-        val text = metadataJson.encodeToString(DeviceRecord.serializer(), record)
-        val file = metadataDir.findFile(DEVICE_FILE)
-            ?: metadataDir.createFile("application/json", DEVICE_FILE)
-            ?: throw IOException("$DEVICE_FILE konnte nicht angelegt werden")
-        // "wt" = überschreiben und kürzen
-        context.contentResolver.openOutputStream(file.uri, "wt")?.use { it.write(text.encodeToByteArray()) }
-            ?: throw IOException("$DEVICE_FILE nicht beschreibbar")
+        io.replaceAtomically(metadataDir, DEVICE_FILE, metadataJson.encodeToString(DeviceRecord.serializer(), record))
     }
 
     companion object {

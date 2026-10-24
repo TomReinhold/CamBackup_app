@@ -35,6 +35,8 @@ class DriveDetector(private val context: Context) {
             if (record != null && relationOf(identity, record) == DeviceRelation.SAME) {
                 return@withContext DetectResult.Active(BackupFolder(dir, record))
             }
+            // Unser Ordner, aber device.json leer/beschädigt (z. B. Medium beim Schreiben getrennt): neu anlegen
+            if (record == null) registry.repair(dir, identity)?.let { return@withContext DetectResult.Active(it) }
         }
         for (tree in drives.grantedTrees()) {
             val dir = DocumentFile.fromTreeUri(context, tree)?.takeIf { runCatching { it.isDirectory }.getOrDefault(false) } ?: continue

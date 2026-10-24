@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.StatFs
+import android.util.Log
 import android.os.storage.StorageManager
 import android.os.storage.StorageVolume
 import android.provider.DocumentsContract
@@ -71,8 +72,14 @@ class DriveRepository(private val context: Context) {
 
     /** Öffnet einen Ordner, wenn er erreichbar ist und das Zugriffsrecht noch besteht. */
     fun open(folderUri: Uri): DocumentFile? {
-        if (treeOf(folderUri) !in grantedTrees()) return null
-        return DocumentFile.fromTreeUri(context, folderUri)?.takeIf { runCatching { it.isDirectory }.getOrDefault(false) }
+        if (treeOf(folderUri) !in grantedTrees()) {
+            Log.i(TAG, "Kein Zugriffsrecht für $folderUri")
+            return null
+        }
+        val dir = DocumentFile.fromTreeUri(context, folderUri)
+        val isDir = runCatching { dir?.isDirectory == true }.onFailure { Log.w(TAG, "Ordner nicht lesbar: $folderUri", it) }.getOrDefault(false)
+        if (!isDir) Log.i(TAG, "Ordner nicht erreichbar: $folderUri (${dir?.uri})")
+        return dir?.takeIf { isDir }
     }
 
     /** Öffnet einen Backup-Ordner für Backup/Verkleinern – mit verständlicher Meldung, wenn das nicht geht. */
@@ -105,7 +112,7 @@ class DriveRepository(private val context: Context) {
         val volume = volumeById(volumeId)
         val space = volume?.directory?.let {
             runCatching { StatFs(it.path).let { s -> DriveSpace(s.availableBytes, s.totalBytes) } }.getOrNull()
-        } ?: rootSpace(volumeId) ?: fileSpace(folderUri)
+        } ?: fileSpace(folderUri)
         return DriveInfo(
             folderUri = folderUri,
             volumeLabel = volume?.getDescription(context) ?: volumeId,
@@ -127,28 +134,6 @@ class DriveRepository(private val context: Context) {
 
     /** Der freigegebene Ordner, zu dem eine (Unter-)Ordner-URI gehört. */
     private fun treeOf(uri: Uri): Uri = DocumentsContract.buildTreeDocumentUri(uri.authority, DocumentsContract.getTreeDocumentId(uri))
-
-    /**
-     * Freier Platz laut Storage Access Framework – Ersatz, wenn der Datenträger keinen für Apps
-     * lesbaren Pfad hat (z. B. USB-Sticks auf Samsung-Geräten).
-     */
-    private fun rootSpace(volumeId: String): DriveSpace? = runCatching {
-        val roots = DocumentsContract.buildRootsUri(EXTERNAL_STORAGE_AUTHORITY)
-        val columns = arrayOf(
-            DocumentsContract.Root.COLUMN_ROOT_ID,
-            DocumentsContract.Root.COLUMN_AVAILABLE_BYTES,
-            DocumentsContract.Root.COLUMN_CAPACITY_BYTES,
-        )
-        context.contentResolver.query(roots, columns, null, null, null)?.use { c ->
-            while (c.moveToNext()) {
-                if (!c.getString(0).equals(volumeId, ignoreCase = true) || c.isNull(1)) continue
-                val free = c.getLong(1)
-                val total = if (c.isNull(2)) 0L else c.getLong(2)
-                return@runCatching DriveSpace(free, maxOf(total, free))
-            }
-        }
-        null
-    }.getOrNull()?.takeIf { it.freeBytes >= 0 }
 
     /**
      * Letzter Ausweg: freier Platz des Dateisystems, auf dem die device.json des Backup-Ordners liegt
@@ -178,5 +163,6 @@ class DriveRepository(private val context: Context) {
 
     private companion object {
         const val KEY_FOLDER = "device_folder_uri"
+        const val TAG = "DriveRepository"
     }
 }
