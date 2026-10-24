@@ -77,6 +77,9 @@ fun backupSubPath(dateTakenMillis: Long, zone: ZoneId = ZoneId.systemDefault()):
     return "%04d/%02d".format(date.year, date.monthValue)
 }
 
+/** Pfad relativ zum Geräteordner; [subPath] "" steht für den Geräteordner selbst. */
+fun joinPath(subPath: String, name: String): String = if (subPath.isEmpty()) name else "$subPath/$name"
+
 /** Liefert [name] oder bei Kollision "Name (1).ext", "Name (2).ext", … */
 fun uniqueName(name: String, taken: (String) -> Boolean): String {
     if (!taken(name)) return name

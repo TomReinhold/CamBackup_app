@@ -25,6 +25,7 @@ class MediaScanner(private val resolver: ContentResolver) {
             MediaStore.MediaColumns.SIZE,
             MediaStore.MediaColumns.DATE_TAKEN,
             MediaStore.MediaColumns.DATE_MODIFIED,
+            MediaStore.MediaColumns.DURATION,
         )
         val selection = "${MediaStore.MediaColumns.RELATIVE_PATH} = ?"
         val args = arrayOf(CAMERA_RELATIVE_PATH)
@@ -38,6 +39,7 @@ class MediaScanner(private val resolver: ContentResolver) {
             val sizeCol = c.getColumnIndexOrThrow(MediaStore.MediaColumns.SIZE)
             val takenCol = c.getColumnIndexOrThrow(MediaStore.MediaColumns.DATE_TAKEN)
             val modifiedCol = c.getColumnIndexOrThrow(MediaStore.MediaColumns.DATE_MODIFIED)
+            val durationCol = c.getColumnIndexOrThrow(MediaStore.MediaColumns.DURATION)
 
             while (c.moveToNext()) {
                 val id = c.getLong(idCol)
@@ -52,6 +54,7 @@ class MediaScanner(private val resolver: ContentResolver) {
                     sizeBytes = c.getLong(sizeCol),
                     dateTakenMillis = taken,
                     isVideo = isVideo,
+                    durationMs = if (c.isNull(durationCol)) 0 else c.getLong(durationCol),
                 )
             }
         }

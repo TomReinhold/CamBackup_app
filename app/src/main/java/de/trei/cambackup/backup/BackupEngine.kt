@@ -7,6 +7,7 @@ import androidx.documentfile.provider.DocumentFile
 import de.trei.cambackup.index.BackupIndex
 import de.trei.cambackup.index.IndexEntry
 import de.trei.cambackup.media.MediaItem
+import de.trei.cambackup.settings.FolderLayout
 import de.trei.cambackup.storage.DeviceRegistry
 import de.trei.cambackup.storage.DirCache
 import de.trei.cambackup.storage.SafIo
@@ -64,6 +65,7 @@ class BackupEngine(private val context: Context) {
         deviceDir: DocumentFile,
         plan: BackupPlan,
         index: BackupIndex,
+        layout: FolderLayout,
         isCancelled: () -> Boolean,
         onProgress: (BackupProgress) -> Unit,
     ): BackupResult = withContext(Dispatchers.IO) {
@@ -85,7 +87,7 @@ class BackupEngine(private val context: Context) {
             }
             try {
                 report(0)
-                when (backupOne(item, dirs, index, report)) {
+                when (backupOne(item, dirs, index, layout, report)) {
                     Outcome.COPIED -> { copied++; bytesCopied += item.sizeBytes }
                     Outcome.ADOPTED -> adopted++
                 }
@@ -121,15 +123,16 @@ class BackupEngine(private val context: Context) {
         item: MediaItem,
         dirs: DirCache,
         index: BackupIndex,
+        layout: FolderLayout,
         report: (Long) -> Unit,
     ): Outcome {
-        val subPath = backupSubPath(item.dateTakenMillis)
+        val subPath = if (layout == FolderLayout.FLAT) "" else backupSubPath(item.dateTakenMillis)
         val dir = dirs.dir(subPath)
         val files = dirs.files(subPath)
 
         // Liegt die Datei schon vollständig dort (Abbruch nach dem Verschieben, vor dem Indexeintrag)?
         files[item.displayName]?.let { existing ->
-            val backupPath = "$subPath/${item.displayName}"
+            val backupPath = joinPath(subPath, item.displayName)
             if (!index.state.containsBackupPath(backupPath) && existing.length() == item.sizeBytes) {
                 val src = hashSource(item) { report(it) }
                 val dst = hashDocument(existing) { report(item.sizeBytes + it) }
@@ -164,7 +167,7 @@ class BackupEngine(private val context: Context) {
                 ?: throw IOException("Verschieben nach „$subPath“ fehlgeschlagen")
             moved = true
             files[finalName] = DocumentFile.fromSingleUri(context, target)!!
-            index.record(entryFor(item, copy, "$subPath/$finalName"))
+            index.record(entryFor(item, copy, joinPath(subPath, finalName)))
             return Outcome.COPIED
         } catch (e: Throwable) {
             // Unvollständige oder fehlerhafte Kopie nie liegen lassen. Eine bereits verschobene Datei

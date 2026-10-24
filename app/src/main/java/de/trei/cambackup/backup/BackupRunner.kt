@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.documentfile.provider.DocumentFile
 import de.trei.cambackup.index.BackupIndex
 import de.trei.cambackup.media.MediaScanner
+import de.trei.cambackup.settings.SettingsRepository
 import de.trei.cambackup.storage.DeviceRegistry
 import de.trei.cambackup.storage.DriveRepository
 import de.trei.cambackup.storage.SafIo
@@ -24,6 +25,7 @@ class BackupRunner(private val context: Context) {
     private val io = SafIo(context.contentResolver)
     private val scanner = MediaScanner(context.contentResolver)
     private val engine = BackupEngine(context)
+    private val settings = SettingsRepository(context)
     private val registry = DeviceRegistry(
         context,
         context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "?",
@@ -69,7 +71,7 @@ class BackupRunner(private val context: Context) {
         // stattdessen zwischen den Datenblöcken über isCancelled abgefragt.
         return withContext(NonCancellable) {
             val result = engine.run(
-                prepared.deviceDir, prepared.plan, prepared.index,
+                prepared.deviceDir, prepared.plan, prepared.index, settings.current().folderLayout,
                 isCancelled = { userCancelled() || !caller.isActive },
                 onProgress = onProgress,
             )

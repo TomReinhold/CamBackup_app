@@ -13,6 +13,8 @@ data class MediaItem(
     /** Aufnahmezeitpunkt in Millisekunden seit 1970 (Fallback: Änderungsdatum). */
     val dateTakenMillis: Long,
     val isVideo: Boolean,
+    /** Nur bei Videos gesetzt, sonst 0. */
+    val durationMs: Long = 0,
 )
 
 data class MediaSummary(
