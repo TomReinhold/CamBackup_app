@@ -45,9 +45,9 @@ import java.text.DateFormat
 import java.time.Instant
 import java.util.Date
 
-/** Karte mit Speichermedium, freiem Platz und Geräteordner. [neededBytes]: Größe aller Kamera-Dateien. */
+/** Karte mit Speichermedium, freiem Platz, Geräteordner und Backup. */
 @Composable
-fun DriveSection(neededBytes: Long, modifier: Modifier = Modifier, vm: DriveViewModel = viewModel()) {
+fun DriveSection(modifier: Modifier = Modifier, vm: DriveViewModel = viewModel()) {
     val state by vm.state.collectAsStateWithLifecycle()
     val pickTree = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree(), vm::onTreePicked)
     val pick = { pickTree.launch(null) }
@@ -80,7 +80,7 @@ fun DriveSection(neededBytes: Long, modifier: Modifier = Modifier, vm: DriveView
                 }
 
                 is DriveState.InternalStorage -> {
-                    DriveDetails(s.info, neededBytes)
+                    DriveDetails(s.info)
                     Text(
                         "Dieser Ordner liegt im internen Speicher des Smartphones und ist als Backup-Ziel " +
                             "ungeeignet. Bitte einen Ordner auf dem USB-Stick oder der SD-Karte wählen.",
@@ -98,8 +98,8 @@ fun DriveSection(neededBytes: Long, modifier: Modifier = Modifier, vm: DriveView
                 }
 
                 is DriveState.Ready -> {
-                    DriveDetails(s.info, neededBytes)
-                    DeviceStatus(s, onCreate = vm::createDevice, onAssign = vm::assignExisting)
+                    DriveDetails(s.info)
+                    DeviceStatus(s, onCreate = vm::createDevice, onAssign = vm::assignExisting, onBackupFinished = vm::refresh)
                     TextButton(onClick = pick) { Text("Anderes Speichermedium wählen") }
                 }
             }
@@ -108,24 +108,24 @@ fun DriveSection(neededBytes: Long, modifier: Modifier = Modifier, vm: DriveView
 }
 
 @Composable
-private fun DriveDetails(info: DriveInfo, neededBytes: Long) {
+private fun DriveDetails(info: DriveInfo) {
     Text(info.volumeLabel + if (info.path.isNotEmpty()) " / ${info.path}" else "", style = MaterialTheme.typography.bodyLarge)
     val space = info.space
     if (space == null) {
         Text("Freier Speicher: unbekannt")
     } else {
         Text("Frei: ${formatBytes(space.freeBytes)} von ${formatBytes(space.totalBytes)}")
-        val enough = space.freeBytes >= neededBytes
-        Text(
-            "Kamera-Dateien gesamt: ${formatBytes(neededBytes)} – " + if (enough) "Platz reicht" else "zu wenig Platz",
-            color = if (enough) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
-        )
     }
     info.fsType?.let { Text("Dateisystem: $it", style = MaterialTheme.typography.bodySmall) }
 }
 
 @Composable
-private fun DeviceStatus(s: DriveState.Ready, onCreate: (String) -> Unit, onAssign: (DeviceFolder) -> Unit) {
+private fun DeviceStatus(
+    s: DriveState.Ready,
+    onCreate: (String) -> Unit,
+    onAssign: (DeviceFolder) -> Unit,
+    onBackupFinished: () -> Unit,
+) {
     var showCreate by rememberSaveable { mutableStateOf(false) }
     var showAssign by rememberSaveable { mutableStateOf(false) }
 
@@ -142,6 +142,7 @@ private fun DeviceStatus(s: DriveState.Ready, onCreate: (String) -> Unit, onAssi
                     )
                 }
             }
+            BackupPanel(deviceFolderName = m.folder.folderName, onBackupFinished = onBackupFinished)
         }
 
         is DeviceMatch.Unknown -> {

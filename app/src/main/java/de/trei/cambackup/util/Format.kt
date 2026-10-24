@@ -2,6 +2,9 @@ package de.trei.cambackup.util
 
 import java.util.Locale
 
+/** "1 Datei", "2 Dateien" */
+fun fileCount(n: Int): String = if (n == 1) "1 Datei" else "$n Dateien"
+
 /** Formatiert eine Byte-Anzahl menschenlesbar (Basis 1024), z. B. "1,5 GB". */
 fun formatBytes(bytes: Long, locale: Locale = Locale.GERMANY): String {
     if (bytes < 1024) return "$bytes B"

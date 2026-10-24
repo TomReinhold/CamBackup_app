@@ -73,6 +73,14 @@ class DeviceRegistry(private val context: Context, private val appVersion: Strin
             folder.copy(record = updated)
         }
 
+    /** Trägt den Zeitpunkt der letzten erfolgreichen Sicherung in device.json ein. */
+    suspend fun markBackup(deviceDir: DocumentFile, at: Instant) = withContext(Dispatchers.IO) {
+        val metadata = deviceDir.findFile(METADATA_DIR) ?: throw IOException("Ordner „$METADATA_DIR“ fehlt")
+        val file = metadata.findFile(DEVICE_FILE) ?: throw IOException("$DEVICE_FILE fehlt")
+        val record = readRecord(file)
+        writeRecord(metadata, record.copy(lastBackupAt = at.toString(), lastSeenAt = at.toString()))
+    }
+
     private fun readRecord(file: DocumentFile): DeviceRecord {
         val text = context.contentResolver.openInputStream(file.uri)?.use { it.readBytes().decodeToString() }
             ?: throw IOException("${file.name} nicht lesbar")

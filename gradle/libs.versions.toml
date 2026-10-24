@@ -8,6 +8,7 @@ composeBom = "2024.12.01"
 documentfile = "1.0.1"
 kotlinxSerialization = "1.7.3"
 junit = "4.13.2"
+mockk = "1.13.13"
 androidxJunit = "1.2.1"
 espressoCore = "3.6.1"
 
@@ -28,6 +29,7 @@ androidx-material3 = { group = "androidx.compose.material3", name = "material3" 
 androidx-documentfile = { group = "androidx.documentfile", name = "documentfile", version.ref = "documentfile" }
 kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "kotlinxSerialization" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
+mockk = { group = "io.mockk", name = "mockk", version.ref = "mockk" }
 androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "androidxJunit" }
 androidx-espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espressoCore" }
 
