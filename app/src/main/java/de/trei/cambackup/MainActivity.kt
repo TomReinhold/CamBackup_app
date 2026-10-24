@@ -42,7 +42,7 @@ class MainActivity : ComponentActivity() {
 
 private enum class Tab(val label: String, val icon: Int) {
     OVERVIEW("Übersicht", R.drawable.ic_dashboard),
-    PHOTOS("Fotos", R.drawable.ic_photo_library),
+    GALLERY("Galerie", R.drawable.ic_photo_library),
     SETTINGS("Einstellungen", R.drawable.ic_settings),
 }
 
@@ -82,7 +82,7 @@ private fun MainScaffold() {
     ) { padding ->
         when (tab) {
             Tab.OVERVIEW -> OverviewScreen(library, padding)
-            Tab.PHOTOS -> GalleryScreen(library, padding)
+            Tab.GALLERY -> GalleryScreen(library, padding)
             Tab.SETTINGS -> SettingsScreen(bottomPadding = padding.calculateBottomPadding())
         }
     }
