@@ -6,41 +6,44 @@ import android.content.Intent
 import android.content.IntentFilter
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.Surface
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
@@ -50,30 +53,32 @@ import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import de.trei.cambackup.R
+import de.trei.cambackup.storage.DeviceRecord
+import de.trei.cambackup.storage.DriveInfo
+import de.trei.cambackup.storage.FolderNameCheck
+import de.trei.cambackup.storage.MAX_FOLDER_NAME_LENGTH
+import de.trei.cambackup.storage.sanitizeFolderName
+import de.trei.cambackup.storage.validateFolderName
 import de.trei.cambackup.ui.components.Banner
 import de.trei.cambackup.ui.components.BannerTone
 import de.trei.cambackup.ui.components.BarSegment
 import de.trei.cambackup.ui.components.FeatureCard
 import de.trei.cambackup.ui.components.StackedBar
-import de.trei.cambackup.storage.DeviceFolder
-import de.trei.cambackup.storage.DeviceMatch
-import de.trei.cambackup.storage.DriveInfo
-import de.trei.cambackup.storage.FolderNameCheck
-import de.trei.cambackup.storage.validateFolderName
 import de.trei.cambackup.util.formatBytes
 import java.text.DateFormat
 import java.time.Instant
 import java.util.Date
 
 /**
- * Karten für Speichermedium (freier Platz, Geräteordner), Backup und Speicher freigeben.
+ * Karten für Speichermedium (Backup-Ordner, freier Platz), Backup und Speicher freigeben.
  * [onLibraryChanged]: nach Backup/Ersetzen, damit Übersicht und Fotos neu einlesen.
  */
 @Composable
 fun DriveSection(onLibraryChanged: () -> Unit, modifier: Modifier = Modifier, vm: DriveViewModel = viewModel()) {
     val state by vm.state.collectAsStateWithLifecycle()
+    val pick by vm.pick.collectAsStateWithLifecycle()
+    val autoFound by vm.autoFound.collectAsStateWithLifecycle()
     val pickTree = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree(), vm::onTreePicked)
-    val pick = { pickTree.launch(null) }
 
     // Erneut prüfen, wenn die App wieder sichtbar wird oder ein Datenträger ein-/ausgesteckt wird
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { vm.refresh() }
@@ -86,91 +91,82 @@ fun DriveSection(onLibraryChanged: () -> Unit, modifier: Modifier = Modifier, vm
             title = "Speichermedium",
             subtitle = ready?.info?.let { it.volumeLabel + if (it.path.isNotEmpty()) " / ${it.path}" else "" },
         ) {
+            autoFound?.let {
+                Banner(it, BannerTone.SUCCESS)
+            }
             when (val s = state) {
                 DriveState.Loading -> LinearProgressIndicator(Modifier.fillMaxWidth())
 
-                DriveState.NotSelected -> {
-                    Text("Schließe einen USB-Stick oder eine SD-Karte an und wähle den Zielordner für die Sicherung.")
-                    Banner(
-                        "Android erlaubt nicht die oberste Ebene des Mediums. Lege dort einen Ordner an " +
-                            "(z. B. „CamBackup“) und wähle diesen.",
-                    )
-                    Button(onClick = pick) { Text("Speichermedium wählen") }
-                }
-
-                DriveState.Unavailable -> {
-                    Banner("Das Speichermedium ist nicht verbunden. Bitte einstecken – die App erkennt es automatisch.", BannerTone.WARNING)
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Button(onClick = vm::refresh) { Text("Erneut prüfen") }
-                        OutlinedButton(onClick = pick) { Text("Anderes wählen") }
+                is DriveState.NoFolder -> {
+                    val volume = s.newVolume
+                    when {
+                        volume != null -> {
+                            Banner("Neues Speichermedium „${volume.label}“ erkannt. Wähle dort den Backup-Ordner für dieses Smartphone.", BannerTone.INFO)
+                            Button(onClick = { pickTree.launch(volume.pickerStart) }, modifier = Modifier.fillMaxWidth()) {
+                                Text("Backup-Ordner auf ${volume.label} wählen")
+                            }
+                        }
+                        s.hadFolder -> Banner(
+                            "Das Speichermedium mit dem Backup-Ordner ist nicht verbunden. Bitte einstecken – die App findet ihn automatisch.",
+                            BannerTone.WARNING,
+                        )
+                        else -> Text("Schließe einen USB-Stick oder eine SD-Karte an und wähle einen Ordner für die Sicherung dieses Smartphones.")
                     }
-                }
-
-                is DriveState.InternalStorage -> {
-                    DriveDetails(s.info)
-                    Banner(
-                        "Dieser Ordner liegt im internen Speicher des Smartphones und ist als Backup-Ziel " +
-                            "ungeeignet. Bitte einen Ordner auf dem USB-Stick oder der SD-Karte wählen.",
-                        BannerTone.ERROR,
+                    Text(
+                        "Tipp: Lege auf dem Medium einen Ordner an (z. B. „Backup Handy“) und wähle ihn. Wählst du einen Ordner, " +
+                            "der Backup-Ordner mehrerer Smartphones enthält, findet die App den passenden selbst.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    Button(onClick = pick) { Text("Anderes wählen") }
+                    if (volume == null) OutlinedButton(onClick = { pickTree.launch(null) }) { Text("Ordner wählen") }
                 }
 
                 is DriveState.Error -> {
                     Banner("Fehler: ${s.message}", BannerTone.ERROR)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Button(onClick = vm::refresh) { Text("Erneut versuchen") }
-                        OutlinedButton(onClick = pick) { Text("Anderes wählen") }
+                        OutlinedButton(onClick = { pickTree.launch(null) }) { Text("Anderen Ordner wählen") }
                     }
                 }
 
                 is DriveState.Ready -> {
                     DriveDetails(s.info)
-                    DeviceStatus(s, onCreate = vm::createDevice, onAssign = vm::assignExisting)
-                    TextButton(onClick = pick, contentPadding = ButtonDefaults.TextButtonWithIconContentPadding) {
-                        Text("Anderes Speichermedium wählen")
-                    }
+                    PhoneRow(s.record, onRename = vm::rename)
+                    TextButton(onClick = { pickTree.launch(null) }) { Text("Anderen Backup-Ordner wählen") }
                 }
             }
         }
 
-        val recognized = ready?.match as? DeviceMatch.Recognized
-        if (recognized != null) {
+        if (ready != null) {
+            val folder = ready.info.folderUri.toString()
             BackupPanel(
-                deviceFolderName = recognized.folder.folderName,
+                folderUri = folder,
                 onBackupFinished = {
                     vm.refresh()
                     onLibraryChanged()
                 },
             )
-            FreeUpPanel(deviceFolderName = recognized.folder.folderName, onFinished = onLibraryChanged)
+            FreeUpPanel(folderUri = folder, onFinished = onLibraryChanged)
         }
     }
+
+    pick?.let { PickDialogs(it, vm) }
 }
 
 @Composable
 private fun DriveDetails(info: DriveInfo) {
-    val space = info.space
-    if (space == null) {
+    val space = info.space ?: run {
         Text("Freier Speicher: unbekannt", style = MaterialTheme.typography.bodyMedium)
-    } else {
-        StackedBar(
-            listOf(BarSegment(space.totalBytes - space.freeBytes, MaterialTheme.colorScheme.primary)),
-            height = 8,
-            total = space.totalBytes,
+        return
+    }
+    StackedBar(listOf(BarSegment(space.totalBytes - space.freeBytes, MaterialTheme.colorScheme.primary)), height = 8, total = space.totalBytes)
+    Row {
+        Text("${formatBytes(space.freeBytes)} frei", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+        Text(
+            "von ${formatBytes(space.totalBytes)}" + (info.fsType?.let { " · ${fsLabel(it)}" } ?: ""),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        Row {
-            Text(
-                "${formatBytes(space.freeBytes)} frei",
-                style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.weight(1f),
-            )
-            Text(
-                "von ${formatBytes(space.totalBytes)}" + (info.fsType?.let { " · ${fsLabel(it)}" } ?: ""),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
     }
 }
 
@@ -180,125 +176,171 @@ private fun fsLabel(fs: String) = when (fs.lowercase()) {
     else -> fs
 }
 
+/** Name des Smartphones (aus den Metadaten, änderbar) und letzte Sicherung. */
 @Composable
-private fun DeviceStatus(
-    s: DriveState.Ready,
-    onCreate: (String) -> Unit,
-    onAssign: (DeviceFolder) -> Unit,
-) {
-    var showCreate by rememberSaveable { mutableStateOf(false) }
-    var showAssign by rememberSaveable { mutableStateOf(false) }
-
-    when (val m = s.match) {
-        is DeviceMatch.Recognized -> {
-            val r = m.folder.record
-            Surface(shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.surfaceContainerHighest) {
-                Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(painterResource(R.drawable.ic_smartphone), null, tint = MaterialTheme.colorScheme.primary)
-                    Spacer(Modifier.width(12.dp))
-                    Column {
-                        Text(m.folder.folderName, style = MaterialTheme.typography.titleSmall)
-                        Text(
-                            "Letzte Sicherung: " + (r.lastBackupAt?.let(::formatInstant) ?: "noch keine"),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
-            }
-        }
-
-        is DeviceMatch.Unknown -> {
-            Text("Dieses Smartphone ist auf dem Speichermedium noch nicht bekannt.")
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = { showCreate = true }) { Text("Geräteordner anlegen") }
-                if (m.candidates.isNotEmpty()) {
-                    OutlinedButton(onClick = { showAssign = true }) { Text("Zuordnen…") }
-                }
-            }
-            if (showCreate) {
-                CreateDeviceDialog(
-                    suggestion = s.identity.suggestedFolderName,
-                    existingNames = s.existingNames,
-                    onDismiss = { showCreate = false },
-                    onConfirm = { showCreate = false; onCreate(it) },
+private fun PhoneRow(record: DeviceRecord, onRename: (String) -> Unit) {
+    var editing by rememberSaveable { mutableStateOf(false) }
+    Surface(shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.surfaceContainerHighest) {
+        Row(Modifier.fillMaxWidth().padding(start = 12.dp, top = 8.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(painterResource(R.drawable.ic_smartphone), null, tint = MaterialTheme.colorScheme.primary)
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text(record.displayName, style = MaterialTheme.typography.titleSmall)
+                Text(
+                    "Letzte Sicherung: " + (record.lastBackupAt?.let(::formatInstant) ?: "noch keine"),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            if (showAssign) {
-                AssignDeviceDialog(
-                    candidates = m.candidates,
-                    onDismiss = { showAssign = false },
-                    onSelect = { showAssign = false; onAssign(it) },
-                )
-            }
+            IconButton(onClick = { editing = true }) { Icon(Icons.Default.Edit, "Namen ändern") }
         }
+    }
+    if (editing) {
+        NameDialog(
+            title = "Name des Smartphones",
+            text = "Unter diesem Namen erscheint das Smartphone in den Metadaten des Backup-Ordners.",
+            initial = record.displayName,
+            confirm = "Speichern",
+            onDismiss = { editing = false },
+            onConfirm = { editing = false; onRename(it) },
+        )
     }
 }
 
 @Composable
-private fun CreateDeviceDialog(
-    suggestion: String,
-    existingNames: Set<String>,
-    onDismiss: () -> Unit,
-    onConfirm: (String) -> Unit,
-) {
-    // Cursor ans Ende des Vorschlags setzen
-    var field by rememberSaveable(stateSaver = TextFieldValue.Saver) {
-        mutableStateOf(TextFieldValue(suggestion, TextRange(suggestion.length)))
+private fun PickDialogs(dialog: PickDialog, vm: DriveViewModel) {
+    when (dialog) {
+        PickDialog.Checking -> AlertDialog(
+            onDismissRequest = {},
+            title = { Text("Ordner wird geprüft …") },
+            text = { Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { CircularProgressIndicator() } },
+            confirmButton = {},
+        )
+
+        is PickDialog.Rejected -> AlertDialog(
+            onDismissRequest = vm::dismissPick,
+            title = { Text(dialog.title) },
+            text = { Text(dialog.message) },
+            confirmButton = { TextButton(onClick = vm::dismissPick) { Text("OK") } },
+        )
+
+        is PickDialog.FoundInside -> AlertDialog(
+            onDismissRequest = vm::dismissPick,
+            title = { Text("Backup-Ordner gefunden") },
+            text = {
+                Text(
+                    "In „${dialog.parentName}“ liegt der Backup-Ordner „${dialog.folder.dir.name}“ dieses Smartphones " +
+                        "(„${dialog.folder.record.displayName}“, letzte Sicherung ${dialog.folder.record.lastBackupAt?.let(::formatInstant) ?: "noch keine"}). Verwenden?",
+                )
+            },
+            confirmButton = { TextButton(onClick = { vm.confirm(dialog.folder) }) { Text("Verwenden") } },
+            dismissButton = { TextButton(onClick = vm::dismissPick) { Text("Abbrechen") } },
+        )
+
+        is PickDialog.ConfirmSameModel -> AlertDialog(
+            onDismissRequest = vm::dismissPick,
+            title = { Text("Ist das dieses Smartphone?") },
+            text = {
+                val r = dialog.folder.record
+                Text(
+                    "Der Ordner „${dialog.folder.dir.name}“ gehört zu „${r.displayName}“ – einem Smartphone desselben Modells " +
+                        "(${r.manufacturer} ${r.model}), zuletzt gesehen ${formatInstant(r.lastSeenAt)}. Die Kennung passt nicht " +
+                        "(z. B. nach Neuinstallation der App). Nur übernehmen, wenn es wirklich dieses Smartphone ist.",
+                )
+            },
+            confirmButton = { TextButton(onClick = { vm.confirm(dialog.folder) }) { Text("Ja, übernehmen") } },
+            dismissButton = { TextButton(onClick = vm::dismissPick) { Text("Abbrechen") } },
+        )
+
+        is PickDialog.Setup -> SetupDialog(dialog, vm)
     }
-    val check = remember(field.text, existingNames) { validateFolderName(field.text, existingNames) }
+}
+
+/** Einrichten eines neuen Backup-Ordners: direkt im gewählten Ordner oder als Unterordner. */
+@Composable
+private fun SetupDialog(d: PickDialog.Setup, vm: DriveViewModel) {
+    // Direkt einrichten nur, wenn der Ordner keine Backup-Ordner anderer Smartphones enthält
+    val canUseHere = d.otherDevices.isEmpty()
+    var here by rememberSaveable { mutableStateOf(canUseHere && d.isEmpty) }
+    var field by rememberSaveable(stateSaver = TextFieldValue.Saver) { mutableStateOf(TextFieldValue(d.suggestion, TextRange(d.suggestion.length))) }
+    val name = field.text.trim()
+    val folderCheck = remember(name, d.existingNames) { validateFolderName(sanitizeFolderName(name), d.existingNames) }
+    val valid = name.isNotEmpty() && name.length <= MAX_FOLDER_NAME_LENGTH && (here || folderCheck is FolderNameCheck.Ok)
+
     AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Neuer Geräteordner") },
+        onDismissRequest = vm::dismissPick,
+        title = { Text("Backup-Ordner einrichten") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Unter diesem Namen werden die Originale dieses Smartphones gespeichert.")
+                if (d.otherDevices.isNotEmpty()) {
+                    Text(
+                        "Dieser Ordner enthält Backup-Ordner anderer Smartphones: " + d.otherDevices.joinToString { "„${it.record.displayName}“" } + ".",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
                 OutlinedTextField(
                     value = field,
                     onValueChange = { field = it },
                     singleLine = true,
-                    label = { Text("Ordnername") },
-                    isError = check is FolderNameCheck.Invalid,
-                    supportingText = { (check as? FolderNameCheck.Invalid)?.let { Text(it.reason) } },
+                    label = { Text("Name des Smartphones") },
+                    supportingText = { if (!here && folderCheck is FolderNameCheck.Invalid) Text((folderCheck as FolderNameCheck.Invalid).reason) },
+                    isError = !here && folderCheck is FolderNameCheck.Invalid,
+                )
+                ChoiceRow(
+                    selected = !here,
+                    title = "Neuen Unterordner anlegen",
+                    subtitle = "„${sanitizeFolderName(name)}“ in „${d.dir.name}“",
+                    onClick = { here = false },
+                )
+                ChoiceRow(
+                    selected = here,
+                    enabled = canUseHere,
+                    title = "Diesen Ordner verwenden",
+                    subtitle = if (!canUseHere) "nicht möglich – enthält andere Smartphones"
+                    else if (d.isEmpty) "„${d.dir.name}“ ist leer" else "„${d.dir.name}“ enthält bereits Dateien",
+                    onClick = { here = true },
                 )
             }
         },
         confirmButton = {
             TextButton(
-                onClick = { (check as? FolderNameCheck.Ok)?.let { onConfirm(it.name) } },
-                enabled = check is FolderNameCheck.Ok,
-            ) { Text("Anlegen") }
+                enabled = valid,
+                onClick = { if (here) vm.setupHere(d.dir, name) else vm.setupSubfolder(d.dir, sanitizeFolderName(name), name) },
+            ) { Text("Einrichten") }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Abbrechen") } },
+        dismissButton = { TextButton(onClick = vm::dismissPick) { Text("Abbrechen") } },
     )
 }
 
 @Composable
-private fun AssignDeviceDialog(candidates: List<DeviceFolder>, onDismiss: () -> Unit, onSelect: (DeviceFolder) -> Unit) {
+private fun ChoiceRow(selected: Boolean, title: String, subtitle: String, onClick: () -> Unit, enabled: Boolean = true) {
+    Row(
+        Modifier.fillMaxWidth().selectable(selected = selected, enabled = enabled, role = Role.RadioButton, onClick = onClick),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        RadioButton(selected = selected, onClick = null, enabled = enabled)
+        Spacer(Modifier.width(8.dp))
+        Column {
+            Text(title, style = MaterialTheme.typography.bodyLarge, color = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.outline)
+            Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+@Composable
+private fun NameDialog(title: String, text: String, initial: String, confirm: String, onDismiss: () -> Unit, onConfirm: (String) -> Unit) {
+    var field by rememberSaveable(stateSaver = TextFieldValue.Saver) { mutableStateOf(TextFieldValue(initial, TextRange(initial.length))) }
+    val name = field.text.trim()
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Vorhandenen Ordner zuordnen") },
+        title = { Text(title) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(
-                    "Nur verwenden, wenn dies dasselbe Smartphone ist (z. B. nach Neuinstallation der App). " +
-                        "Ein anderes Gerät bitte als neuen Ordner anlegen.",
-                    style = MaterialTheme.typography.bodySmall,
-                )
-                LazyColumn(Modifier.heightIn(max = 300.dp)) {
-                    items(candidates, key = { it.folderName }) { f ->
-                        Column(Modifier.fillMaxWidth().clickable { onSelect(f) }.padding(vertical = 8.dp)) {
-                            Text(f.folderName, style = MaterialTheme.typography.bodyLarge)
-                            Text(
-                                "${f.record.manufacturer} ${f.record.model} · zuletzt ${formatInstant(f.record.lastSeenAt)}",
-                                style = MaterialTheme.typography.bodySmall,
-                            )
-                        }
-                    }
-                }
+                Text(text, style = MaterialTheme.typography.bodySmall)
+                OutlinedTextField(value = field, onValueChange = { field = it }, singleLine = true, label = { Text("Name") })
             }
         },
-        confirmButton = {},
+        confirmButton = { TextButton(onClick = { onConfirm(name) }, enabled = name.isNotEmpty() && name.length <= MAX_FOLDER_NAME_LENGTH) { Text(confirm) } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Abbrechen") } },
     )
 }

@@ -1,6 +1,7 @@
 package de.trei.cambackup.ui.settings
 
 import androidx.activity.compose.BackHandler
+import androidx.annotation.DrawableRes
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
@@ -8,6 +9,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
@@ -31,6 +34,7 @@ import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
@@ -48,6 +52,8 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -58,7 +64,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.painterResource
+import de.trei.cambackup.R
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import de.trei.cambackup.compress.SavingsEstimate
@@ -69,52 +78,173 @@ import de.trei.cambackup.settings.VideoCodec
 import de.trei.cambackup.util.fileCount
 import de.trei.cambackup.util.formatBytes
 
+/** Unterseiten der Einstellungen. */
+enum class SettingsPage(val title: String) {
+    FOLDERS("Medienordner"),
+    STORAGE("Ablage auf dem Medium"),
+    PHOTOS("Fotos verkleinern"),
+    VIDEOS("Videos verkleinern"),
+    RULES("Wann verkleinern"),
+    ABOUT("Über die App"),
+}
+
+/**
+ * Einstellungen als Übersicht mit Gruppen; jeder Eintrag zeigt den aktuellen Wert und öffnet eine
+ * eigene Unterseite. [bottomPadding]: Platz für die Navigationsleiste.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen(onBack: () -> Unit, vm: SettingsViewModel = viewModel()) {
+fun SettingsScreen(bottomPadding: Dp, vm: SettingsViewModel = viewModel()) {
     val settings by vm.settings.collectAsStateWithLifecycle()
     val preview by vm.preview.collectAsStateWithLifecycle()
     val estimate by vm.estimate.collectAsStateWithLifecycle()
     val folders by vm.folders.collectAsStateWithLifecycle()
+    var page by rememberSaveable { mutableStateOf<SettingsPage?>(null) }
+    var confirmReset by remember { mutableStateOf(false) }
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
 
-    BackHandler(onBack = onBack)
+    BackHandler(enabled = page != null) { page = null }
 
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+        contentWindowInsets = WindowInsets(0),
         topBar = {
             TopAppBar(
-                title = { Text("Einstellungen") },
+                title = { Text(page?.title ?: "Einstellungen") },
                 navigationIcon = {
-                    IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Zurück") }
-                },
-                actions = {
-                    TextButton(onClick = vm::reset) {
-                        Icon(Icons.Default.Refresh, null, Modifier.size(18.dp))
-                        Spacer(Modifier.width(6.dp))
-                        Text("Standard")
-                    }
+                    if (page != null) IconButton(onClick = { page = null }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Zurück") }
                 },
                 scrollBehavior = scrollBehavior,
             )
         },
     ) { padding ->
+        // Jede Seite mit eigenem Scrollzustand, damit eine Unterseite oben beginnt
+        val scroll = key(page) { rememberScrollState() }
         Column(
             Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp, vertical = 8.dp),
+                .verticalScroll(scroll)
+                .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = bottomPadding + 16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            FolderSettings(folders, settings.mediaFolders, vm::toggleFolder)
-            PreviewCard(preview, onPrev = { vm.showPreview(-1) }, onNext = { vm.showPreview(1) })
-            EstimateCard(estimate, settings)
-            ImageSettings(settings, vm::update)
-            VideoSettings(settings, vm::update)
-            GeneralSettings(settings, vm::update)
-            Spacer(Modifier.height(16.dp))
+            when (page) {
+                null -> {
+                    SettingsHome(settings, estimate, folders) { page = it }
+                    TextButton(onClick = { confirmReset = true }, modifier = Modifier.align(Alignment.CenterHorizontally)) {
+                        Icon(Icons.Default.Refresh, null, Modifier.size(18.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("Auf Standardwerte zurücksetzen")
+                    }
+                }
+                SettingsPage.FOLDERS -> FolderSettings(folders, settings.mediaFolders, vm::toggleFolder)
+                SettingsPage.STORAGE -> StorageSettings(settings, vm::update)
+                SettingsPage.PHOTOS -> {
+                    PreviewCard(preview, onPrev = { vm.showPreview(-1) }, onNext = { vm.showPreview(1) })
+                    ImageSettings(settings, vm::update)
+                }
+                SettingsPage.VIDEOS -> VideoSettings(settings, vm::update)
+                SettingsPage.RULES -> RulesSettings(settings, vm::update)
+                SettingsPage.ABOUT -> AboutScreen()
+            }
         }
+    }
+
+    if (confirmReset) {
+        AlertDialog(
+            onDismissRequest = { confirmReset = false },
+            title = { Text("Zurücksetzen?") },
+            text = { Text("Alle Einstellungen außer den Medienordnern werden auf die Standardwerte gesetzt. Der Probelauf ist danach wieder aktiv.") },
+            confirmButton = { TextButton(onClick = { confirmReset = false; vm.reset() }) { Text("Zurücksetzen") } },
+            dismissButton = { TextButton(onClick = { confirmReset = false }) { Text("Abbrechen") } },
+        )
+    }
+}
+
+/** Startseite der Einstellungen: Schätzung und Gruppen mit Kurzfassung der Werte. */
+@Composable
+private fun SettingsHome(
+    s: CompressionSettings,
+    estimate: EstimateState,
+    folders: List<MediaFolder>?,
+    open: (SettingsPage) -> Unit,
+) {
+    EstimateCard(estimate, s)
+
+    SettingsGroup("Sicherung") {
+        NavItem(
+            R.drawable.ic_folder, "Medienordner",
+            s.mediaFolders.sortedBy { it != CompressionSettings.DEFAULT_FOLDER }.joinToString { folderLabel(it) },
+        ) { open(SettingsPage.FOLDERS) }
+        NavItem(
+            R.drawable.ic_usb, "Ablage auf dem Medium",
+            (if (s.folderLayout == FolderLayout.YEAR_MONTH) "Nach Jahr und Monat" else "Ohne Unterordner") +
+                if (s.separateFolders) " · je Medienordner" else "",
+        ) { open(SettingsPage.STORAGE) }
+    }
+
+    SettingsGroup("Verkleinern") {
+        NavItem(
+            R.drawable.ic_image, "Fotos",
+            (s.imageMaxEdge?.let { "max. $it px" } ?: "Originalgröße") + " · Qualität ${s.jpegQuality}" +
+                if (s.keepGps) " · mit Standort" else " · ohne Standort",
+        ) { open(SettingsPage.PHOTOS) }
+        NavItem(
+            R.drawable.ic_videocam, "Videos",
+            (s.videoMaxShortEdge?.let { "${it}p" } ?: "Originalauflösung") + " · ${s.videoCodec.label} · ${s.videoBitrateMbps} Mbit/s" +
+                if (s.videoLimit30Fps) " · 30 fps" else "",
+        ) { open(SettingsPage.VIDEOS) }
+        NavItem(
+            R.drawable.ic_schedule, "Wann verkleinern",
+            (if (s.minAgeDays == 0) "sofort" else "ab ${minAgeLabel(s.minAgeDays)}") + " · mind. ${s.minSavingsPercent} % kleiner",
+            badge = if (s.dryRun) "Probelauf" else null,
+        ) { open(SettingsPage.RULES) }
+    }
+
+    SettingsGroup("App") {
+        NavItem(R.drawable.ic_info, "Über die App", "Version, Funktionsweise, Lizenzen") { open(SettingsPage.ABOUT) }
+    }
+}
+
+@Composable
+private fun SettingsGroup(title: String, content: @Composable ColumnScope.() -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(
+            title,
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.padding(start = 8.dp),
+        )
+        ElevatedCard(Modifier.fillMaxWidth()) { Column { content() } }
+    }
+}
+
+@Composable
+private fun NavItem(@DrawableRes icon: Int, title: String, summary: String, badge: String? = null, onClick: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(painterResource(icon), null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp))
+        Spacer(Modifier.width(16.dp))
+        Column(Modifier.weight(1f)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(title, style = MaterialTheme.typography.bodyLarge)
+                badge?.let {
+                    Spacer(Modifier.width(8.dp))
+                    Surface(shape = RoundedCornerShape(50), color = MaterialTheme.colorScheme.tertiaryContainer) {
+                        Text(
+                            it,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onTertiaryContainer,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                        )
+                    }
+                }
+            }
+            Text(summary, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2)
+        }
+        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
@@ -491,8 +621,8 @@ private fun bytesPerMinute(mbps: Int): Long =
     (mbps * 1_000_000L + CompressionSettings.AUDIO_BITRATE_KBPS * 1000L) / 8 * 60
 
 @Composable
-private fun GeneralSettings(s: CompressionSettings, update: Update) {
-    SettingsSection("Allgemein") {
+private fun RulesSettings(s: CompressionSettings, update: Update) {
+    SettingsSection("Wann wird verkleinert?", "Gilt für Fotos und Videos") {
         SegmentedSetting(
             label = "Erst verkleinern ab einem Alter von",
             options = CompressionSettings.MIN_AGE_OPTIONS,
@@ -510,14 +640,6 @@ private fun GeneralSettings(s: CompressionSettings, update: Update) {
             onChange = { v -> update { it.copy(minSavingsPercent = v) } },
         )
         Hint("Dateien, die dadurch nicht mindestens ${s.minSavingsPercent} % kleiner werden, bleiben unverändert.")
-        SegmentedSetting(
-            label = "Ordner auf dem Speichermedium",
-            options = FolderLayout.entries,
-            selected = s.folderLayout,
-            optionLabel = { if (it == FolderLayout.YEAR_MONTH) "Jahr / Monat" else "Ein Ordner" },
-            onSelect = { v -> update { it.copy(folderLayout = v) } },
-            hint = "Gilt für neu gesicherte Dateien",
-        )
         SwitchSetting(
             title = "Probelauf",
             description = "Nur sichern – auf dem Smartphone wird nichts ersetzt",
@@ -538,6 +660,25 @@ private fun GeneralSettings(s: CompressionSettings, update: Update) {
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun StorageSettings(s: CompressionSettings, update: Update) {
+    SettingsSection("Ablage auf dem Speichermedium", "Wie die Originale im Backup-Ordner abgelegt werden") {
+        SegmentedSetting(
+            label = "Unterordner",
+            options = FolderLayout.entries,
+            selected = s.folderLayout,
+            optionLabel = { if (it == FolderLayout.YEAR_MONTH) "Jahr / Monat" else "Keine" },
+            onSelect = { v -> update { it.copy(folderLayout = v) } },
+            hint = if (s.folderLayout == FolderLayout.YEAR_MONTH) "z. B. „2026/10/IMG_1234.jpg“ – gilt für neu gesicherte Dateien"
+            else "Alle Dateien direkt im Backup-Ordner – gilt für neu gesicherte Dateien",
+        )
+        Hint(
+            "Bei mehreren Medienordnern bekommt jeder zusätzlich einen eigenen Unterordner (z. B. „Pictures/Screenshots“). " +
+                "Den Backup-Ordner selbst wählst du in der Übersicht unter „Speichermedium“.",
+        )
     }
 }
 

@@ -103,11 +103,12 @@ object Notifications {
             .setContentIntent(openApp(context))
             .build()
 
-    fun driveDetected(context: Context) =
+    fun driveDetected(context: Context, text: String) =
         NotificationCompat.Builder(context, CHANNEL_EVENTS)
             .setSmallIcon(R.drawable.ic_notification)
-            .setContentTitle("Backup-Speichermedium erkannt")
-            .setContentText("Tippen, um neue Fotos und Videos zu sichern.")
+            .setContentTitle("Speichermedium erkannt")
+            .setContentText(text)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(text))
             .setAutoCancel(true)
             .setContentIntent(openApp(context))
             .build()

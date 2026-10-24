@@ -5,12 +5,9 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
@@ -36,14 +33,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            CamBackupTheme {
-                var showSettings by rememberSaveable { mutableStateOf(false) }
-                if (showSettings) {
-                    SettingsScreen(onBack = { showSettings = false })
-                } else {
-                    MainScaffold(onOpenSettings = { showSettings = true })
-                }
-            }
+            CamBackupTheme { MainScaffold() }
         }
     }
 }
@@ -51,11 +41,12 @@ class MainActivity : ComponentActivity() {
 private enum class Tab(val label: String, val icon: Int) {
     OVERVIEW("Übersicht", R.drawable.ic_dashboard),
     PHOTOS("Fotos", R.drawable.ic_photo_library),
+    SETTINGS("Einstellungen", R.drawable.ic_settings),
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun MainScaffold(onOpenSettings: () -> Unit) {
+private fun MainScaffold() {
     val library: LibraryViewModel = viewModel()
     var tab by rememberSaveable { mutableStateOf(Tab.OVERVIEW) }
 
@@ -65,12 +56,8 @@ private fun MainScaffold(onOpenSettings: () -> Unit) {
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         topBar = {
-            CenterAlignedTopAppBar(
-                title = { Text(if (tab == Tab.OVERVIEW) "CamBackup" else "Fotos") },
-                actions = {
-                    IconButton(onClick = onOpenSettings) { Icon(Icons.Default.Settings, "Einstellungen") }
-                },
-            )
+            // Die Einstellungen haben eine eigene Titelleiste (mit Zurück auf Unterseiten)
+            if (tab != Tab.SETTINGS) CenterAlignedTopAppBar(title = { Text(tab.label) })
         },
         bottomBar = {
             NavigationBar {
@@ -88,6 +75,7 @@ private fun MainScaffold(onOpenSettings: () -> Unit) {
         when (tab) {
             Tab.OVERVIEW -> OverviewScreen(library, padding)
             Tab.PHOTOS -> GalleryScreen(library, padding)
+            Tab.SETTINGS -> SettingsScreen(bottomPadding = padding.calculateBottomPadding())
         }
     }
 }

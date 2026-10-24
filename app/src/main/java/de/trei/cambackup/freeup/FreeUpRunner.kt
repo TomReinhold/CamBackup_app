@@ -52,9 +52,8 @@ class FreeUpRunner(private val context: Context) {
 
     private class Opened(val deviceDir: DocumentFile, val index: BackupIndex)
 
-    private suspend fun open(folderName: String): Opened = withContext(Dispatchers.IO) {
-        val root = drives.openRoot() ?: throw IOException("Speichermedium nicht verbunden")
-        val deviceDir = root.findFile(folderName) ?: throw IOException("Geräteordner „$folderName“ fehlt")
+    private suspend fun open(folderUri: String): Opened = withContext(Dispatchers.IO) {
+        val deviceDir = drives.requireFolder(folderUri)
         val metadata = deviceDir.findFile(DeviceRegistry.METADATA_DIR) ?: throw IOException("Ordner Metadata fehlt")
         Opened(deviceDir, BackupIndex.open(io, metadata))
     }

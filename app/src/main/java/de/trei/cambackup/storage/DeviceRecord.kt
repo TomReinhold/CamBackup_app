@@ -36,37 +36,31 @@ data class DeviceRecord(
     val previousUuids: List<String> = emptyList(),
 )
 
-/** Ein Geräteordner auf dem Speichermedium samt gelesener device.json. */
-data class DeviceFolder(val folderName: String, val record: DeviceRecord)
-
 val metadataJson = Json {
     prettyPrint = true
     ignoreUnknownKeys = true
     encodeDefaults = true
 }
 
-sealed interface DeviceMatch {
-    /** [viaAndroidId]: nur über ANDROID_ID erkannt – UUID in device.json sollte aktualisiert werden. */
-    data class Recognized(val folder: DeviceFolder, val viaAndroidId: Boolean) : DeviceMatch
-
-    /** Kein eindeutiger Treffer. [candidates] sind vorhandene Ordner, wahrscheinlichste zuerst. */
-    data class Unknown(val candidates: List<DeviceFolder>) : DeviceMatch
+/** Wie gut passt ein Backup-Ordner (laut seiner device.json) zu diesem Smartphone? */
+enum class DeviceRelation {
+    /** Eindeutig dieses Smartphone (App-UUID bzw. ANDROID_ID stimmen). */
+    SAME,
+    /**
+     * Gleicher Hersteller und gleiches Modell, aber keine passende Kennung – z. B. nach Neuinstallation
+     * mit anderem Signaturschlüssel. Nur nach Rückfrage verwendbar.
+     */
+    SAME_MODEL,
+    /** Ein anderes Smartphone – der Ordner darf nicht verwendet werden. */
+    OTHER,
 }
 
-fun matchDevice(identity: LocalIdentity, folders: List<DeviceFolder>): DeviceMatch {
-    folders.firstOrNull {
-        it.record.deviceUuid == identity.deviceUuid || identity.deviceUuid in it.record.previousUuids
-    }?.let { return DeviceMatch.Recognized(it, viaAndroidId = false) }
-
-    val byAndroidId = identity.androidId?.let { id -> folders.filter { it.record.androidId == id } }.orEmpty()
-    if (byAndroidId.size == 1) return DeviceMatch.Recognized(byAndroidId.single(), viaAndroidId = true)
-
-    val candidates = folders.sortedWith(
-        compareByDescending<DeviceFolder> { it in byAndroidId }
-            .thenByDescending { it.record.model == identity.model }
-            .thenBy { it.folderName.lowercase() },
-    )
-    return DeviceMatch.Unknown(candidates)
+fun relationOf(identity: LocalIdentity, record: DeviceRecord): DeviceRelation = when {
+    record.deviceUuid == identity.deviceUuid || identity.deviceUuid in record.previousUuids -> DeviceRelation.SAME
+    identity.androidId != null && record.androidId == identity.androidId -> DeviceRelation.SAME
+    record.manufacturer.equals(identity.manufacturer, ignoreCase = true) &&
+        record.model.equals(identity.model, ignoreCase = true) -> DeviceRelation.SAME_MODEL
+    else -> DeviceRelation.OTHER
 }
 
 sealed interface FolderNameCheck {

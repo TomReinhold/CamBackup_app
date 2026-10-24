@@ -29,10 +29,7 @@ class BackupRunner(private val context: Context) {
     private val scanner = MediaScanner(context.contentResolver)
     private val engine = BackupEngine(context)
     private val settings = SettingsRepository(context)
-    private val registry = DeviceRegistry(
-        context,
-        context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "?",
-    )
+    private val registry = DeviceRegistry(context, DeviceRegistry.appVersion(context))
 
     class Prepared internal constructor(
         internal val deviceDir: DocumentFile,
@@ -47,10 +44,8 @@ class BackupRunner(private val context: Context) {
     )
 
     /** Lädt Index und Mediendateien und berechnet, was zu sichern ist. */
-    suspend fun prepare(deviceFolderName: String): Prepared {
-        val root = drives.openRoot() ?: throw IOException("Speichermedium nicht verbunden")
-        val deviceDir = withContext(Dispatchers.IO) { root.findFile(deviceFolderName) }
-            ?: throw IOException("Geräteordner „$deviceFolderName“ fehlt")
+    suspend fun prepare(folderUri: String): Prepared {
+        val deviceDir = withContext(Dispatchers.IO) { drives.requireFolder(folderUri) }
         val metadata = withContext(Dispatchers.IO) { deviceDir.findFile(DeviceRegistry.METADATA_DIR) }
             ?: throw IOException("Ordner Metadata fehlt")
         val index = BackupIndex.open(io, metadata)
@@ -58,7 +53,7 @@ class BackupRunner(private val context: Context) {
         // Reste abgebrochener Läufe vor der Platzprüfung entfernen
         engine.cleanupStaging(deviceDir)
         withContext(Dispatchers.IO) { registry.ensureNoMedia(deviceDir) }
-        val info = drives.info(drives.selectedTree!!)
+        val info = drives.info(deviceDir.uri)
         val folders = settings.current().mediaFolders
         val items = scanner.scan(folders)
         val plan = planBackup(items, index.state, info.fsType)

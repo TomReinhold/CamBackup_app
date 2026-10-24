@@ -76,18 +76,18 @@ class BackupViewModel(app: Application) : AndroidViewModel(app) {
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), BackupState.Preparing)
 
     /** Automatisches Neuplanen (Bildschirmstart, Rückkehr in die App). */
-    fun prepareIfIdle(deviceFolderName: String) {
+    fun prepareIfIdle(folderUri: String) {
         val s = state.value
         if (s is BackupState.Running || s is BackupState.Finished || s is BackupState.ApplyingMissing || s is BackupState.MissingFinished) return
-        prepare(deviceFolderName)
+        prepare(folderUri)
     }
 
-    fun prepare(deviceFolderName: String) {
+    fun prepare(folderUri: String) {
         if (prepareJob?.isActive == true) return
         prepareJob = viewModelScope.launch {
             planState.value = BackupState.Preparing
             planState.value = try {
-                val p = runner.prepare(deviceFolderName)
+                val p = runner.prepare(folderUri)
                 BackupState.Ready(p.plan, p.space, p.missing, p.missingUris)
             } catch (e: Exception) {
                 BackupState.Error(e.message ?: e.javaClass.simpleName)
@@ -95,25 +95,25 @@ class BackupViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun start(deviceFolderName: String) {
+    fun start(folderUri: String) {
         val ready = state.value as? BackupState.Ready ?: return
         // Sicherheitsnetz: die UI bietet den Start bei zu wenig Platz gar nicht erst an
         if (ready.space is SpaceCheck.NotEnough || ready.plan.toCopy.isEmpty()) return
-        BackupWorker.start(getApplication(), deviceFolderName)
+        BackupWorker.start(getApplication(), folderUri)
     }
 
     fun cancel() = BackupWorker.cancel(getApplication())
 
     /** Entscheidungen zu gelöschten Dateien umsetzen (Pfade ohne Entscheidung bleiben unberührt). */
-    fun applyMissing(deviceFolderName: String, actions: Map<String, MissingAction>) {
+    fun applyMissing(folderUri: String, actions: Map<String, MissingAction>) {
         if (actions.isEmpty()) return
-        MissingWorker.start(getApplication(), MissingDecisions(deviceFolderName, actions))
+        MissingWorker.start(getApplication(), MissingDecisions(folderUri, actions))
     }
 
     /** Zusammenfassung bestätigen und neu planen. */
-    fun acknowledge(deviceFolderName: String) {
+    fun acknowledge(folderUri: String) {
         lastRun.markSeen()
         missingStore.saveSummary(null)
-        prepare(deviceFolderName)
+        prepare(folderUri)
     }
 }

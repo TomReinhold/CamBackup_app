@@ -106,9 +106,9 @@ class BackupWorker(context: Context, params: WorkerParameters) : CoroutineWorker
         private const val KEY_BYTES_DONE = "bytesDone"
         private const val KEY_BYTES_TOTAL = "bytesTotal"
 
-        fun start(context: Context, deviceFolderName: String) {
+        fun start(context: Context, folderUri: String) {
             val request = OneTimeWorkRequestBuilder<BackupWorker>()
-                .setInputData(workDataOf(KEY_FOLDER to deviceFolderName))
+                .setInputData(workDataOf(KEY_FOLDER to folderUri))
                 .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
                 .build()
             // KEEP: ein bereits laufendes Backup wird nicht ein zweites Mal gestartet

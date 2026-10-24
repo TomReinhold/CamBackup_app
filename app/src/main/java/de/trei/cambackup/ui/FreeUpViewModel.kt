@@ -63,12 +63,12 @@ class FreeUpViewModel(app: Application) : AndroidViewModel(app) {
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), FreeUpState.Loading)
 
-    fun load(deviceFolderName: String) {
+    fun load(folderUri: String) {
         if (loadJob?.isActive == true) return
-        loadJob = viewModelScope.launch { overview.value = runCatching { runner.overview(deviceFolderName) } }
+        loadJob = viewModelScope.launch { overview.value = runCatching { runner.overview(folderUri) } }
     }
 
-    fun prepare(deviceFolderName: String) = FreeUpWorker.prepare(getApplication(), deviceFolderName, TAG_PREPARE)
+    fun prepare(folderUri: String) = FreeUpWorker.prepare(getApplication(), folderUri, TAG_PREPARE)
 
     /** System-Dialog, in dem der Nutzer dem Ändern der Dateien zustimmt. */
     fun writeRequest(batch: PendingBatch): PendingIntent =
@@ -79,16 +79,16 @@ class FreeUpViewModel(app: Application) : AndroidViewModel(app) {
     fun cancel() = FreeUpWorker.cancel(getApplication())
 
     /** Vorbereitete Dateien verwerfen (z. B. im Probelauf). */
-    fun discard(deviceFolderName: String) {
+    fun discard(folderUri: String) {
         store.batch.value?.items?.forEach { File(it.newFile).delete() }
         store.saveBatch(null)
-        load(deviceFolderName)
+        load(folderUri)
     }
 
-    fun acknowledge(deviceFolderName: String) {
+    fun acknowledge(folderUri: String) {
         store.saveSummary(null)
         overview.value = null
-        load(deviceFolderName)
+        load(folderUri)
     }
 
     private companion object {

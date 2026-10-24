@@ -35,14 +35,14 @@ import de.trei.cambackup.util.formatBytes
 
 /** Speicher freigeben: vorbereiten, prüfen, nach Zustimmung ersetzen. */
 @Composable
-fun FreeUpPanel(deviceFolderName: String, onFinished: () -> Unit, vm: FreeUpViewModel = viewModel()) {
+fun FreeUpPanel(folderUri: String, onFinished: () -> Unit, vm: FreeUpViewModel = viewModel()) {
     val state by vm.state.collectAsStateWithLifecycle()
 
-    LaunchedEffect(deviceFolderName) { vm.load(deviceFolderName) }
+    LaunchedEffect(folderUri) { vm.load(folderUri) }
     // Nach Ende eines Laufs sofort neu einlesen (Größen/Status in Übersicht und Fotos)
     val finished = state is FreeUpState.Finished
     LaunchedEffect(finished) { if (finished) onFinished() }
-    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { vm.load(deviceFolderName) }
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { vm.load(folderUri) }
 
     // System-Dialog „Darf CamBackup diese Dateien ändern?“ – erst danach wird ersetzt
     val writeRequest = rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
@@ -57,7 +57,7 @@ fun FreeUpPanel(deviceFolderName: String, onFinished: () -> Unit, vm: FreeUpView
         when (val s = state) {
             FreeUpState.Loading -> LinearProgressIndicator(Modifier.fillMaxWidth())
 
-            is FreeUpState.Overview -> OverviewView(s.overview, s.dryRun, s.minAgeDays) { vm.prepare(deviceFolderName) }
+            is FreeUpState.Overview -> OverviewView(s.overview, s.dryRun, s.minAgeDays) { vm.prepare(folderUri) }
 
             is FreeUpState.Working -> {
                 val p = s.progress
@@ -86,17 +86,17 @@ fun FreeUpPanel(deviceFolderName: String, onFinished: () -> Unit, vm: FreeUpView
                 batch = s.batch,
                 dryRun = s.dryRun,
                 onReplace = { writeRequest.launch(IntentSenderRequest.Builder(vm.writeRequest(s.batch).intentSender).build()) },
-                onDiscard = { vm.discard(deviceFolderName) },
+                onDiscard = { vm.discard(folderUri) },
             )
 
             is FreeUpState.Finished -> SummaryView(s.summary) {
-                vm.acknowledge(deviceFolderName)
+                vm.acknowledge(folderUri)
                 onFinished()
             }
 
             is FreeUpState.Error -> {
                 Banner("Fehler: ${s.message}", BannerTone.ERROR)
-                Button(onClick = { vm.load(deviceFolderName) }) { Text("Erneut versuchen") }
+                Button(onClick = { vm.load(folderUri) }) { Text("Erneut versuchen") }
             }
         }
     }

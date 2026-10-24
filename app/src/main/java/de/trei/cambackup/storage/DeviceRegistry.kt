@@ -7,75 +7,121 @@ import kotlinx.coroutines.withContext
 import java.io.IOException
 import java.time.Instant
 
-/** Liest und schreibt die Geräteordner samt `Metadata/device.json` auf dem Speichermedium. */
+/** Ein Backup-Ordner samt seiner device.json. */
+data class BackupFolder(val dir: DocumentFile, val record: DeviceRecord)
+
+/** Ergebnis der Prüfung eines vom Nutzer gewählten Ordners. */
+sealed interface FolderCheck {
+    /** Backup-Ordner dieses Smartphones – direkt verwendbar. */
+    data class Own(val folder: BackupFolder) : FolderCheck
+    /** Backup-Ordner eines Smartphones gleichen Modells – nur nach Rückfrage. */
+    data class SameModel(val folder: BackupFolder) : FolderCheck
+    /** Gehört einem anderen Smartphone – nicht verwendbar. */
+    data class Foreign(val record: DeviceRecord) : FolderCheck
+    /** Kein Backup-Ordner, enthält aber (auch) einen passenden Unterordner. */
+    data class ContainsMatch(val folder: BackupFolder, val relation: DeviceRelation) : FolderCheck
+    /**
+     * Kein Backup-Ordner und kein passender Unterordner. [isEmpty]: hier kann direkt eingerichtet werden;
+     * [otherDevices]: Unterordner anderer Smartphones (dann besser einen eigenen Unterordner anlegen).
+     */
+    data class Unused(val dir: DocumentFile, val isEmpty: Boolean, val otherDevices: List<BackupFolder>, val existingNames: Set<String>) : FolderCheck
+}
+
+/**
+ * Liest und schreibt `Metadata/device.json` im Backup-Ordner. Der Ordnername ist frei wählbar;
+ * welchem Smartphone ein Ordner gehört, steht allein in der device.json.
+ */
 class DeviceRegistry(private val context: Context, private val appVersion: String) {
 
-    data class ScanResult(
-        val devices: List<DeviceFolder>,
-        /** Namen aller Einträge im Stammordner – für die Namensprüfung. */
-        val existingNames: Set<String>,
-    )
-
-    suspend fun scan(root: DocumentFile): ScanResult = withContext(Dispatchers.IO) {
-        val children = root.listFiles()
-        val devices = children.filter { it.isDirectory }.mapNotNull { dir ->
-            val file = dir.findFile(METADATA_DIR)?.findFile(DEVICE_FILE) ?: return@mapNotNull null
-            runCatching { DeviceFolder(dir.name!!, readRecord(file)) }.getOrNull()
-        }
-        ScanResult(devices, children.mapNotNull { it.name }.toSet())
+    /** device.json eines Ordners, oder null, wenn er kein Backup-Ordner ist. */
+    suspend fun read(dir: DocumentFile): DeviceRecord? = withContext(Dispatchers.IO) {
+        dir.findFile(METADATA_DIR)?.findFile(DEVICE_FILE)?.let { runCatching { readRecord(it) }.getOrNull() }
     }
 
-    /** Legt `<root>/<folderName>/Metadata/device.json` für dieses Smartphone an. */
-    suspend fun createDevice(root: DocumentFile, folderName: String, identity: LocalIdentity): DeviceFolder =
-        withContext(Dispatchers.IO) {
-            if (root.findFile(folderName) != null) throw IOException("Ordner „$folderName“ existiert bereits")
-            val dir = root.createDirectory(folderName) ?: throw IOException("Ordner „$folderName“ konnte nicht angelegt werden")
-            val metadata = dir.createDirectory(METADATA_DIR) ?: throw IOException("Ordner „$METADATA_DIR“ konnte nicht angelegt werden")
-            val now = Instant.now().toString()
-            val record = DeviceRecord(
-                deviceUuid = identity.deviceUuid,
-                androidId = identity.androidId,
-                manufacturer = identity.manufacturer,
-                model = identity.model,
-                displayName = folderName,
-                createdAt = now,
-                lastSeenAt = now,
-                appVersion = appVersion,
-            )
-            writeRecord(metadata, record)
-            ensureNoMedia(dir)
-            DeviceFolder(dir.name ?: folderName, record)
-        }
-
-    /**
-     * Ordnet einen vorhandenen Geräteordner diesem Smartphone zu (z. B. nach Neuinstallation der App)
-     * bzw. aktualisiert lastSeenAt. Die bisherige UUID wird in previousUuids aufbewahrt.
-     */
-    suspend fun claim(root: DocumentFile, folder: DeviceFolder, identity: LocalIdentity): DeviceFolder =
-        withContext(Dispatchers.IO) {
-            val metadata = root.findFile(folder.folderName)?.findFile(METADATA_DIR)
-                ?: throw IOException("Metadaten von „${folder.folderName}“ nicht gefunden")
-            val old = folder.record
-            val previous = if (old.deviceUuid != identity.deviceUuid) {
-                (old.previousUuids + old.deviceUuid).distinct()
-            } else {
-                old.previousUuids
+    /** Prüft einen gewählten Ordner – und ggf. seine direkten Unterordner – auf Zugehörigkeit. */
+    suspend fun check(dir: DocumentFile, identity: LocalIdentity): FolderCheck = withContext(Dispatchers.IO) {
+        read(dir)?.let { record ->
+            val folder = BackupFolder(dir, record)
+            return@withContext when (relationOf(identity, record)) {
+                DeviceRelation.SAME -> FolderCheck.Own(folder)
+                DeviceRelation.SAME_MODEL -> FolderCheck.SameModel(folder)
+                DeviceRelation.OTHER -> FolderCheck.Foreign(record)
             }
-            val updated = old.copy(
-                deviceUuid = identity.deviceUuid,
-                androidId = identity.androidId,
-                manufacturer = identity.manufacturer,
-                model = identity.model,
-                lastSeenAt = Instant.now().toString(),
-                appVersion = appVersion,
-                previousUuids = previous - identity.deviceUuid,
-            )
-            writeRecord(metadata, updated)
-            folder.copy(record = updated)
+        }
+        val children = dir.listFiles()
+        val subfolders = children.filter { it.isDirectory }.mapNotNull { child -> read(child)?.let { BackupFolder(child, it) } }
+        // Eindeutig eigener Unterordner vor einem gleichen Modell
+        subfolders.firstOrNull { relationOf(identity, it.record) == DeviceRelation.SAME }
+            ?.let { return@withContext FolderCheck.ContainsMatch(it, DeviceRelation.SAME) }
+        subfolders.firstOrNull { relationOf(identity, it.record) == DeviceRelation.SAME_MODEL }
+            ?.let { return@withContext FolderCheck.ContainsMatch(it, DeviceRelation.SAME_MODEL) }
+        FolderCheck.Unused(
+            dir = dir,
+            isEmpty = children.none { it.name != null && !it.name!!.startsWith(".") },
+            otherDevices = subfolders,
+            existingNames = children.mapNotNull { it.name }.toSet(),
+        )
+    }
+
+    /** Richtet [dir] als Backup-Ordner dieses Smartphones ein (Metadata/device.json, .nomedia). */
+    suspend fun setup(dir: DocumentFile, identity: LocalIdentity, displayName: String): BackupFolder = withContext(Dispatchers.IO) {
+        if (read(dir) != null) throw IOException("Ordner ist bereits ein Backup-Ordner")
+        val metadata = dir.findFile(METADATA_DIR) ?: dir.createDirectory(METADATA_DIR)
+            ?: throw IOException("Ordner „$METADATA_DIR“ konnte nicht angelegt werden")
+        val now = Instant.now().toString()
+        val record = DeviceRecord(
+            deviceUuid = identity.deviceUuid,
+            androidId = identity.androidId,
+            manufacturer = identity.manufacturer,
+            model = identity.model,
+            displayName = displayName,
+            createdAt = now,
+            lastSeenAt = now,
+            appVersion = appVersion,
+        )
+        writeRecord(metadata, record)
+        ensureNoMedia(dir)
+        BackupFolder(dir, record)
+    }
+
+    /** Legt in [parent] einen neuen Unterordner [folderName] an und richtet ihn ein. */
+    suspend fun createAndSetup(parent: DocumentFile, folderName: String, identity: LocalIdentity, displayName: String): BackupFolder =
+        withContext(Dispatchers.IO) {
+            if (parent.findFile(folderName) != null) throw IOException("Ordner „$folderName“ existiert bereits")
+            val dir = parent.createDirectory(folderName) ?: throw IOException("Ordner „$folderName“ konnte nicht angelegt werden")
+            setup(dir, identity, displayName)
         }
 
     /**
-     * Legt ".nomedia" im Geräteordner an: Android indiziert die Sicherungskopien dann nicht, sonst
+     * Übernimmt einen Backup-Ordner für dieses Smartphone (z. B. nach Neuinstallation der App) bzw.
+     * aktualisiert lastSeenAt. Die bisherige UUID wird in previousUuids aufbewahrt.
+     */
+    suspend fun claim(folder: BackupFolder, identity: LocalIdentity): BackupFolder = withContext(Dispatchers.IO) {
+        val metadata = folder.dir.findFile(METADATA_DIR) ?: throw IOException("Metadaten nicht gefunden")
+        val old = folder.record
+        val previous = if (old.deviceUuid != identity.deviceUuid) (old.previousUuids + old.deviceUuid).distinct() else old.previousUuids
+        val updated = old.copy(
+            deviceUuid = identity.deviceUuid,
+            androidId = identity.androidId,
+            manufacturer = identity.manufacturer,
+            model = identity.model,
+            lastSeenAt = Instant.now().toString(),
+            appVersion = appVersion,
+            previousUuids = previous - identity.deviceUuid,
+        )
+        writeRecord(metadata, updated)
+        folder.copy(record = updated)
+    }
+
+    /** Ändert den in device.json gespeicherten Namen des Smartphones. */
+    suspend fun rename(dir: DocumentFile, displayName: String) = withContext(Dispatchers.IO) {
+        val metadata = dir.findFile(METADATA_DIR) ?: throw IOException("Metadaten nicht gefunden")
+        val record = read(dir) ?: throw IOException("$DEVICE_FILE fehlt")
+        writeRecord(metadata, record.copy(displayName = displayName))
+    }
+
+    /**
+     * Legt ".nomedia" im Backup-Ordner an: Android indiziert die Sicherungskopien dann nicht, sonst
      * erschienen sie bei eingestecktem Medium doppelt in Galerie-Apps.
      */
     fun ensureNoMedia(deviceDir: DocumentFile) {
@@ -110,5 +156,8 @@ class DeviceRegistry(private val context: Context, private val appVersion: Strin
         const val METADATA_DIR = "Metadata"
         const val DEVICE_FILE = "device.json"
         const val NO_MEDIA = ".nomedia"
+
+        fun appVersion(context: Context): String =
+            context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "?"
     }
 }

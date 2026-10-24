@@ -1,12 +1,11 @@
 package de.trei.cambackup
 
-import de.trei.cambackup.storage.DeviceFolder
-import de.trei.cambackup.storage.DeviceMatch
 import de.trei.cambackup.storage.DeviceRecord
+import de.trei.cambackup.storage.DeviceRelation
 import de.trei.cambackup.storage.FolderNameCheck
 import de.trei.cambackup.storage.LocalIdentity
-import de.trei.cambackup.storage.matchDevice
 import de.trei.cambackup.storage.metadataJson
+import de.trei.cambackup.storage.relationOf
 import de.trei.cambackup.storage.sanitizeFolderName
 import de.trei.cambackup.storage.validateFolderName
 import org.junit.Assert.assertEquals
@@ -17,48 +16,30 @@ class DeviceRecordTest {
 
     private val me = LocalIdentity("uuid-me", "aid-me", "Google", "Pixel 8")
 
-    private fun folder(name: String, uuid: String, androidId: String?, model: String = "Pixel 8", prev: List<String> = emptyList()) =
-        DeviceFolder(
-            name,
-            DeviceRecord(
-                deviceUuid = uuid, androidId = androidId, manufacturer = "Google", model = model,
-                displayName = name, createdAt = "2026-01-01T00:00:00Z", lastSeenAt = "2026-01-01T00:00:00Z",
-                appVersion = "0.1.0", previousUuids = prev,
-            ),
+    private fun record(uuid: String, androidId: String?, manufacturer: String = "Google", model: String = "Pixel 8", prev: List<String> = emptyList()) =
+        DeviceRecord(
+            deviceUuid = uuid, androidId = androidId, manufacturer = manufacturer, model = model,
+            displayName = "Handy", createdAt = "2026-01-01T00:00:00Z", lastSeenAt = "2026-01-01T00:00:00Z",
+            appVersion = "1.0.0", previousUuids = prev,
         )
 
-    @Test fun recognizedByUuid() {
-        val mine = folder("Mein Pixel", "uuid-me", "other")
-        val result = matchDevice(me, listOf(folder("Anderes", "x", "y"), mine))
-        assertEquals(DeviceMatch.Recognized(mine, viaAndroidId = false), result)
+    @Test fun sameByUuid() = assertEquals(DeviceRelation.SAME, relationOf(me, record("uuid-me", "other")))
+
+    @Test fun sameByPreviousUuid() = assertEquals(DeviceRelation.SAME, relationOf(me, record("new", null, prev = listOf("uuid-me"))))
+
+    @Test fun sameByAndroidIdAfterReinstall() = assertEquals(DeviceRelation.SAME, relationOf(me, record("old-uuid", "aid-me")))
+
+    /** Neuinstallation mit anderem Signaturschlüssel: UUID und ANDROID_ID neu, Modell gleich → nur mit Rückfrage. */
+    @Test fun sameModelNeedsConfirmation() =
+        assertEquals(DeviceRelation.SAME_MODEL, relationOf(me, record("x", "y", manufacturer = "google", model = "pixel 8")))
+
+    @Test fun otherPhoneIsRejected() {
+        assertEquals(DeviceRelation.OTHER, relationOf(me, record("x", "y", manufacturer = "samsung", model = "SM-S918B")))
+        assertEquals(DeviceRelation.OTHER, relationOf(me, record("x", "y", model = "Pixel 7")))
     }
 
-    @Test fun recognizedByPreviousUuid() {
-        val mine = folder("Mein Pixel", "new", null, prev = listOf("uuid-me"))
-        assertEquals(DeviceMatch.Recognized(mine, false), matchDevice(me, listOf(mine)))
-    }
-
-    @Test fun recognizedByAndroidIdAfterReinstall() {
-        val mine = folder("Mein Pixel", "old-uuid", "aid-me")
-        assertEquals(DeviceMatch.Recognized(mine, viaAndroidId = true), matchDevice(me, listOf(mine)))
-    }
-
-    @Test fun ambiguousAndroidIdIsUnknownWithThoseFirst() {
-        val a = folder("B", "1", "aid-me")
-        val b = folder("A", "2", "aid-me")
-        val other = folder("0 Anderes", "3", "zzz", model = "Galaxy")
-        val result = matchDevice(me, listOf(other, a, b)) as DeviceMatch.Unknown
-        assertEquals(listOf("A", "B", "0 Anderes"), result.candidates.map { it.folderName })
-    }
-
-    @Test fun unknownSortsSameModelFirst() {
-        val galaxy = folder("A Galaxy", "1", null, model = "Galaxy")
-        val pixel = folder("Z Pixel", "2", null)
-        val result = matchDevice(me, listOf(galaxy, pixel)) as DeviceMatch.Unknown
-        assertEquals(listOf("Z Pixel", "A Galaxy"), result.candidates.map { it.folderName })
-    }
-
-    @Test fun emptyDriveIsUnknown() = assertEquals(DeviceMatch.Unknown(emptyList()), matchDevice(me, emptyList()))
+    @Test fun missingAndroidIdDoesNotMatchOtherMissingId() =
+        assertEquals(DeviceRelation.OTHER, relationOf(LocalIdentity("u", null, "A", "B"), record("x", null, "C", "D")))
 
     @Test fun validNameIsTrimmed() =
         assertEquals(FolderNameCheck.Ok("Pixel Tom"), validateFolderName("  Pixel Tom ", emptySet()))
@@ -84,9 +65,9 @@ class DeviceRecordTest {
     }
 
     @Test fun jsonRoundTripIgnoresUnknownFields() {
-        val record = folder("X", "u", "a").record
-        val text = metadataJson.encodeToString(DeviceRecord.serializer(), record)
+        val r = record("u", "a")
+        val text = metadataJson.encodeToString(DeviceRecord.serializer(), r)
         val withExtra = text.replaceFirst("{", "{\n  \"futureField\": 42,")
-        assertEquals(record, metadataJson.decodeFromString(DeviceRecord.serializer(), withExtra))
+        assertEquals(r, metadataJson.decodeFromString(DeviceRecord.serializer(), withExtra))
     }
 }

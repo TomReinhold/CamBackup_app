@@ -37,24 +37,24 @@ import de.trei.cambackup.util.formatBytes
 
 /** Planung, Fortschritt und Ergebnis des Backups für den erkannten Geräteordner. */
 @Composable
-fun BackupPanel(deviceFolderName: String, onBackupFinished: () -> Unit, vm: BackupViewModel = viewModel()) {
+fun BackupPanel(folderUri: String, onBackupFinished: () -> Unit, vm: BackupViewModel = viewModel()) {
     val state by vm.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
-    LaunchedEffect(deviceFolderName) { vm.prepareIfIdle(deviceFolderName) }
+    LaunchedEffect(folderUri) { vm.prepareIfIdle(folderUri) }
     // Nach Ende eines Laufs sofort neu einlesen (Status in Übersicht und Fotos)
     val finished = state is BackupState.Finished || state is BackupState.MissingFinished
     LaunchedEffect(finished) { if (finished) onBackupFinished() }
-    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { vm.prepareIfIdle(deviceFolderName) }
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { vm.prepareIfIdle(folderUri) }
 
     // Benachrichtigungen (Fortschritt/Ergebnis) beim ersten Start erfragen; das Backup startet in jedem Fall
     val notificationPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
-        vm.start(deviceFolderName)
+        vm.start(folderUri)
     }
     val start = {
         val needsAsk = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
             ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
-        if (needsAsk) notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS) else vm.start(deviceFolderName)
+        if (needsAsk) notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS) else vm.start(folderUri)
     }
 
     FeatureCard(
@@ -79,7 +79,7 @@ fun BackupPanel(deviceFolderName: String, onBackupFinished: () -> Unit, vm: Back
                             onDismiss = { showMissing = false },
                             onApply = { actions ->
                                 showMissing = false
-                                vm.applyMissing(deviceFolderName, actions)
+                                vm.applyMissing(folderUri, actions)
                             },
                         )
                     }
@@ -108,7 +108,7 @@ fun BackupPanel(deviceFolderName: String, onBackupFinished: () -> Unit, vm: Back
                 )
                 m.failures.take(10).forEach { Text("• ${it.name}: ${it.reason}", style = MaterialTheme.typography.bodySmall) }
                 Button(onClick = {
-                    vm.acknowledge(deviceFolderName)
+                    vm.acknowledge(folderUri)
                     onBackupFinished()
                 }) { Text("OK") }
             }
@@ -134,13 +134,13 @@ fun BackupPanel(deviceFolderName: String, onBackupFinished: () -> Unit, vm: Back
             }
 
             is BackupState.Finished -> ResultView(s.summary) {
-                vm.acknowledge(deviceFolderName)
+                vm.acknowledge(folderUri)
                 onBackupFinished()
             }
 
             is BackupState.Error -> {
                 Banner("Fehler: ${s.message}", BannerTone.ERROR)
-                Button(onClick = { vm.prepare(deviceFolderName) }) { Text("Erneut versuchen") }
+                Button(onClick = { vm.prepare(folderUri) }) { Text("Erneut versuchen") }
             }
         }
     }

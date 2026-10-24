@@ -82,9 +82,7 @@ class MissingRunner(private val context: Context) {
     private val settings = SettingsRepository(context)
 
     suspend fun apply(decisions: MissingDecisions, onProgress: (done: Int, total: Int, name: String) -> Unit): MissingSummary {
-        val root = drives.openRoot() ?: throw IOException("Speichermedium nicht verbunden")
-        val deviceDir = withContext(Dispatchers.IO) { root.findFile(decisions.deviceFolder) }
-            ?: throw IOException("Geräteordner „${decisions.deviceFolder}“ fehlt")
+        val deviceDir = withContext(Dispatchers.IO) { drives.requireFolder(decisions.deviceFolder) }
         val metadata = withContext(Dispatchers.IO) { deviceDir.findFile(DeviceRegistry.METADATA_DIR) }
             ?: throw IOException("Ordner Metadata fehlt")
         val index = BackupIndex.open(io, metadata)

@@ -80,7 +80,7 @@ class FreeUpWorker(context: Context, params: WorkerParameters) : CoroutineWorker
         private const val KEY_TOTAL = "total"
         private const val KEY_NAME = "name"
 
-        fun prepare(context: Context, deviceFolderName: String, tag: String) = enqueue(context, workDataOf(KEY_FOLDER to deviceFolderName), tag)
+        fun prepare(context: Context, folderUri: String, tag: String) = enqueue(context, workDataOf(KEY_FOLDER to folderUri), tag)
 
         /** Nur aufrufen, nachdem der Nutzer dem Schreiben per createWriteRequest zugestimmt hat. */
         fun replace(context: Context, tag: String) = enqueue(context, workDataOf(KEY_REPLACE to true), tag)
