@@ -33,7 +33,6 @@ sealed interface FreeUpState {
     data object Loading : FreeUpState
     data class Overview(val overview: FreeUpOverview, val dryRun: Boolean, val minAgeDays: Int) : FreeUpState
     data class Working(val progress: FreeUpProgress?, val replacing: Boolean) : FreeUpState
-    data class Finished(val summary: FreeUpSummary) : FreeUpState
     data class Error(val message: String) : FreeUpState
 }
 
@@ -49,13 +48,12 @@ class FreeUpViewModel(app: Application) : AndroidViewModel(app) {
         .getWorkInfosForUniqueWorkFlow(FreeUpWorker.UNIQUE_NAME)
         .map { infos -> infos.firstOrNull { !it.state.isFinished } }
 
-    val state: StateFlow<FreeUpState> = combine(work, store.summary, overview, settings) { running, summary, ov, s ->
+    val state: StateFlow<FreeUpState> = combine(work, overview, settings) { running, ov, s ->
         when {
             running != null -> FreeUpState.Working(
                 running.takeIf { it.state == WorkInfo.State.RUNNING }?.let { FreeUpWorker.progressOf(it.progress) },
                 replacing = TAG_COMPRESS in running.tags,
             )
-            summary != null -> FreeUpState.Finished(summary)
             ov == null -> FreeUpState.Loading
             else -> ov.fold(
                 onSuccess = { FreeUpState.Overview(it, s.dryRun, s.minAgeDays) },
@@ -83,7 +81,10 @@ class FreeUpViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /** Probelauf: berechnet die Ersparnis, auf dem Smartphone ändert sich nichts. */
-    fun dryRun(folderUri: String) = FreeUpWorker.dryRun(getApplication(), folderUri, TAG_DRY_RUN)
+    fun dryRun(folderUri: String) {
+        store.saveSummary(null)
+        FreeUpWorker.dryRun(getApplication(), folderUri, TAG_DRY_RUN)
+    }
 
     /**
      * System-Dialoge, in denen der Nutzer dem Ändern der Dateien zustimmt – nur für Dateien, für die
@@ -98,15 +99,24 @@ class FreeUpViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /** Nach Zustimmung im System-Dialog: verkleinern und sofort ersetzen. */
-    fun compress(folderUri: String) = FreeUpWorker.compress(getApplication(), folderUri, TAG_COMPRESS)
+    fun compress(folderUri: String) {
+        store.saveSummary(null)
+        FreeUpWorker.compress(getApplication(), folderUri, TAG_COMPRESS)
+    }
 
     fun cancel() = FreeUpWorker.cancel(getApplication())
 
-    fun acknowledge(folderUri: String) {
-        store.saveSummary(null)
+    /** Ergebnis des letzten Laufs – steht über dem Überblick, bis die App verlassen wird. */
+    val result: StateFlow<FreeUpSummary?> = store.summary
+
+    /** Nach einem Lauf: Überblick neu laden (Kandidaten haben sich geändert). */
+    fun reload(folderUri: String) {
+        loadJob?.cancel()
         overview.value = null
         load(folderUri)
     }
+
+    fun dismissResult() = store.saveSummary(null)
 
     private companion object {
         const val TAG_DRY_RUN = "freeup-dryrun"

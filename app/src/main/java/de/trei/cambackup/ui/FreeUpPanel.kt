@@ -41,11 +41,19 @@ fun FreeUpPanel(folderUri: String, onFinished: () -> Unit, vm: FreeUpViewModel =
     val state by vm.state.collectAsStateWithLifecycle()
     val probeCount by vm.probeCount.collectAsStateWithLifecycle()
 
+    val result by vm.result.collectAsStateWithLifecycle()
+
     LaunchedEffect(folderUri) { vm.load(folderUri) }
     // Nach Ende eines Laufs sofort neu einlesen (Größen/Status in Übersicht und Galerie)
-    val finished = state is FreeUpState.Finished
-    LaunchedEffect(finished) { if (finished) onFinished() }
+    LaunchedEffect(result?.finishedAt) {
+        if (result != null) {
+            vm.reload(folderUri)
+            onFinished()
+        }
+    }
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { vm.load(folderUri) }
+    // Ergebnis verschwindet, sobald die App verlassen wird – ohne „OK“
+    LifecycleEventEffect(Lifecycle.Event.ON_STOP) { vm.dismissResult() }
 
     // System-Dialoge „Darf CamBackup diese Dateien ändern?“ – nacheinander, erst danach wird verkleinert
     var pending by remember { mutableStateOf(emptyList<PendingIntent>()) }
@@ -63,6 +71,7 @@ fun FreeUpPanel(folderUri: String, onFinished: () -> Unit, vm: FreeUpViewModel =
         title = "Speicher freigeben",
         subtitle = "Gesicherte Originale auf dem Smartphone verkleinern",
     ) {
+        if (state !is FreeUpState.Working) result?.let { SummaryView(it) }
         when (val s = state) {
             FreeUpState.Loading -> LinearProgressIndicator(Modifier.fillMaxWidth())
 
@@ -104,11 +113,6 @@ fun FreeUpPanel(folderUri: String, onFinished: () -> Unit, vm: FreeUpViewModel =
                     title = if (s.replacing) "Speichermedium bitte nicht abziehen" else "Probelauf – es wird nichts verändert",
                 )
                 OutlinedButton(onClick = vm::cancel) { Text("Abbrechen") }
-            }
-
-            is FreeUpState.Finished -> SummaryView(s.summary) {
-                vm.acknowledge(folderUri)
-                onFinished()
             }
 
             is FreeUpState.Error -> {
@@ -198,7 +202,7 @@ private fun OverviewView(
 }
 
 @Composable
-private fun SummaryView(s: FreeUpSummary, onDone: () -> Unit) {
+private fun SummaryView(s: FreeUpSummary) {
     val ok = s.abortReason == null && s.failures.isEmpty()
     Banner(
         when {
@@ -215,5 +219,4 @@ private fun SummaryView(s: FreeUpSummary, onDone: () -> Unit) {
         Text("Fehler bei ${fileCount(s.failures.size)}:", color = MaterialTheme.colorScheme.error)
         s.failures.take(10).forEach { Text("• ${it.name}: ${it.reason}", style = MaterialTheme.typography.bodySmall) }
     }
-    Button(onClick = onDone) { Text("OK") }
 }

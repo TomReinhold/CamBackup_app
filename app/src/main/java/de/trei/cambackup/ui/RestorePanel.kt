@@ -64,7 +64,6 @@ sealed interface RestoreState {
     data object Nothing : RestoreState
     data class Ready(val overview: RestoreOverview) : RestoreState
     data class Running(val done: Int, val total: Int) : RestoreState
-    data class Finished(val summary: RestoreSummary) : RestoreState
     data class Error(val message: String) : RestoreState
 }
 
@@ -78,10 +77,9 @@ class RestoreViewModel(app: Application) : AndroidViewModel(app) {
     private val work = WorkManager.getInstance(app).getWorkInfosForUniqueWorkFlow(RestoreWorker.UNIQUE_NAME)
         .map { infos -> infos.firstOrNull { !it.state.isFinished } }
 
-    val state: StateFlow<RestoreState> = combine(work, store.summary, overview) { running, summary, ov ->
+    val state: StateFlow<RestoreState> = combine(work, overview) { running, ov ->
         when {
             running != null -> RestoreWorker.progressOf(running.progress).let { RestoreState.Running(it?.first ?: 0, it?.second ?: 0) }
-            summary != null -> RestoreState.Finished(summary)
             ov == null -> RestoreState.Loading
             else -> ov.fold(
                 onSuccess = { if (it.candidates.isEmpty()) RestoreState.Nothing else RestoreState.Ready(it) },
@@ -99,15 +97,24 @@ class RestoreViewModel(app: Application) : AndroidViewModel(app) {
     fun writeRequest(o: RestoreOverview): PendingIntent =
         MediaStore.createWriteRequest(getApplication<Application>().contentResolver, o.candidates.map { it.item.uri })
 
-    fun start(folderUri: String, keepOriginal: Boolean) = RestoreWorker.start(getApplication(), folderUri, keepOriginal)
+    fun start(folderUri: String, keepOriginal: Boolean) {
+        store.save(null)
+        RestoreWorker.start(getApplication(), folderUri, keepOriginal)
+    }
 
     fun cancel() = RestoreWorker.cancel(getApplication())
 
-    fun acknowledge(folderUri: String) {
-        store.save(null)
+    /** Ergebnis des letzten Laufs – steht über dem Überblick, bis die App verlassen wird. */
+    val result: StateFlow<RestoreSummary?> = store.summary
+
+    /** Nach einem Lauf: Überblick neu laden. */
+    fun reload(folderUri: String) {
+        job?.cancel()
         overview.value = null
         load(folderUri)
     }
+
+    fun dismissResult() = store.save(null)
 }
 
 /** Originale aller verkleinerten Dateien vom Medium zurück aufs Smartphone holen. */
@@ -117,18 +124,36 @@ fun RestorePanel(folderUri: String, onFinished: () -> Unit, vm: RestoreViewModel
     var confirm by rememberSaveable { mutableStateOf(false) }
     var keepOriginal by rememberSaveable { mutableStateOf(true) }
 
+    val result by vm.result.collectAsStateWithLifecycle()
+
     LaunchedEffect(folderUri) { vm.load(folderUri) }
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { vm.load(folderUri) }
-    val finished = state is RestoreState.Finished
-    LaunchedEffect(finished) { if (finished) onFinished() }
+    LaunchedEffect(result?.finishedAt) {
+        if (result != null) {
+            vm.reload(folderUri)
+            onFinished()
+        }
+    }
+    // Ergebnis verschwindet, sobald die App verlassen wird – ohne „OK“
+    LifecycleEventEffect(Lifecycle.Event.ON_STOP) { vm.dismissResult() }
 
     val writeRequest = rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
         if (result.resultCode == Activity.RESULT_OK) vm.start(folderUri, keepOriginal)
     }
 
-    if (state is RestoreState.Nothing || state is RestoreState.Loading) return
+    // Ohne verkleinerte Dateien keine Karte – außer um das Ergebnis eines eben beendeten Laufs zu zeigen
+    if ((state is RestoreState.Nothing || state is RestoreState.Loading) && result == null) return
 
     FeatureCard(icon = R.drawable.ic_restore, title = "Originale zurückholen", subtitle = "Verkleinerte Dateien wieder in voller Größe") {
+        if (state !is RestoreState.Running) {
+            result?.let { r ->
+                Banner(
+                    "${fileCount(r.restored)} wieder in voller Größe (${formatBytes(r.bytesAdded)})" + (r.abortReason?.let { " – $it" } ?: ""),
+                    if (r.failures.isEmpty() && r.abortReason == null) BannerTone.SUCCESS else BannerTone.WARNING,
+                )
+                r.failures.take(10).forEach { Text("• ${it.name}: ${it.reason}", style = MaterialTheme.typography.bodySmall) }
+            }
+        }
         when (val s = state) {
             is RestoreState.Ready -> {
                 val o = s.overview
@@ -192,16 +217,6 @@ fun RestorePanel(folderUri: String, onFinished: () -> Unit, vm: RestoreViewModel
                 else LinearProgressIndicator(Modifier.fillMaxWidth())
                 Banner("Speichermedium bitte nicht abziehen.")
                 OutlinedButton(onClick = vm::cancel) { Text("Abbrechen") }
-            }
-
-            is RestoreState.Finished -> {
-                val r = s.summary
-                Banner(
-                    "${fileCount(r.restored)} wieder in voller Größe (${formatBytes(r.bytesAdded)})" + (r.abortReason?.let { " – $it" } ?: ""),
-                    if (r.failures.isEmpty() && r.abortReason == null) BannerTone.SUCCESS else BannerTone.WARNING,
-                )
-                r.failures.take(10).forEach { Text("• ${it.name}: ${it.reason}", style = MaterialTheme.typography.bodySmall) }
-                Button(onClick = { vm.acknowledge(folderUri) }) { Text("OK") }
             }
 
             is RestoreState.Error -> {

@@ -37,10 +37,8 @@ sealed interface BackupState {
         val missingUris: Map<String, Uri>,
     ) : BackupState
     data class Running(val progress: BackupProgress?) : BackupState
-    data class Finished(val summary: RunSummary) : BackupState
     /** Gelöschte Dateien werden wiederhergestellt bzw. ihre Sicherungen gelöscht. */
     data class ApplyingMissing(val done: Int, val total: Int) : BackupState
-    data class MissingFinished(val summary: MissingSummary) : BackupState
     data class Error(val message: String) : BackupState
 }
 
@@ -59,8 +57,8 @@ class BackupViewModel(app: Application) : AndroidViewModel(app) {
 
     private val work = combine(running(BackupWorker.UNIQUE_NAME), running(MissingWorker.UNIQUE_NAME)) { b, m -> b to m }
 
-    /** Laufende Jobs haben Vorrang, dann unbestätigte Zusammenfassungen, sonst die Planung. */
-    val state: StateFlow<BackupState> = combine(work, lastRun.unseenFlow(), missingStore.summary, planState) { (backup, missing), summary, missingSummary, plan ->
+    /** Laufende Jobs haben Vorrang, sonst die Planung. */
+    val state: StateFlow<BackupState> = combine(work, planState) { (backup, missing), plan ->
         when {
             backup != null -> BackupState.Running(
                 backup.takeIf { it.state == WorkInfo.State.RUNNING }?.let { BackupWorker.progressOf(it.progress) },
@@ -69,17 +67,33 @@ class BackupViewModel(app: Application) : AndroidViewModel(app) {
                 val p = MissingWorker.progressOf(missing.progress)
                 BackupState.ApplyingMissing(p?.first ?: 0, p?.second ?: 0)
             }
-            summary != null -> BackupState.Finished(summary)
-            missingSummary != null -> BackupState.MissingFinished(missingSummary)
             else -> plan
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), BackupState.Preparing)
 
+    /** Ergebnis des letzten Laufs – steht über der Planung, bis es nicht mehr gebraucht wird. */
+    val result: StateFlow<RunSummary?> = lastRun.unseenFlow().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+    val missingResult: StateFlow<MissingSummary?> = missingStore.summary
+
     /** Automatisches Neuplanen (Bildschirmstart, Rückkehr in die App). */
     fun prepareIfIdle(folderUri: String) {
         val s = state.value
-        if (s is BackupState.Running || s is BackupState.Finished || s is BackupState.ApplyingMissing || s is BackupState.MissingFinished) return
+        if (s is BackupState.Running || s is BackupState.ApplyingMissing) return
         prepare(folderUri)
+    }
+
+    /**
+     * Ergebnisse ausblenden, wenn die App verlassen wird. Ein unterbrochenes Backup bleibt stehen,
+     * bis es fortgesetzt wird (auch die Benachrichtigung beim Einstecken bietet dann das Fortsetzen an).
+     */
+    fun dismissCompleted() {
+        if (lastRun.unseen()?.abortReason == null) lastRun.markSeen()
+        missingStore.saveSummary(null)
+    }
+
+    private fun clearResults() {
+        lastRun.markSeen()
+        missingStore.saveSummary(null)
     }
 
     fun prepare(folderUri: String) {
@@ -102,25 +116,8 @@ class BackupViewModel(app: Application) : AndroidViewModel(app) {
     private fun startIfPossible(folderUri: String, ready: BackupState.Ready) {
         // Sicherheitsnetz: die UI bietet den Start bei zu wenig Platz gar nicht erst an
         if (ready.space is SpaceCheck.NotEnough || !ready.plan.hasWork) return
+        clearResults()
         BackupWorker.start(getApplication(), folderUri)
-    }
-
-    /** Unterbrochenes Backup fortsetzen: neu planen (bereits Gesichertes entfällt) und gleich starten. */
-    fun resume(folderUri: String) {
-        lastRun.markSeen()
-        prepareJob?.cancel()
-        prepareJob = viewModelScope.launch {
-            planState.value = BackupState.Preparing
-            val ready = try {
-                val p = runner.prepare(folderUri)
-                BackupState.Ready(p.plan, p.space, p.missing, p.missingUris)
-            } catch (e: Exception) {
-                planState.value = BackupState.Error(e.message ?: e.javaClass.simpleName)
-                return@launch
-            }
-            planState.value = ready
-            startIfPossible(folderUri, ready)
-        }
     }
 
     fun cancel() = BackupWorker.cancel(getApplication())
@@ -128,13 +125,7 @@ class BackupViewModel(app: Application) : AndroidViewModel(app) {
     /** Entscheidungen zu gelöschten Dateien umsetzen (Pfade ohne Entscheidung bleiben unberührt). */
     fun applyMissing(folderUri: String, actions: Map<String, MissingAction>) {
         if (actions.isEmpty()) return
+        clearResults()
         MissingWorker.start(getApplication(), MissingDecisions(folderUri, actions))
-    }
-
-    /** Zusammenfassung bestätigen und neu planen. */
-    fun acknowledge(folderUri: String) {
-        lastRun.markSeen()
-        missingStore.saveSummary(null)
-        prepare(folderUri)
     }
 }

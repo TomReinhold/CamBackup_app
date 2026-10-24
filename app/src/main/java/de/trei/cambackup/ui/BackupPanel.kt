@@ -29,6 +29,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import de.trei.cambackup.R
 import de.trei.cambackup.backup.BackupPlan
+import de.trei.cambackup.backup.MissingSummary
 import de.trei.cambackup.backup.RunSummary
 import de.trei.cambackup.backup.SpaceCheck
 import de.trei.cambackup.ui.components.Banner
@@ -45,11 +46,20 @@ fun BackupPanel(folderUri: String, onBackupFinished: () -> Unit, vm: BackupViewM
     val state by vm.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
+    val result by vm.result.collectAsStateWithLifecycle()
+    val missingResult by vm.missingResult.collectAsStateWithLifecycle()
+
     LaunchedEffect(folderUri) { vm.prepareIfIdle(folderUri) }
-    // Nach Ende eines Laufs sofort neu einlesen (Status in Übersicht und Fotos)
-    val finished = state is BackupState.Finished || state is BackupState.MissingFinished
-    LaunchedEffect(finished) { if (finished) onBackupFinished() }
+    // Nach Ende eines Laufs sofort neu planen und einlesen (Status in Übersicht und Galerie)
+    LaunchedEffect(result?.finishedAt, missingResult?.finishedAt) {
+        if (result != null || missingResult != null) {
+            vm.prepare(folderUri)
+            onBackupFinished()
+        }
+    }
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { vm.prepareIfIdle(folderUri) }
+    // Erledigte Ergebnisse verschwinden, sobald die App verlassen wird – ohne „OK“
+    LifecycleEventEffect(Lifecycle.Event.ON_STOP) { vm.dismissCompleted() }
 
     // Benachrichtigungen (Fortschritt/Ergebnis) beim ersten Start erfragen; das Backup startet in jedem Fall
     val notificationPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
@@ -66,6 +76,10 @@ fun BackupPanel(folderUri: String, onBackupFinished: () -> Unit, vm: BackupViewM
         title = "Backup",
         subtitle = "Originale bitgenau auf das Speichermedium kopieren",
     ) {
+        if (state !is BackupState.Running && state !is BackupState.ApplyingMissing) {
+            result?.let { ResultView(it) }
+            missingResult?.let { MissingResultView(it) }
+        }
         when (val s = state) {
             BackupState.Preparing -> {
                 Text("Vergleiche Medienordner mit dem Speichermedium …", style = MaterialTheme.typography.bodyMedium)
@@ -88,7 +102,12 @@ fun BackupPanel(folderUri: String, onBackupFinished: () -> Unit, vm: BackupViewM
                         )
                     }
                 }
-                PlanView(s.plan, s.space, onStart = start)
+                PlanView(
+                    s.plan, s.space,
+                    resume = result?.abortReason != null,
+                    showDone = result?.isComplete != true,
+                    onStart = start,
+                )
             }
 
             is BackupState.ApplyingMissing -> {
@@ -101,20 +120,6 @@ fun BackupPanel(folderUri: String, onBackupFinished: () -> Unit, vm: BackupViewM
                 } else {
                     LinearProgressIndicator(Modifier.fillMaxWidth())
                 }
-            }
-
-            is BackupState.MissingFinished -> {
-                val m = s.summary
-                Banner(
-                    "${fileCount(m.restored)} wiederhergestellt, ${fileCount(m.deleted)} im Backup gelöscht" +
-                        (m.abortReason?.let { " – $it" } ?: ""),
-                    if (m.failures.isEmpty() && m.abortReason == null) BannerTone.SUCCESS else BannerTone.WARNING,
-                )
-                m.failures.take(10).forEach { Text("• ${it.name}: ${it.reason}", style = MaterialTheme.typography.bodySmall) }
-                Button(onClick = {
-                    vm.acknowledge(folderUri)
-                    onBackupFinished()
-                }) { Text("OK") }
             }
 
             is BackupState.Running -> {
@@ -153,11 +158,6 @@ fun BackupPanel(folderUri: String, onBackupFinished: () -> Unit, vm: BackupViewM
                 OutlinedButton(onClick = vm::cancel) { Text("Abbrechen") }
             }
 
-            is BackupState.Finished -> ResultView(s.summary, onResume = { vm.resume(folderUri) }) {
-                vm.acknowledge(folderUri)
-                onBackupFinished()
-            }
-
             is BackupState.Error -> {
                 Banner("Fehler: ${s.message}", BannerTone.ERROR)
                 Button(onClick = { vm.prepare(folderUri) }) { Text("Erneut versuchen") }
@@ -167,7 +167,7 @@ fun BackupPanel(folderUri: String, onBackupFinished: () -> Unit, vm: BackupViewM
 }
 
 @Composable
-private fun PlanView(plan: BackupPlan, space: SpaceCheck, onStart: () -> Unit) {
+private fun PlanView(plan: BackupPlan, space: SpaceCheck, resume: Boolean, showDone: Boolean, onStart: () -> Unit) {
     if (plan.tooLargeForFileSystem.isNotEmpty()) {
         Banner(
             "${fileCount(plan.tooLargeForFileSystem.size)} größer als 4 GB – passt nicht auf ein FAT32-Medium: " +
@@ -186,10 +186,13 @@ private fun PlanView(plan: BackupPlan, space: SpaceCheck, onStart: () -> Unit) {
         )
     }
     if (!plan.hasWork) {
-        Banner(
-            "Alles gesichert" + (if (plan.alreadyBackedUp > 0) " – ${fileCount(plan.alreadyBackedUp)} liegen auf dem Medium." else "."),
-            BannerTone.SUCCESS,
-        )
+        // Direkt nach einem erfolgreichen Lauf sagt das Ergebnis darüber schon dasselbe
+        if (showDone) {
+            Banner(
+                "Alles gesichert" + (if (plan.alreadyBackedUp > 0) " – ${fileCount(plan.alreadyBackedUp)} liegen auf dem Medium." else "."),
+                BannerTone.SUCCESS,
+            )
+        }
         return
     }
     if (plan.toCopy.isNotEmpty()) {
@@ -221,12 +224,29 @@ private fun PlanView(plan: BackupPlan, space: SpaceCheck, onStart: () -> Unit) {
         )
     }
     Button(onClick = onStart, enabled = space !is SpaceCheck.NotEnough, modifier = Modifier.fillMaxWidth()) {
-        Text(if (plan.toCopy.isEmpty()) "Ordnerstruktur anpassen" else "Backup starten")
+        Text(
+            when {
+                resume -> "Fortsetzen"
+                plan.toCopy.isEmpty() -> "Ordnerstruktur anpassen"
+                else -> "Backup starten"
+            },
+        )
     }
 }
 
+/** Ergebnis gelöschter Dateien (wiederhergestellt bzw. im Backup gelöscht). */
 @Composable
-private fun ResultView(s: RunSummary, onResume: () -> Unit, onDone: () -> Unit) {
+private fun MissingResultView(m: MissingSummary) {
+    Banner(
+        "${fileCount(m.restored)} wiederhergestellt, ${fileCount(m.deleted)} im Backup gelöscht" +
+            (m.abortReason?.let { " – $it" } ?: ""),
+        if (m.failures.isEmpty() && m.abortReason == null) BannerTone.SUCCESS else BannerTone.WARNING,
+    )
+    m.failures.take(10).forEach { Text("• ${it.name}: ${it.reason}", style = MaterialTheme.typography.bodySmall) }
+}
+
+@Composable
+private fun ResultView(s: RunSummary) {
     Banner(
         if (s.isComplete && s.copied == 0 && s.moved > 0) "Ordnerstruktur angepasst: ${fileCount(s.moved)} verschoben."
         else if (s.isComplete && s.copied == 0 && s.adopted == 0) "Backup abgeschlossen – es gab nichts Neues zu sichern."
@@ -245,11 +265,5 @@ private fun ResultView(s: RunSummary, onResume: () -> Unit, onDone: () -> Unit) 
             "Alles bis zur Unterbrechung ist geprüft gesichert. Beim Fortsetzen werden nur die fehlenden Dateien kopiert.",
             style = MaterialTheme.typography.bodySmall,
         )
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(onClick = onResume) { Text("Fortsetzen") }
-            OutlinedButton(onClick = onDone) { Text("Später") }
-        }
-    } else {
-        Button(onClick = onDone) { Text("OK") }
     }
 }
