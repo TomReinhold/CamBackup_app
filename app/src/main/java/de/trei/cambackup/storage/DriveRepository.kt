@@ -105,7 +105,7 @@ class DriveRepository(private val context: Context) {
         val volume = volumeById(volumeId)
         val space = volume?.directory?.let {
             runCatching { StatFs(it.path).let { s -> DriveSpace(s.availableBytes, s.totalBytes) } }.getOrNull()
-        }
+        } ?: rootSpace(volumeId) ?: fileSpace(folderUri)
         return DriveInfo(
             folderUri = folderUri,
             volumeLabel = volume?.getDescription(context) ?: volumeId,
@@ -128,12 +128,52 @@ class DriveRepository(private val context: Context) {
     /** Der freigegebene Ordner, zu dem eine (Unter-)Ordner-URI gehört. */
     private fun treeOf(uri: Uri): Uri = DocumentsContract.buildTreeDocumentUri(uri.authority, DocumentsContract.getTreeDocumentId(uri))
 
-    /** Liest das Dateisystem aus /proc/mounts (best effort, nicht auf allen Geräten lesbar). */
+    /**
+     * Freier Platz laut Storage Access Framework – Ersatz, wenn der Datenträger keinen für Apps
+     * lesbaren Pfad hat (z. B. USB-Sticks auf Samsung-Geräten).
+     */
+    private fun rootSpace(volumeId: String): DriveSpace? = runCatching {
+        val roots = DocumentsContract.buildRootsUri(EXTERNAL_STORAGE_AUTHORITY)
+        val columns = arrayOf(
+            DocumentsContract.Root.COLUMN_ROOT_ID,
+            DocumentsContract.Root.COLUMN_AVAILABLE_BYTES,
+            DocumentsContract.Root.COLUMN_CAPACITY_BYTES,
+        )
+        context.contentResolver.query(roots, columns, null, null, null)?.use { c ->
+            while (c.moveToNext()) {
+                if (!c.getString(0).equals(volumeId, ignoreCase = true) || c.isNull(1)) continue
+                val free = c.getLong(1)
+                val total = if (c.isNull(2)) 0L else c.getLong(2)
+                return@runCatching DriveSpace(free, maxOf(total, free))
+            }
+        }
+        null
+    }.getOrNull()?.takeIf { it.freeBytes >= 0 }
+
+    /**
+     * Letzter Ausweg: freier Platz des Dateisystems, auf dem die device.json des Backup-Ordners liegt
+     * (fstatvfs auf der geöffneten Datei). Samsung meldet für USB-Datenträger weder Pfad noch Platz.
+     */
+    private fun fileSpace(folderUri: Uri): DriveSpace? = runCatching {
+        val file = DocumentFile.fromTreeUri(context, folderUri)
+            ?.findFile(DeviceRegistry.METADATA_DIR)
+            ?.findFile(DeviceRegistry.DEVICE_FILE)
+            ?: return@runCatching null
+        context.contentResolver.openFileDescriptor(file.uri, "r")?.use { pfd ->
+            val st = android.system.Os.fstatvfs(pfd.fileDescriptor)
+            DriveSpace(st.f_bavail * st.f_frsize, st.f_blocks * st.f_frsize)
+        }
+    }.getOrNull()
+
+    /**
+     * Liest das Dateisystem aus /proc/mounts (best effort, nicht auf allen Geräten lesbar).
+     * Samsung meldet seinen Treiber "sdfat" und nennt das eigentliche Dateisystem in der Option "fs=".
+     */
     private fun readFsType(volumeId: String): String? = runCatching {
         File("/proc/mounts").readLines()
             .map { it.split(' ') }
-            .firstOrNull { it.size > 2 && it[1] == "/mnt/media_rw/$volumeId" }
-            ?.get(2)
+            .firstOrNull { it.size > 3 && it[1] == "/mnt/media_rw/$volumeId" }
+            ?.let { parts -> parts[3].split(',').firstOrNull { it.startsWith("fs=") }?.substringAfter("fs=") ?: parts[2] }
     }.getOrNull()
 
     private companion object {
