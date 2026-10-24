@@ -53,6 +53,11 @@ dependencies {
     implementation(libs.androidx.work.runtime.ktx)
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.androidx.exifinterface)
+    implementation(libs.androidx.media3.transformer)
+    implementation(libs.androidx.media3.effect)
+    implementation(libs.androidx.media3.common)
+    implementation(libs.androidx.media3.muxer)
+    implementation(libs.androidx.media3.container)
     implementation(libs.androidx.material.icons.core)
     implementation(libs.kotlinx.serialization.json)
 
