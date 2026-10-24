@@ -101,7 +101,7 @@ class BackupViewModel(app: Application) : AndroidViewModel(app) {
 
     private fun startIfPossible(folderUri: String, ready: BackupState.Ready) {
         // Sicherheitsnetz: die UI bietet den Start bei zu wenig Platz gar nicht erst an
-        if (ready.space is SpaceCheck.NotEnough || ready.plan.toCopy.isEmpty()) return
+        if (ready.space is SpaceCheck.NotEnough || !ready.plan.hasWork) return
         BackupWorker.start(getApplication(), folderUri)
     }
 

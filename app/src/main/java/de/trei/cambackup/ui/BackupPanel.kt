@@ -34,6 +34,7 @@ import de.trei.cambackup.backup.SpaceCheck
 import de.trei.cambackup.ui.components.Banner
 import de.trei.cambackup.ui.components.BannerTone
 import de.trei.cambackup.ui.components.FeatureCard
+import de.trei.cambackup.ui.settings.layoutLabel
 import de.trei.cambackup.util.fileCount
 import de.trei.cambackup.util.formatBytes
 import de.trei.cambackup.util.formatRemaining
@@ -118,7 +119,13 @@ fun BackupPanel(folderUri: String, onBackupFinished: () -> Unit, vm: BackupViewM
 
             is BackupState.Running -> {
                 val p = s.progress
-                if (p == null || p.bytesTotal == 0L) {
+                if (p != null && p.moving) {
+                    Text("Neue Ordnerstruktur: ${minOf(p.fileIndex + 1, p.fileCount)} von ${p.fileCount} Dateien verschoben")
+                    LinearProgressIndicator(
+                        progress = { if (p.fileCount > 0) p.fileIndex.toFloat() / p.fileCount else 0f },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                } else if (p == null || p.bytesTotal == 0L) {
                     Text("Backup wird vorbereitet …")
                     LinearProgressIndicator(Modifier.fillMaxWidth())
                 } else {
@@ -167,16 +174,27 @@ private fun PlanView(plan: BackupPlan, space: SpaceCheck, onStart: () -> Unit) {
             BannerTone.WARNING,
         )
     }
-    if (plan.toCopy.isEmpty()) {
+    if (plan.toMove.isNotEmpty()) {
+        val from = plan.currentLayout?.let { d ->
+            " (bisher: ${layoutLabel(d.layout)}" + (if (d.separateFolders) ", je Medienordner" else "") + ")"
+        }.orEmpty()
+        Banner(
+            "Neue Ordnerstruktur: ${fileCount(plan.toMove.size)} liegen noch in der bisherigen Ablage$from und werden " +
+                "beim Backup auf dem Medium verschoben. Der Inhalt bleibt unverändert, es wird nichts neu kopiert.",
+        )
+    }
+    if (!plan.hasWork) {
         Banner(
             "Alles gesichert" + (if (plan.alreadyBackedUp > 0) " – ${fileCount(plan.alreadyBackedUp)} liegen auf dem Medium." else "."),
             BannerTone.SUCCESS,
         )
         return
     }
-    Row {
-        Text("Neu zu sichern", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
-        Text("${fileCount(plan.toCopy.size)} · ${formatBytes(plan.bytesToCopy)}", style = MaterialTheme.typography.titleSmall)
+    if (plan.toCopy.isNotEmpty()) {
+        Row {
+            Text("Neu zu sichern", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+            Text("${fileCount(plan.toCopy.size)} · ${formatBytes(plan.bytesToCopy)}", style = MaterialTheme.typography.titleSmall)
+        }
     }
     if (plan.alreadyBackedUp > 0) {
         Row {
@@ -201,18 +219,20 @@ private fun PlanView(plan: BackupPlan, space: SpaceCheck, onStart: () -> Unit) {
         )
     }
     Button(onClick = onStart, enabled = space !is SpaceCheck.NotEnough, modifier = Modifier.fillMaxWidth()) {
-        Text("Backup starten")
+        Text(if (plan.toCopy.isEmpty()) "Ordnerstruktur anpassen" else "Backup starten")
     }
 }
 
 @Composable
 private fun ResultView(s: RunSummary, onResume: () -> Unit, onDone: () -> Unit) {
     Banner(
-        if (s.isComplete) "Backup abgeschlossen: ${fileCount(s.copied)} (${formatBytes(s.bytesCopied)}) kopiert und geprüft."
+        if (s.isComplete && s.copied == 0 && s.moved > 0) "Ordnerstruktur angepasst: ${fileCount(s.moved)} verschoben."
+        else if (s.isComplete) "Backup abgeschlossen: ${fileCount(s.copied)} (${formatBytes(s.bytesCopied)}) kopiert und geprüft."
         else "Backup unvollständig: ${fileCount(s.copied)} kopiert" + (s.abortReason?.let { " – $it" } ?: ""),
         if (s.isComplete) BannerTone.SUCCESS else BannerTone.WARNING,
     )
     if (s.adopted > 0) Text("Bereits vorhanden und übernommen: ${fileCount(s.adopted)}", style = MaterialTheme.typography.bodySmall)
+    if (s.moved > 0) Text("In die neue Ordnerstruktur verschoben: ${fileCount(s.moved)}", style = MaterialTheme.typography.bodySmall)
     if (s.failures.isNotEmpty()) {
         Text("Fehler bei ${fileCount(s.failures.size)}:", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)
         s.failures.take(10).forEach { Text("• ${it.name}: ${it.reason}", style = MaterialTheme.typography.bodySmall) }

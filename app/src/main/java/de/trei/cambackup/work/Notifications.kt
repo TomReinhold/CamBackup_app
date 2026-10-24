@@ -44,11 +44,24 @@ object Notifications {
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle("Backup läuft")
             .setContentText(
-                if (p == null || p.fileCount == 0) "Wird vorbereitet …"
-                else "${formatBytes(p.bytesDone / 2)} von ${formatBytes(p.bytesTotal / 2)}" +
-                    (if (p.remainingSeconds >= 0) " · ${formatRemaining(p.remainingSeconds)}" else ""),
+                when {
+                    p == null || p.fileCount == 0 -> "Wird vorbereitet …"
+                    p.moving -> "Neue Ordnerstruktur: ${minOf(p.fileIndex + 1, p.fileCount)} von ${p.fileCount} verschoben"
+                    else -> "${formatBytes(p.bytesDone / 2)} von ${formatBytes(p.bytesTotal / 2)}" +
+                        (if (p.remainingSeconds >= 0) " · ${formatRemaining(p.remainingSeconds)}" else "")
+                },
             )
-            .setProgress(1000, p?.let { if (it.bytesTotal > 0) (it.bytesDone * 1000 / it.bytesTotal).toInt() else 0 } ?: 0, p == null)
+            .setProgress(
+                1000,
+                p?.let {
+                    when {
+                        it.moving -> if (it.fileCount > 0) it.fileIndex * 1000 / it.fileCount else 0
+                        it.bytesTotal > 0 -> (it.bytesDone * 1000 / it.bytesTotal).toInt()
+                        else -> 0
+                    }
+                } ?: 0,
+                p == null,
+            )
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setContentIntent(openApp(context))
@@ -62,6 +75,7 @@ object Notifications {
             .setContentText(
                 buildString {
                     append("${fileCount(s.copied)} gesichert (${formatBytes(s.bytesCopied)})")
+                    if (s.moved > 0) append(", ${s.moved} umsortiert")
                     if (s.failures.isNotEmpty()) append(", ${s.failures.size} Fehler")
                     s.abortReason?.let { append(" – $it") }
                 },

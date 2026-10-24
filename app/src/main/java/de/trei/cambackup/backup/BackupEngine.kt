@@ -25,6 +25,8 @@ data class BackupProgress(
     val bytesTotal: Long,
     /** Geschätzte Restdauer in Sekunden, -1 solange noch keine Schätzung möglich ist. */
     val remainingSeconds: Long = -1,
+    /** true: gesicherte Dateien werden in die neue Ordnerstruktur verschoben (fileIndex/fileCount zählen diese). */
+    val moving: Boolean = false,
 )
 
 data class BackupFailure(val item: MediaItem, val reason: String)

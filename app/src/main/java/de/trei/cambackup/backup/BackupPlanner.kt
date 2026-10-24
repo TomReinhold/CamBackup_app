@@ -13,8 +13,13 @@ data class BackupPlan(
     val alreadyBackedUp: Int,
     /** Dateien > 4 GB, die auf FAT32 nicht gespeichert werden können. */
     val tooLargeForFileSystem: List<MediaItem>,
+    /** Bereits gesicherte Dateien, die für die eingestellte Ablage in einen anderen Ordner gehören. */
+    val toMove: List<Relocation> = emptyList(),
+    /** Ablage, die auf dem Medium bisher vorliegt (aus dem Index erkannt). */
+    val currentLayout: DetectedLayout? = null,
 ) {
     val bytesToCopy: Long = toCopy.sumOf { it.sizeBytes }
+    val hasWork: Boolean get() = toCopy.isNotEmpty() || toMove.isNotEmpty()
 }
 
 val MediaItem.phonePath: String get() = relativePath + displayName

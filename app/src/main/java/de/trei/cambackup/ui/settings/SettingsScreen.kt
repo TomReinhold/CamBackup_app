@@ -516,7 +516,7 @@ private fun FolderSettings(folders: List<MediaFolder>?, selected: Set<String>, o
         Hint(
             if (selected.size > 1) {
                 "Mehrere Ordner: Auf dem Speichermedium bekommt jeder einen eigenen Unterordner (z. B. „DCIM/Camera/2026/10“). " +
-                    "Bereits gesicherte Dateien bleiben, wo sie sind."
+                    "Bereits gesicherte Dateien werden beim nächsten Backup dorthin verschoben."
             } else {
                 "Bei einem Ordner liegen die Sicherungen direkt im Geräteordner. Bei mehreren bekommt jeder einen eigenen Unterordner."
             },
@@ -666,7 +666,7 @@ private fun StorageSettings(s: CompressionSettings, update: Update) {
             selected = s.folderLayout,
             optionLabel = ::layoutShort,
             onSelect = { v -> update { it.copy(folderLayout = v) } },
-            hint = "Gilt für neu gesicherte Dateien – bereits gesicherte bleiben, wo sie sind.",
+            hint = "Bereits gesicherte Dateien werden beim nächsten Backup automatisch in diese Struktur verschoben.",
         )
         FolderPreview(s.folderLayout, s.separateFolders)
         Hint(
@@ -682,7 +682,7 @@ private fun layoutShort(layout: FolderLayout) = when (layout) {
     FolderLayout.YEAR_MONTH -> "Jahr / Monat"
 }
 
-private fun layoutLabel(layout: FolderLayout) = when (layout) {
+fun layoutLabel(layout: FolderLayout) = when (layout) {
     FolderLayout.FLAT -> "Ohne Unterordner"
     FolderLayout.YEAR -> "Nach Jahr"
     FolderLayout.YEAR_MONTH -> "Nach Jahr und Monat"

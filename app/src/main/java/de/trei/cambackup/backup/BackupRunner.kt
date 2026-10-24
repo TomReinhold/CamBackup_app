@@ -59,7 +59,13 @@ class BackupRunner(private val context: Context) {
         val info = drives.info(deviceDir.uri)
         val folders = settings.current().mediaFolders
         val items = scanner.scan(folders)
-        val plan = planBackup(items, index.state, info.fsType)
+        val s = settings.current()
+        // Wurde die Ablage geändert (Einstellung oder weiterer Medienordner), werden bereits gesicherte
+        // Dateien beim Backup in die neue Struktur verschoben – wo sie liegen, steht im Index
+        val plan = planBackup(items, index.state, info.fsType).copy(
+            toMove = planRelocation(index.state, s.folderLayout, s.separateFolders),
+            currentLayout = detectLayout(index.state),
+        )
         val missing = findMissing(items, index.state, folders)
         val uris = withContext(Dispatchers.IO) {
             val dirs = DirCache(deviceDir)
@@ -92,10 +98,18 @@ class BackupRunner(private val context: Context) {
         val cache = IndexCache.get(context)
         var lastShown = 0L
         return withContext(NonCancellable) {
+            val stop = { abortReason() ?: if (!caller.isActive) "Abgebrochen" else null }
+            // Erst umsortieren (schnell, nur Verschieben auf dem Medium), dann neue Dateien kopieren
+            val relocation = if (prepared.plan.toMove.isEmpty()) null else {
+                Relocator(context).run(prepared.deviceDir, prepared.index, prepared.plan.toMove, stop) { done, total ->
+                    onProgress(BackupProgress(done, total, 0, 0, moving = true))
+                }
+            }
+            val plan = if (relocation?.abortReason != null) prepared.plan.copy(toCopy = emptyList()) else prepared.plan
             val result = engine.run(
-                prepared.deviceDir, prepared.plan, prepared.index,
+                prepared.deviceDir, plan, prepared.index,
                 targetDir = { backupDirFor(it.relativePath, it.dateTakenMillis, s.folderLayout, s.separateFolders) },
-                abortReason = { abortReason() ?: if (!caller.isActive) "Abgebrochen" else null },
+                abortReason = stop,
                 onProgress = { p ->
                     // Übersicht und Galerie zeigen den Fortschritt live (etwa alle 2 Sekunden)
                     val now = SystemClock.elapsedRealtime()
@@ -106,14 +120,17 @@ class BackupRunner(private val context: Context) {
                     onProgress(p)
                 },
             )
-            val finishError = runCatching { finish(prepared, result) }.exceptionOrNull()
-            summaryOf(result, finishError?.let { "Abschluss fehlgeschlagen: ${it.message}" })
+            val merged = relocation?.let { r ->
+                result.copy(abortReason = r.abortReason ?: result.abortReason)
+            } ?: result
+            val finishError = runCatching { finish(prepared, merged, relocation) }.exceptionOrNull()
+            summaryOf(merged, finishError?.let { "Abschluss fehlgeschlagen: ${it.message}" }, relocation)
         }
     }
 
-    private suspend fun finish(p: Prepared, result: BackupResult) = withContext(Dispatchers.IO) {
+    private suspend fun finish(p: Prepared, result: BackupResult, relocation: RelocationResult?) = withContext(Dispatchers.IO) {
         val now = Instant.now()
-        val line = logLine(now, result)
+        val line = logLine(now, result, relocation)
         if (!p.deviceDir.exists()) {
             // Medium schon getrennt: Protokollzeile merken und beim nächsten Lauf nachtragen
             pendingLog(p.deviceDir).appendText(line)
@@ -122,7 +139,7 @@ class BackupRunner(private val context: Context) {
         p.index.compact()
         IndexCache.get(context).update(p.index.state)
         engine.cleanupStaging(p.deviceDir)
-        if (result.copied + result.adopted > 0) registry.markBackup(p.deviceDir, now)
+        if (result.copied + result.adopted + (relocation?.moved ?: 0) > 0) registry.markBackup(p.deviceDir, now)
         val written = runCatching {
             io.appendText(p.deviceDir.findFile(DeviceRegistry.METADATA_DIR) ?: throw IOException("Metadata fehlt"), LOG_FILE, line)
         }
@@ -137,22 +154,25 @@ class BackupRunner(private val context: Context) {
         runCatching { io.appendText(metadata, LOG_FILE, pending.readText()) }.onSuccess { pending.delete() }
     }
 
-    private fun logLine(now: Instant, result: BackupResult) = buildString {
+    private fun logLine(now: Instant, result: BackupResult, relocation: RelocationResult?) = buildString {
         append("$now  Backup: ${result.copied} kopiert (${formatBytes(result.bytesCopied)})")
         if (result.adopted > 0) append(", ${result.adopted} übernommen")
-        append(", ${result.failures.size} Fehler")
+        relocation?.let { append(", ${it.moved} in die neue Ordnerstruktur verschoben") }
+        append(", ${result.failures.size + (relocation?.failures?.size ?: 0)} Fehler")
         result.abortReason?.let { append(" – abgebrochen: $it") }
         append("\n")
+        relocation?.failures?.forEach { append("    Fehler beim Verschieben: ${it.name}: ${it.reason}\n") }
         result.failures.forEach { append("    Fehler: ${it.item.phonePath}: ${it.reason}\n") }
     }
 
-    private fun summaryOf(result: BackupResult?, extraAbort: String?) = RunSummary(
+    private fun summaryOf(result: BackupResult?, extraAbort: String?, relocation: RelocationResult? = null) = RunSummary(
         finishedAt = Instant.now().toString(),
         copied = result?.copied ?: 0,
         adopted = result?.adopted ?: 0,
         bytesCopied = result?.bytesCopied ?: 0,
-        failures = result?.failures.orEmpty().map { RunSummary.Failure(it.item.displayName, it.reason) },
+        failures = relocation?.failures.orEmpty() + result?.failures.orEmpty().map { RunSummary.Failure(it.item.displayName, it.reason) },
         abortReason = result?.abortReason ?: extraAbort,
+        moved = relocation?.moved ?: 0,
     )
 
     companion object {

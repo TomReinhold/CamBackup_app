@@ -221,7 +221,8 @@ class FreeUpRunner(private val context: Context) {
 
     private suspend fun replaceOne(p: PendingReplacement, index: BackupIndex, dirs: DirCache) {
         val uri = Uri.parse(p.uri)
-        val entry = index.state.forPhonePath(p.phonePath).lastOrNull { it.backupPath == p.backupPath }
+        // Über die Prüfsumme statt den Pfad: die Sicherung kann seit der Vorbereitung umsortiert worden sein
+        val entry = index.state.forPhonePath(p.phonePath).lastOrNull { it.originalSha256 == p.originalSha256 }
             ?: throw IOException("Kein Index-Eintrag")
         val backup = backupFile(dirs, entry) ?: throw IOException("Sicherung auf dem Medium fehlt")
         if (backup.length() != entry.originalSize) throw IOException("Sicherung auf dem Medium unvollständig")

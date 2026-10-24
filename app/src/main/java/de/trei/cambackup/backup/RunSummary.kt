@@ -19,6 +19,8 @@ data class RunSummary(
     val failures: List<Failure>,
     /** Gesetzt, wenn der Lauf vorzeitig endete oder gar nicht starten konnte. */
     val abortReason: String?,
+    /** In die neue Ordnerstruktur verschobene, bereits gesicherte Dateien. */
+    val moved: Int = 0,
 ) {
     @Serializable
     data class Failure(val name: String, val reason: String)

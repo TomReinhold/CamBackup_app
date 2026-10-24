@@ -73,6 +73,15 @@ class BackupWorker(context: Context, params: WorkerParameters) : CoroutineWorker
                         }
                     }
                     runner.execute(prepared, abortReason) { run ->
+                        if (run.moving) {
+                            // Umsortieren: nur Dateien zählen, keine Bytes und keine Restzeit
+                            val now = SystemClock.elapsedRealtime()
+                            if (now - lastPublish >= PUBLISH_INTERVAL_MS || run.fileIndex == run.fileCount) {
+                                lastPublish = now
+                                publish(run)
+                            }
+                            return@execute
+                        }
                         val p = offset.apply(run)
                         val now = SystemClock.elapsedRealtime()
                         val remaining = eta.update(now, p.bytesDone, p.bytesTotal)
@@ -106,6 +115,7 @@ class BackupWorker(context: Context, params: WorkerParameters) : CoroutineWorker
                 KEY_REMAINING to p.remainingSeconds,
                 KEY_BYTES_DONE to p.bytesDone,
                 KEY_BYTES_TOTAL to p.bytesTotal,
+                KEY_MOVING to p.moving,
             ),
         )
         notifications.notify(
@@ -125,6 +135,7 @@ class BackupWorker(context: Context, params: WorkerParameters) : CoroutineWorker
         private const val KEY_REMAINING = "remaining"
         private const val KEY_BYTES_DONE = "bytesDone"
         private const val KEY_BYTES_TOTAL = "bytesTotal"
+        private const val KEY_MOVING = "moving"
 
         fun start(context: Context, folderUri: String) {
             val request = OneTimeWorkRequestBuilder<BackupWorker>()
@@ -149,6 +160,7 @@ class BackupWorker(context: Context, params: WorkerParameters) : CoroutineWorker
                 bytesDone = data.getLong(KEY_BYTES_DONE, 0),
                 bytesTotal = total,
                 remainingSeconds = data.getLong(KEY_REMAINING, -1),
+                moving = data.getBoolean(KEY_MOVING, false),
             )
         }
     }
