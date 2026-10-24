@@ -5,6 +5,7 @@ import android.app.PendingIntent
 import android.net.Uri
 import android.provider.MediaStore
 import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
@@ -14,6 +15,7 @@ import de.trei.cambackup.freeup.FreeUpRunner
 import de.trei.cambackup.freeup.FreeUpStore
 import de.trei.cambackup.freeup.FreeUpSummary
 import de.trei.cambackup.freeup.PendingBatch
+import de.trei.cambackup.freeup.PendingReplacement
 import de.trei.cambackup.settings.SettingsRepository
 import de.trei.cambackup.work.FreeUpWorker
 import kotlinx.coroutines.Job
@@ -35,7 +37,7 @@ sealed interface FreeUpState {
     data class Error(val message: String) : FreeUpState
 }
 
-class FreeUpViewModel(app: Application) : AndroidViewModel(app) {
+class FreeUpViewModel(app: Application, private val saved: SavedStateHandle) : AndroidViewModel(app) {
 
     private val runner = FreeUpRunner(app)
     private val store = FreeUpStore.get(app)
@@ -70,11 +72,16 @@ class FreeUpViewModel(app: Application) : AndroidViewModel(app) {
 
     fun prepare(folderUri: String) = FreeUpWorker.prepare(getApplication(), folderUri, TAG_PREPARE)
 
-    /** System-Dialog, in dem der Nutzer dem Ändern der Dateien zustimmt. */
-    fun writeRequest(batch: PendingBatch): PendingIntent =
-        MediaStore.createWriteRequest(getApplication<Application>().contentResolver, batch.items.map { Uri.parse(it.uri) })
+    /**
+     * System-Dialog, in dem der Nutzer dem Ändern der Dateien zustimmt – nur für [items] (null = ganzer Stapel).
+     * Die Auswahl übersteht im SavedStateHandle auch ein Beenden der App während des Dialogs.
+     */
+    fun writeRequest(batch: PendingBatch, items: List<PendingReplacement>? = null): PendingIntent {
+        saved[KEY_SELECTION] = items?.map { it.mediaId }?.toLongArray()
+        return MediaStore.createWriteRequest(getApplication<Application>().contentResolver, (items ?: batch.items).map { Uri.parse(it.uri) })
+    }
 
-    fun replaceApproved() = FreeUpWorker.replace(getApplication(), TAG_REPLACE)
+    fun replaceApproved() = FreeUpWorker.replace(getApplication(), TAG_REPLACE, saved.get<LongArray>(KEY_SELECTION))
 
     fun cancel() = FreeUpWorker.cancel(getApplication())
 
@@ -94,5 +101,6 @@ class FreeUpViewModel(app: Application) : AndroidViewModel(app) {
     private companion object {
         const val TAG_PREPARE = "freeup-prepare"
         const val TAG_REPLACE = "freeup-replace"
+        const val KEY_SELECTION = "selection"
     }
 }

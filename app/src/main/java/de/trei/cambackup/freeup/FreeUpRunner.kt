@@ -143,8 +143,9 @@ class FreeUpRunner(private val context: Context) {
     /**
      * Ersetzt die vorbereiteten Dateien. Setzt voraus, dass der Nutzer per MediaStore.createWriteRequest
      * zugestimmt hat. Läuft bis zum Ende der aktuellen Datei auch bei Abbruch weiter (NonCancellable).
+     * Mit [only] wird nur diese Auswahl ersetzt (Test mit wenigen Dateien); der Rest bleibt vorbereitet.
      */
-    suspend fun replace(onProgress: (FreeUpProgress) -> Unit): FreeUpSummary {
+    suspend fun replace(only: Set<Long>? = null, onProgress: (FreeUpProgress) -> Unit): FreeUpSummary {
         val batch = store.batch.value ?: return summary(0, 0, emptyList(), "Nichts vorbereitet")
         if (settings.current().dryRun) return summary(0, 0, emptyList(), "Probelauf ist aktiv – es wurde nichts ersetzt")
         val caller = currentCoroutineContext()
@@ -156,14 +157,15 @@ class FreeUpRunner(private val context: Context) {
             var saved = 0L
             val failures = mutableListOf<FreeUpSummary.Failure>()
             var abort: String? = null
-            var processed = 0
-            for ((i, p) in batch.items.withIndex()) {
+            val work = if (only == null) batch.items else batch.items.filter { it.mediaId in only }
+            val processed = mutableSetOf<Long>()
+            for ((i, p) in work.withIndex()) {
                 if (!caller.isActive) {
                     abort = "Abgebrochen"
                     break
                 }
-                processed = i + 1
-                onProgress(FreeUpProgress(i, batch.items.size, p.displayName, replacing = true))
+                processed += p.mediaId
+                onProgress(FreeUpProgress(i, work.size, p.displayName, replacing = true))
                 try {
                     replaceOne(p, opened.index, dirs)
                     replaced++
@@ -185,7 +187,7 @@ class FreeUpRunner(private val context: Context) {
             }
             IndexCache.get(context).update(opened.index.state)
             // Nicht bearbeitete Dateien bleiben vorbereitet (z. B. nach Abbruch)
-            val rest = batch.items.drop(processed)
+            val rest = batch.items.filter { it.mediaId !in processed }
             store.saveBatch(batch.copy(items = rest).takeIf { rest.isNotEmpty() })
             if (rest.isEmpty()) images.clearCache()
             summary(replaced, saved, failures, abort)
@@ -210,6 +212,11 @@ class FreeUpRunner(private val context: Context) {
             io.writeSynced(uri, p.displayName) { out -> newFile.inputStream().use { it.copyTo(out, 1 shl 20) } }
             if (hashOf(uri) != p.newSha256) throw IOException("Prüfsumme nach dem Ersetzen falsch")
         } catch (e: Exception) {
+            // Scheitert schon das Öffnen (z. B. keine Schreibberechtigung), ist das Original noch unverändert
+            if (runCatching { hashOf(uri) == entry.originalSha256 }.getOrDefault(false)) {
+                index.record(entry.asVerifiedOnly())
+                throw IOException("Ersetzen fehlgeschlagen (${e.message}) – Original unverändert", e)
+            }
             restoreOriginal(uri, p, backup, index, entry)
             throw IOException("Ersetzen fehlgeschlagen (${e.message}) – Original wiederhergestellt", e)
         }
