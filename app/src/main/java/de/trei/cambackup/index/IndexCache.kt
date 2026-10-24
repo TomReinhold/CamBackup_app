@@ -31,6 +31,11 @@ class IndexCache private constructor(context: Context) {
         _entries.value = list
     }
 
+    /** Zwischenstand während eines Laufs nur anzeigen (ohne zu speichern) – am Ende folgt [update]. */
+    fun show(state: IndexState) {
+        _entries.value = state.entries.toList()
+    }
+
     private fun load(): List<IndexEntry> = runCatching { json.decodeFromString(serializer, file.readText()) }.getOrDefault(emptyList())
 
     companion object {

@@ -1,6 +1,10 @@
 package de.trei.cambackup.library
 
 import android.app.Application
+import android.database.ContentObserver
+import android.os.Handler
+import android.os.Looper
+import android.provider.MediaStore
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import de.trei.cambackup.index.IndexCache
@@ -10,6 +14,7 @@ import de.trei.cambackup.media.MediaItem
 import de.trei.cambackup.media.MediaPermissions
 import de.trei.cambackup.media.MediaScanner
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -62,11 +67,30 @@ class LibraryViewModel(app: Application) : AndroidViewModel(app) {
         }
     }.stateIn(viewModelScope, SharingStarted.Eagerly, LibraryState.Loading)
 
+    /** Neue, gelöschte oder ersetzte Fotos/Videos: kurz sammeln, dann einmal neu einlesen. */
+    private val mediaObserver = object : ContentObserver(Handler(Looper.getMainLooper())) {
+        override fun onChange(selfChange: Boolean) {
+            debounce?.cancel()
+            debounce = viewModelScope.launch {
+                delay(MEDIA_DEBOUNCE_MS)
+                refresh()
+            }
+        }
+    }
+    private var debounce: Job? = null
+
     init {
         // Neu einlesen, sobald sich die Auswahl der Medienordner ändert
         viewModelScope.launch {
             settings.settings.map { it.mediaFolders }.distinctUntilChanged().drop(1).collect { refresh() }
         }
+        listOf(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, MediaStore.Video.Media.EXTERNAL_CONTENT_URI).forEach {
+            app.contentResolver.registerContentObserver(it, true, mediaObserver)
+        }
+    }
+
+    override fun onCleared() {
+        getApplication<Application>().contentResolver.unregisterContentObserver(mediaObserver)
     }
 
     /** Berechtigung prüfen und Medienordner neu einlesen (z. B. nach Rückkehr in die App). */
@@ -88,3 +112,5 @@ class LibraryViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 }
+
+private const val MEDIA_DEBOUNCE_MS = 1_000L

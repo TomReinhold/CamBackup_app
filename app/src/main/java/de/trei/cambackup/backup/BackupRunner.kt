@@ -2,6 +2,7 @@ package de.trei.cambackup.backup
 
 import android.content.Context
 import android.net.Uri
+import android.os.SystemClock
 import de.trei.cambackup.storage.DirCache
 import androidx.documentfile.provider.DocumentFile
 import de.trei.cambackup.index.BackupIndex
@@ -86,12 +87,22 @@ class BackupRunner(private val context: Context) {
         // NonCancellable: das Ende des Laufs wird immer sauber abgeschlossen; der Abbruch wird
         // stattdessen zwischen den Datenblöcken über abortReason abgefragt.
         val s = settings.current()
+        val cache = IndexCache.get(context)
+        var lastShown = 0L
         return withContext(NonCancellable) {
             val result = engine.run(
                 prepared.deviceDir, prepared.plan, prepared.index,
                 targetDir = { backupDirFor(it.relativePath, it.dateTakenMillis, s.folderLayout, s.separateFolders) },
                 abortReason = { abortReason() ?: if (!caller.isActive) "Abgebrochen" else null },
-                onProgress = onProgress,
+                onProgress = { p ->
+                    // Übersicht und Galerie zeigen den Fortschritt live (etwa alle 2 Sekunden)
+                    val now = SystemClock.elapsedRealtime()
+                    if (now - lastShown >= LIVE_INTERVAL_MS) {
+                        lastShown = now
+                        cache.show(prepared.index.state)
+                    }
+                    onProgress(p)
+                },
             )
             val finishError = runCatching { finish(prepared, result) }.exceptionOrNull()
             summaryOf(result, finishError?.let { "Abschluss fehlgeschlagen: ${it.message}" })
@@ -128,6 +139,7 @@ class BackupRunner(private val context: Context) {
 
     companion object {
         private const val LOG_FILE = "backup_log.txt"
+        private const val LIVE_INTERVAL_MS = 2_000L
 
         /**
          * Nur ein Lauf gleichzeitig: Nach einem Abbruch schließt der alte Job seine aktuelle Datei
