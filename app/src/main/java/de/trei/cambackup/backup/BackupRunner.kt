@@ -19,6 +19,7 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.withContext
+import java.io.File
 import java.io.IOException
 import java.time.Instant
 
@@ -50,6 +51,7 @@ class BackupRunner(private val context: Context) {
         val metadata = withContext(Dispatchers.IO) { deviceDir.findFile(DeviceRegistry.METADATA_DIR) }
             ?: throw IOException("Ordner Metadata fehlt")
         val index = BackupIndex.open(io, metadata)
+        withContext(Dispatchers.IO) { flushPendingLog(deviceDir, metadata) }
         IndexCache.get(context).update(index.state)
         // Reste abgebrochener Läufe vor der Platzprüfung entfernen
         engine.cleanupStaging(deviceDir)
@@ -110,22 +112,38 @@ class BackupRunner(private val context: Context) {
     }
 
     private suspend fun finish(p: Prepared, result: BackupResult) = withContext(Dispatchers.IO) {
-        if (!p.deviceDir.exists()) return@withContext
+        val now = Instant.now()
+        val line = logLine(now, result)
+        if (!p.deviceDir.exists()) {
+            // Medium schon getrennt: Protokollzeile merken und beim nächsten Lauf nachtragen
+            pendingLog(p.deviceDir).appendText(line)
+            return@withContext
+        }
         p.index.compact()
         IndexCache.get(context).update(p.index.state)
         engine.cleanupStaging(p.deviceDir)
-        val now = Instant.now()
         if (result.copied + result.adopted > 0) registry.markBackup(p.deviceDir, now)
-        val metadata = p.deviceDir.findFile(DeviceRegistry.METADATA_DIR) ?: return@withContext
-        val line = buildString {
-            append("$now  Backup: ${result.copied} kopiert (${formatBytes(result.bytesCopied)})")
-            if (result.adopted > 0) append(", ${result.adopted} übernommen")
-            append(", ${result.failures.size} Fehler")
-            result.abortReason?.let { append(" – abgebrochen: $it") }
-            append("\n")
-            result.failures.forEach { append("    Fehler: ${it.item.phonePath}: ${it.reason}\n") }
+        val written = runCatching {
+            io.appendText(p.deviceDir.findFile(DeviceRegistry.METADATA_DIR) ?: throw IOException("Metadata fehlt"), LOG_FILE, line)
         }
-        io.appendText(metadata, LOG_FILE, line)
+        if (written.isFailure) pendingLog(p.deviceDir).appendText(line)
+    }
+
+    /** Protokollzeilen von Läufen, die nach dem Trennen des Mediums nicht mehr geschrieben werden konnten. */
+    private fun pendingLog(deviceDir: DocumentFile) = File(context.filesDir, "pending_log_${deviceDir.uri.toString().hashCode()}.txt")
+
+    private fun flushPendingLog(deviceDir: DocumentFile, metadata: DocumentFile) {
+        val pending = pendingLog(deviceDir).takeIf { it.exists() } ?: return
+        runCatching { io.appendText(metadata, LOG_FILE, pending.readText()) }.onSuccess { pending.delete() }
+    }
+
+    private fun logLine(now: Instant, result: BackupResult) = buildString {
+        append("$now  Backup: ${result.copied} kopiert (${formatBytes(result.bytesCopied)})")
+        if (result.adopted > 0) append(", ${result.adopted} übernommen")
+        append(", ${result.failures.size} Fehler")
+        result.abortReason?.let { append(" – abgebrochen: $it") }
+        append("\n")
+        result.failures.forEach { append("    Fehler: ${it.item.phonePath}: ${it.reason}\n") }
     }
 
     private fun summaryOf(result: BackupResult?, extraAbort: String?) = RunSummary(
