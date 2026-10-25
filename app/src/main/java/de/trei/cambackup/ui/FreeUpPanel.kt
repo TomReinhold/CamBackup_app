@@ -67,8 +67,8 @@ fun FreeUpPanel(folderUri: String, onFinished: () -> Unit, vm: FreeUpViewModel =
     // Ergebnis verschwindet, sobald die App verlassen wird – ohne „OK“
     LifecycleEventEffect(Lifecycle.Event.ON_STOP) { vm.dismissResult() }
 
-    // System-Dialog „Darf CamBackup diese Dateien ändern?“ – erst danach wird verkleinert. Normalerweise
-    // einer für alle Dateien; passt die Liste nicht in eine Abfrage, nacheinander in Hälften
+    // System-Dialog „Darf CamBackup diese Dateien ändern?“ – erst danach wird verkleinert. Bei sehr vielen
+    // Dateien mehrere Dialoge nacheinander; lässt sich eine Abfrage nicht anlegen, wird sie halbiert
     var pending by remember { mutableStateOf(emptyList<List<Uri>>()) }
     val scope = rememberCoroutineScope()
     val writeRequest = rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->

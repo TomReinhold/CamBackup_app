@@ -100,16 +100,20 @@ class FreeUpViewModel(app: Application) : AndroidViewModel(app) {
 
     /**
      * Dateien für den System-Dialog, in dem der Nutzer dem Ändern zustimmt – nur solche, für die
-     * es noch keine Zustimmung gibt. Normalerweise alles in EINER Abfrage; ist die Liste dafür zu lang,
-     * teilt das Panel sie beim Anzeigen auf. Die Abfrage selbst erzeugt [writeRequest] erst direkt davor –
-     * Android verwirft eine Abfrage, sobald die nächste angelegt wird.
+     * es noch keine Zustimmung gibt. Möglichst wenige Abfragen, aber höchstens [WRITE_REQUEST_MAX]
+     * Dateien je Abfrage: darüber passt die Liste nicht mehr in die 1 MB, die Android zwischen App und
+     * System erlaubt, und der Dialog bricht wortlos ab. Gleich große Teile, damit kein kleiner Rest
+     * übrig bleibt. Die Abfrage selbst erzeugt [writeRequest] erst direkt davor – Android verwirft eine
+     * Abfrage, sobald die nächste angelegt wird.
      */
     suspend fun writeChunks(o: FreeUpOverview, minAgeDays: Int): List<List<Uri>> = withContext(Dispatchers.Default) {
         val app = getApplication<Application>()
-        compressTargets(o.candidates, minAgeDays, System.currentTimeMillis())
+        val uris = compressTargets(o.candidates, minAgeDays, System.currentTimeMillis())
             .map { it.item.uri }
             .filter { app.checkUriPermission(it, Process.myPid(), Process.myUid(), Intent.FLAG_GRANT_WRITE_URI_PERMISSION) != PackageManager.PERMISSION_GRANTED }
-            .let { if (it.isEmpty()) emptyList() else listOf(it) }
+        if (uris.isEmpty()) return@withContext emptyList()
+        val parts = (uris.size + WRITE_REQUEST_MAX - 1) / WRITE_REQUEST_MAX
+        uris.chunked((uris.size + parts - 1) / parts)
     }
 
     fun writeRequest(uris: List<Uri>): PendingIntent =
@@ -150,5 +154,7 @@ class FreeUpViewModel(app: Application) : AndroidViewModel(app) {
     private companion object {
         const val TAG_DRY_RUN = "freeup-dryrun"
         const val TAG_COMPRESS = "freeup-compress"
+        /** 3733 Dateien gingen noch in einen Dialog, 10004 nicht mehr (≈ 100 Byte je Datei). */
+        const val WRITE_REQUEST_MAX = 3000
     }
 }
