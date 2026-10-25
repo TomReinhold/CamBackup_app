@@ -236,7 +236,7 @@ fun StepIndicator(labels: List<String>, current: Int, done: Set<Int>, onSelect: 
                     },
                 )
                 Text(
-                    (if (isDone && !isCurrent) "✓ " else "${i + 1} ") + label,
+                    (if (isDone && !isCurrent) "✓ " else "") + label,
                     style = MaterialTheme.typography.labelMedium,
                     color = when {
                         isCurrent -> MaterialTheme.colorScheme.onSurface

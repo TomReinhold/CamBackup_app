@@ -91,6 +91,9 @@ class BackupViewModel(app: Application) : AndroidViewModel(app) {
      * Ergebnisse ausblenden, wenn die App verlassen wird. Ein unterbrochenes Backup bleibt stehen,
      * bis es fortgesetzt wird (auch die Benachrichtigung beim Einstecken bietet dann das Fortsetzen an).
      */
+    /** Welche Laufergebnisse die Oberfläche schon zum Neuplanen genutzt hat. */
+    var handledFinish: String? = null
+
     fun dismissCompleted() {
         if (lastRun.unseen()?.abortReason == null) lastRun.markSeen()
         missingStore.saveSummary(null)

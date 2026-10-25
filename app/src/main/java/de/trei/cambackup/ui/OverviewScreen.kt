@@ -1,5 +1,9 @@
 package de.trei.cambackup.ui
 
+import kotlinx.coroutines.launch
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.pager.HorizontalPager
 import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
@@ -88,73 +92,90 @@ fun OverviewScreen(library: LibraryViewModel, contentPadding: PaddingValues) {
                 freeUpVm.load(folder)
             }
         }
-        val auto = when {
+        // Welcher Schritt gerade dran ist; null, solange nur kurz verglichen/geladen wird – das soll
+        // die Ansicht nicht umspringen lassen
+        val current: Step? = when {
             ready == null -> Step.BACKUP
             backup is BackupState.Running || backup is BackupState.ApplyingMissing -> Step.BACKUP
             freeUp is FreeUpState.Working -> Step.FREE_UP
+            backup is BackupState.Preparing -> null
             backupResult != null -> Step.BACKUP
             backup !is BackupState.Ready -> Step.BACKUP
             (backup as BackupState.Ready).let { it.plan.hasWork || it.missing.isNotEmpty() } -> Step.BACKUP
             freeUpResult != null -> Step.FREE_UP
+            freeUp is FreeUpState.Loading -> null
             freeUp is FreeUpState.Overview -> (freeUp as FreeUpState.Overview).let {
                 if (compressTargets(it.overview.candidates, it.minAgeDays, System.currentTimeMillis()).isNotEmpty()) Step.FREE_UP else Step.DONE
             }
             else -> Step.FREE_UP
         }
-        var manual by rememberSaveable { mutableStateOf<Step?>(null) }
-        // Ändert sich die Lage (Backup fertig, Stick eingesteckt …), zählt wieder der automatische Schritt
-        LaunchedEffect(auto) { manual = null }
-        val step = if (ready == null) Step.BACKUP else manual ?: auto
+        var auto by rememberSaveable { mutableStateOf(Step.BACKUP) }
+        LaunchedEffect(current) { if (current != null) auto = current }
+
+        val pager = rememberPagerState(initialPage = auto.ordinal) { Step.entries.size }
+        val scope = rememberCoroutineScope()
+        // Nur wenn sich die Lage wirklich ändert (Backup fertig, Stick eingesteckt …), blättert die App selbst
+        LaunchedEffect(auto) { pager.animateScrollToPage(auto.ordinal) }
+        val goTo = { step: Step -> scope.launch { pager.animateScrollToPage(step.ordinal) }; Unit }
 
         Column(
             Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
                 .padding(
-                    start = 16.dp, end = 16.dp,
                     top = contentPadding.calculateTopPadding() + 4.dp,
                     bottom = contentPadding.calculateBottomPadding() + 16.dp,
                 ),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
+            val side = Modifier.padding(horizontal = 16.dp)
             StepIndicator(
                 labels = listOf(stringResource(R.string.step_backup), stringResource(R.string.step_free_up), stringResource(R.string.step_done)),
-                current = step.ordinal,
+                current = if (folder == null) 0 else pager.targetPage,
                 done = Step.entries.filter { it.ordinal < auto.ordinal }.map { it.ordinal }.toSet(),
-                onSelect = { i -> if (ready != null) manual = Step.entries[i] },
+                onSelect = { i -> if (folder != null) goTo(Step.entries[i]) },
+                modifier = side,
             )
             if (folder == null) {
                 // Noch kein Backup-Ordner: die Karte zum Einrichten ist der erste Schritt
-                DriveSection()
+                DriveSection(side)
             } else {
-                when (step) {
-                    Step.BACKUP -> BackupPanel(
-                        folderUri = folder,
-                        onBackupFinished = {
-                            driveVm.refresh()
-                            library.refresh()
-                        },
-                        onNext = { manual = Step.FREE_UP },
-                    )
-                    Step.FREE_UP -> FreeUpPanel(folderUri = folder, onFinished = library::refresh)
-                    Step.DONE -> DoneCard(loaded.stats)
+                // Wischen nach links/rechts wechselt die Karte; die Seiten reichen bis an den Rand,
+                // damit der Sticker-Schatten nicht abgeschnitten wird
+                HorizontalPager(pager, verticalAlignment = Alignment.Top) { page ->
+                    Box(side.padding(bottom = 8.dp)) {
+                        when (Step.entries[page]) {
+                            Step.BACKUP -> BackupPanel(
+                                folderUri = folder,
+                                onBackupFinished = {
+                                    driveVm.refresh()
+                                    library.refresh()
+                                },
+                                onNext = { goTo(Step.FREE_UP) },
+                            )
+                            Step.FREE_UP -> FreeUpPanel(folderUri = folder, onFinished = library::refresh)
+                            Step.DONE -> SummaryCard(loaded.stats, allDone = auto == Step.DONE)
+                        }
+                    }
                 }
-                DriveSection()
-                RestorePanel(folderUri = folder, onFinished = library::refresh)
+                Column(side, verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    DriveSection()
+                    RestorePanel(folderUri = folder, onFinished = library::refresh)
+                }
             }
-            CameraFolderCard(loaded.stats, loaded.driveConnected)
+            CameraFolderCard(loaded.stats, loaded.driveConnected, side)
         }
     }
 }
 
-/** Schritt 3: alles gesichert und verkleinert. */
+/** Schritt 3: Zusammenfassung – gelb mit „Alles erledigt!“, sobald gesichert und verkleinert ist. */
 @Composable
-private fun DoneCard(s: LibraryStats) {
+private fun SummaryCard(s: LibraryStats, allDone: Boolean) {
     FeatureCard(
         icon = R.drawable.ic_step_done,
-        title = stringResource(R.string.done_title),
-        subtitle = stringResource(R.string.done_subtitle),
-        done = true,
+        title = stringResource(if (allDone) R.string.done_title else R.string.summary_title),
+        subtitle = stringResource(if (allDone) R.string.done_subtitle else R.string.summary_subtitle),
+        done = allDone,
     ) {
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             StatTile(formatBytes(s.savedBytes), stringResource(R.string.done_freed), Modifier.weight(1f))
@@ -229,12 +250,13 @@ private fun CenteredMessage(title: String, text: String, button: String, onClick
 }
 
 @Composable
-private fun CameraFolderCard(s: LibraryStats, driveConnected: Boolean) {
+private fun CameraFolderCard(s: LibraryStats, driveConnected: Boolean, modifier: Modifier = Modifier) {
     FeatureCard(
         icon = R.drawable.ic_smartphone,
         title = stringResource(R.string.overview_media_title),
         subtitle = stringResource(R.string.overview_media_subtitle, fileCount(s.totalCount)),
         compact = true,
+        modifier = modifier,
     ) {
         Row(verticalAlignment = Alignment.Bottom) {
             Text(formatBytes(s.totalBytes), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.SemiBold)

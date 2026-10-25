@@ -548,7 +548,9 @@
     <string name="chip_drive_missing">Kein Stick</string>
     <string name="step_backup">Sichern</string>
     <string name="step_free_up">Verkleinern</string>
-    <string name="step_done">Fertig</string>
+    <string name="step_done">Zusammenfassung</string>
+    <string name="summary_title">Zusammenfassung</string>
+    <string name="summary_subtitle">Was die App bisher für dich erledigt hat</string>
     <string name="action_next_free_up">Weiter: Verkleinern</string>
     <string name="done_title">Alles erledigt!</string>
     <string name="done_subtitle">Neue Fotos sichert die App, sobald du den Stick wieder einsteckst.</string>

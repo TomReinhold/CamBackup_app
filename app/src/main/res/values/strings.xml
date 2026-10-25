@@ -551,7 +551,9 @@
     <string name="chip_drive_missing">No stick</string>
     <string name="step_backup">Back up</string>
     <string name="step_free_up">Compress</string>
-    <string name="step_done">Done</string>
+    <string name="step_done">Summary</string>
+    <string name="summary_title">Summary</string>
+    <string name="summary_subtitle">What the app has done for you so far</string>
     <string name="action_next_free_up">Next: compress</string>
     <string name="done_title">All done!</string>
     <string name="done_subtitle">New photos are backed up as soon as you plug the stick in again.</string>

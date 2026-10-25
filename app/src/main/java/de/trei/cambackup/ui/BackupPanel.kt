@@ -63,8 +63,11 @@ fun BackupPanel(
 
     LaunchedEffect(folderUri) { vm.prepareIfIdle(folderUri) }
     // Nach Ende eines Laufs sofort neu planen und einlesen (Status in Übersicht und Galerie)
+    // Nur einmal je Lauf – nicht jedes Mal, wenn die Karte wieder ins Bild kommt
     LaunchedEffect(result?.finishedAt, missingResult?.finishedAt) {
-        if (result != null || missingResult != null) {
+        val finished = "${result?.finishedAt}|${missingResult?.finishedAt}"
+        if ((result != null || missingResult != null) && vm.handledFinish != finished) {
+            vm.handledFinish = finished
             vm.prepare(folderUri)
             onBackupFinished()
         }
