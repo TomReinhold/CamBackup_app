@@ -1,5 +1,8 @@
 package de.trei.cambackup.ui
 
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.Dispatchers
+import android.net.Uri
 import android.app.Application
 import android.app.PendingIntent
 import android.content.Intent
@@ -98,14 +101,19 @@ class FreeUpViewModel(app: Application) : AndroidViewModel(app) {
     /**
      * System-Dialoge, in denen der Nutzer dem Ändern der Dateien zustimmt – nur für Dateien, für die
      * es noch keine Zustimmung gibt, und in Portionen (sehr lange Listen passen nicht in einen Dialog).
+     * Liefert nur die Portionen; die Abfrage selbst erzeugt [writeRequest] erst direkt vor dem Anzeigen –
+     * Android verwirft eine Abfrage, sobald die nächste angelegt wird.
      */
-    fun writeRequests(o: FreeUpOverview, minAgeDays: Int): List<PendingIntent> {
+    suspend fun writeChunks(o: FreeUpOverview, minAgeDays: Int): List<List<Uri>> = withContext(Dispatchers.Default) {
         val app = getApplication<Application>()
-        val uris = compressTargets(o.candidates, minAgeDays, System.currentTimeMillis())
+        compressTargets(o.candidates, minAgeDays, System.currentTimeMillis())
             .map { it.item.uri }
             .filter { app.checkUriPermission(it, Process.myPid(), Process.myUid(), Intent.FLAG_GRANT_WRITE_URI_PERMISSION) != PackageManager.PERMISSION_GRANTED }
-        return uris.chunked(WRITE_REQUEST_CHUNK).map { MediaStore.createWriteRequest(app.contentResolver, it) }
+            .chunked(WRITE_REQUEST_CHUNK)
     }
+
+    fun writeRequest(uris: List<Uri>): PendingIntent =
+        MediaStore.createWriteRequest(getApplication<Application>().contentResolver, uris)
 
     /** Nach Zustimmung im System-Dialog: verkleinern und sofort ersetzen. */
     fun compress(folderUri: String) {

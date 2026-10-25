@@ -1,8 +1,10 @@
 package de.trei.cambackup.ui
 
+import kotlinx.coroutines.launch
+import androidx.compose.runtime.rememberCoroutineScope
+import android.net.Uri
 import de.trei.cambackup.util.formatRemaining
 import android.app.Activity
-import android.app.PendingIntent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -64,14 +66,15 @@ fun FreeUpPanel(folderUri: String, onFinished: () -> Unit, vm: FreeUpViewModel =
     LifecycleEventEffect(Lifecycle.Event.ON_STOP) { vm.dismissResult() }
 
     // System-Dialoge „Darf CamBackup diese Dateien ändern?“ – nacheinander, erst danach wird verkleinert
-    var pending by remember { mutableStateOf(emptyList<PendingIntent>()) }
+    var pending by remember { mutableStateOf(emptyList<List<Uri>>()) }
+    val scope = rememberCoroutineScope()
     val writeRequest = rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
         val rest = pending.drop(1)
         pending = if (result.resultCode == Activity.RESULT_OK) rest else emptyList()
         if (result.resultCode == Activity.RESULT_OK && rest.isEmpty()) vm.compress(folderUri)
     }
     LaunchedEffect(pending) {
-        pending.firstOrNull()?.let { writeRequest.launch(IntentSenderRequest.Builder(it.intentSender).build()) }
+        pending.firstOrNull()?.let { writeRequest.launch(IntentSenderRequest.Builder(vm.writeRequest(it).intentSender).build()) }
     }
 
     FeatureCard(
@@ -96,9 +99,11 @@ fun FreeUpPanel(folderUri: String, onFinished: () -> Unit, vm: FreeUpViewModel =
                     if (s.dryRun) {
                         vm.dryRun(folderUri)
                     } else {
-                        val requests = vm.writeRequests(s.overview, s.minAgeDays)
-                        // Zustimmung schon vorhanden (z. B. nach einem Abbruch): gleich los
-                        if (requests.isEmpty()) vm.compress(folderUri) else pending = requests
+                        scope.launch {
+                            val chunks = vm.writeChunks(s.overview, s.minAgeDays)
+                            // Zustimmung schon vorhanden (z. B. nach einem Abbruch): gleich los
+                            if (chunks.isEmpty()) vm.compress(folderUri) else pending = chunks
+                        }
                     }
                 },
             )
