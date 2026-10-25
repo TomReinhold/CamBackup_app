@@ -1,5 +1,6 @@
 package de.trei.cambackup.ui
 
+import de.trei.cambackup.util.formatRemaining
 import android.app.Activity
 import android.app.PendingIntent
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -113,7 +114,11 @@ fun FreeUpPanel(folderUri: String, onFinished: () -> Unit, vm: FreeUpViewModel =
                 )
                 val fraction = if (p == null || p.total == 0) null else p.done.toFloat() / p.total
                 // Ein Fortschritt reicht: der Ring, sobald die Zahl der Dateien bekannt ist, vorher der Balken
-                if (fraction != null) JobRing(fraction, caption = null) else HazardProgressBar(null, Modifier.fillMaxWidth())
+                if (fraction != null) {
+                    JobRing(fraction, caption = p?.remainingSeconds?.takeIf { it >= 0 }?.let { formatRemaining(it) } ?: stringResource(R.string.backup_eta_pending))
+                } else {
+                    HazardProgressBar(null, Modifier.fillMaxWidth())
+                }
                 Banner(
                     stringResource(if (s.replacing) R.string.freeup_running_info else R.string.freeup_dry_running_info),
                     title = stringResource(if (s.replacing) R.string.dont_unplug else R.string.freeup_dry_running_title),

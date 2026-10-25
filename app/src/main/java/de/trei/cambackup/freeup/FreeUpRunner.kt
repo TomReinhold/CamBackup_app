@@ -1,5 +1,6 @@
 package de.trei.cambackup.freeup
 
+import android.os.SystemClock
 import de.trei.cambackup.work.JobControl
 import android.content.Context
 import android.net.Uri
@@ -37,7 +38,14 @@ import java.io.File
 import java.io.IOException
 import java.time.Instant
 
-data class FreeUpProgress(val done: Int, val total: Int, val currentName: String, val replacing: Boolean)
+data class FreeUpProgress(
+    val done: Int,
+    val total: Int,
+    val currentName: String,
+    val replacing: Boolean,
+    /** Geschätzte Restdauer in Sekunden, -1 solange noch keine Schätzung möglich ist. */
+    val remainingSeconds: Long = -1,
+)
 
 /**
  * Speicher freigeben: für jedes gesicherte, unveränderte Original (SHA-256 geprüft) eine verkleinerte
@@ -94,14 +102,33 @@ class FreeUpRunner(private val context: Context) {
         var abort: Msg? = null
         var lastShown = 0L
 
+        // Für die Zeitschätzung: wie viele Fotos und Video-Sekunden ab Datei i noch offen sind
+        val restImages = IntArray(candidates.size + 1)
+        val restVideoSeconds = DoubleArray(candidates.size + 1)
+        for (j in candidates.indices.reversed()) {
+            val m = candidates[j].item
+            restImages[j] = restImages[j + 1] + if (m.isVideo) 0 else 1
+            restVideoSeconds[j] = restVideoSeconds[j + 1] + if (m.isVideo) m.durationMs / 1000.0 else 0.0
+        }
+        val eta = FreeUpEta()
+        var fileStart = 0L
+
         for ((i, c) in candidates.withIndex()) {
+            // Die vorige Datei ist fertig – vor dem Warten auf Pause, damit Pausen nicht mitzählen
+            if (i > 0) candidates[i - 1].item.let { eta.record(it.isVideo, it.durationMs, SystemClock.elapsedRealtime() - fileStart) }
             JobControl.waitWhilePaused(JobControl.FREE_UP) { !caller.isActive }
             if (!caller.isActive) {
                 abort = msg(R.string.abort_cancelled)
                 break
             }
+            fileStart = SystemClock.elapsedRealtime()
             val item = c.item
-            onProgress(FreeUpProgress(i, candidates.size, item.displayName, replacing = doReplace))
+            onProgress(
+                FreeUpProgress(
+                    i, candidates.size, item.displayName, replacing = doReplace,
+                    remainingSeconds = eta.remainingSeconds(restImages[i], restVideoSeconds[i]),
+                ),
+            )
             val pre = if (item.isVideo) precheckVideo(item, s, now) else precheckImage(item, s, now)
             if (pre != null) {
                 skip(pre.text)

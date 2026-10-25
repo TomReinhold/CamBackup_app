@@ -1,5 +1,6 @@
 package de.trei.cambackup.work
 
+import de.trei.cambackup.util.formatRemaining
 import android.app.NotificationManager
 import android.content.Context
 import android.content.pm.ServiceInfo
@@ -42,7 +43,10 @@ class FreeUpWorker(context: Context, params: WorkerParameters) : CoroutineWorker
         Notifications.simpleProgress(
             applicationContext,
             title = L10n.str(if (replacing) R.string.notif_compressing else R.string.notif_dry_running),
-            text = p?.let { L10n.str(R.string.notif_n_of_total, it.done + 1, it.total) } ?: L10n.str(R.string.restore_starting),
+            text = p?.let {
+                L10n.str(R.string.notif_n_of_total, it.done + 1, it.total) +
+                    (if (it.remainingSeconds >= 0) " · ${formatRemaining(it.remainingSeconds)}" else "")
+            } ?: L10n.str(R.string.restore_starting),
             percent = p?.let { if (it.total > 0) it.done * 100 / it.total else 0 },
             cancelIntent = WorkManager.getInstance(applicationContext).createCancelPendingIntent(id),
         ),
@@ -57,7 +61,7 @@ class FreeUpWorker(context: Context, params: WorkerParameters) : CoroutineWorker
             val now = SystemClock.elapsedRealtime()
             if (!isStopped && now - lastPublish >= 500) {
                 lastPublish = now
-                setProgressAsync(workDataOf(KEY_DONE to p.done, KEY_TOTAL to p.total, KEY_NAME to p.currentName))
+                setProgressAsync(workDataOf(KEY_DONE to p.done, KEY_TOTAL to p.total, KEY_NAME to p.currentName, KEY_REMAINING to p.remainingSeconds))
                 notifications.notify(Notifications.ID_PROGRESS, foregroundInfo(p).notification)
             }
         }
@@ -84,6 +88,7 @@ class FreeUpWorker(context: Context, params: WorkerParameters) : CoroutineWorker
         private const val KEY_DONE = "done"
         private const val KEY_TOTAL = "total"
         private const val KEY_NAME = "name"
+        private const val KEY_REMAINING = "remaining"
 
         /** Probelauf: nur berechnen, wie viel Platz frei würde. */
         fun dryRun(context: Context, folderUri: String, tag: String) = enqueue(context, workDataOf(KEY_FOLDER to folderUri), tag)
@@ -108,7 +113,10 @@ class FreeUpWorker(context: Context, params: WorkerParameters) : CoroutineWorker
         fun progressOf(data: Data): FreeUpProgress? {
             val total = data.getInt(KEY_TOTAL, -1)
             if (total < 0) return null
-            return FreeUpProgress(data.getInt(KEY_DONE, 0), total, data.getString(KEY_NAME).orEmpty(), replacing = false)
+            return FreeUpProgress(
+                data.getInt(KEY_DONE, 0), total, data.getString(KEY_NAME).orEmpty(), replacing = false,
+                remainingSeconds = data.getLong(KEY_REMAINING, -1),
+            )
         }
     }
 }
