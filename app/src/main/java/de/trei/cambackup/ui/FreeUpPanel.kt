@@ -1,5 +1,6 @@
 package de.trei.cambackup.ui
 
+import de.trei.cambackup.freeup.compressTargets
 import android.util.Log
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.rememberCoroutineScope
@@ -158,9 +159,18 @@ private fun OverviewView(
     onStart: () -> Unit,
 ) {
     val candidateBytes = o.candidates.sumOf { it.item.sizeBytes }
+    // Was davon alt genug ist, wird verkleinert; neuere bleiben im Original
+    val targets = remember(o, minAgeDays) { compressTargets(o.candidates, minAgeDays, System.currentTimeMillis()) }
+    val recent = o.candidates.size - targets.size
     Row {
         Text(stringResource(R.string.freeup_candidates), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
-        Text("${fileCount(o.candidates.size)} · ${formatBytes(candidateBytes)}", style = MaterialTheme.typography.titleSmall)
+        Text("${fileCount(o.candidates.size)} · ${formatBytes(candidateBytes)}", style = MaterialTheme.typography.bodyMedium)
+    }
+    if (targets.isNotEmpty()) {
+        Row {
+            Text(stringResource(R.string.freeup_targets), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+            Text("${fileCount(targets.size)} · ${formatBytes(targets.sumOf { it.item.sizeBytes })}", style = MaterialTheme.typography.titleSmall)
+        }
     }
     if (o.alreadyCompressed > 0) {
         Row {
@@ -199,13 +209,21 @@ private fun OverviewView(
             TextButton(onClick = onDeleteProbes) { Text(stringResource(R.string.action_delete)) }
         }
     }
-    if (o.candidates.isEmpty()) {
+    if (targets.isEmpty()) {
         Text(stringResource(R.string.freeup_nothing), style = MaterialTheme.typography.bodyMedium)
+        if (recent > 0) {
+            Text(
+                pluralStringResource(R.plurals.freeup_age_recent, minAgeDays, fileCount(recent), minAgeDays),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
         return
     }
     Text(
-        when (minAgeDays) {
-            0 -> stringResource(R.string.freeup_age_all)
+        when {
+            minAgeDays == 0 -> stringResource(R.string.freeup_age_all)
+            recent > 0 -> pluralStringResource(R.plurals.freeup_age_recent, minAgeDays, fileCount(recent), minAgeDays)
             else -> pluralStringResource(R.plurals.freeup_age, minAgeDays, minAgeDays)
         },
         style = MaterialTheme.typography.bodySmall,

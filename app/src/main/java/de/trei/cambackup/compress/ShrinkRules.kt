@@ -1,5 +1,7 @@
 package de.trei.cambackup.compress
 
+import java.time.ZoneId
+import java.time.Instant
 import androidx.annotation.StringRes
 import de.trei.cambackup.R
 import de.trei.cambackup.media.MediaItem
@@ -22,12 +24,22 @@ enum class SkipReason(@StringRes private val textRes: Int) {
 /** Kennzeichnung im EXIF-Feld „Software“ verkleinerter Bilder. */
 const val COMPRESSED_MARKER = "CamBackup"
 
-private const val DAY_MS = 24L * 60 * 60 * 1000
+/**
+ * Grenze für „älter als [minAgeDays] Tage“ in ganzen Kalendertagen: alles, was vor Beginn des Tages
+ * vor [minAgeDays] Tagen aufgenommen wurde. So wandert die Grenze nicht minütlich mit (sonst kämen
+ * mitten in einer Sitzung neue Dateien hinzu); 0 heißt: ohne Altersgrenze.
+ */
+fun ageCutoffMillis(minAgeDays: Int, nowMillis: Long, zone: ZoneId = ZoneId.systemDefault()): Long =
+    if (minAgeDays <= 0) Long.MAX_VALUE
+    else Instant.ofEpochMilli(nowMillis).atZone(zone).toLocalDate().minusDays(minAgeDays.toLong()).atStartOfDay(zone).toInstant().toEpochMilli()
+
+/** Alt genug zum Verkleinern? */
+fun oldEnough(dateTakenMillis: Long, minAgeDays: Int, nowMillis: Long): Boolean = dateTakenMillis < ageCutoffMillis(minAgeDays, nowMillis)
 
 /** Prüfungen, die ohne Lesen der Datei möglich sind. */
 fun precheckImage(item: MediaItem, settings: CompressionSettings, nowMillis: Long): SkipReason? = when {
     item.mimeType.lowercase() != "image/jpeg" -> SkipReason.UNSUPPORTED_FORMAT
-    item.dateTakenMillis > nowMillis - settings.minAgeDays * DAY_MS -> SkipReason.TOO_RECENT
+    !oldEnough(item.dateTakenMillis, settings.minAgeDays, nowMillis) -> SkipReason.TOO_RECENT
     else -> null
 }
 
@@ -37,7 +49,7 @@ fun precheckImage(item: MediaItem, settings: CompressionSettings, nowMillis: Lon
  */
 fun precheckVideo(item: MediaItem, settings: CompressionSettings, nowMillis: Long): SkipReason? = when {
     item.mimeType.lowercase() != "video/mp4" || item.durationMs <= 0 -> SkipReason.UNSUPPORTED_FORMAT
-    item.dateTakenMillis > nowMillis - settings.minAgeDays * DAY_MS -> SkipReason.TOO_RECENT
+    !oldEnough(item.dateTakenMillis, settings.minAgeDays, nowMillis) -> SkipReason.TOO_RECENT
     !worthReplacing(item.sizeBytes, estimatedVideoBytes(item.durationMs, settings), settings.minSavingsPercent) ->
         SkipReason.TOO_LITTLE_SAVING
     else -> null

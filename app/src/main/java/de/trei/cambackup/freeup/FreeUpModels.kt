@@ -1,5 +1,6 @@
 package de.trei.cambackup.freeup
 
+import de.trei.cambackup.compress.oldEnough
 import de.trei.cambackup.backup.phonePath
 import de.trei.cambackup.index.EntryStatus
 import de.trei.cambackup.index.IndexEntry
@@ -71,8 +72,7 @@ fun restoreCandidates(items: List<MediaItem>, index: IndexState): List<RestoreCa
 
 /** Kandidaten, die alt genug zum Verkleinern sind – nur für diese wird die Zustimmung eingeholt. */
 fun compressTargets(candidates: List<Candidate>, minAgeDays: Int, nowMillis: Long): List<Candidate> {
-    val cutoff = nowMillis - minAgeDays * 24L * 60 * 60 * 1000
-    return candidates.filter { it.item.dateTakenMillis <= cutoff }
+    return candidates.filter { oldEnough(it.item.dateTakenMillis, minAgeDays, nowMillis) }
 }
 
 /** Platzbedarf beim Zurückholen inkl. Reserve, damit das Smartphone nicht vollläuft. */

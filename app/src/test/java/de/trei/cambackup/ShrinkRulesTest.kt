@@ -97,3 +97,17 @@ class ShrinkRulesTest {
         assertEquals(listOf("DateTimeOriginal", "Make"), tagsToCopy(all, keepGps = false))
     }
 }
+
+class AgeCutoffTest {
+    private val zone = java.time.ZoneId.of("Europe/Berlin")
+    private fun millis(s: String) = java.time.LocalDateTime.parse(s).atZone(zone).toInstant().toEpochMilli()
+
+    @Test fun grenzeIstTagesbeginn() {
+        // 25.10. 11:53 – 90 Tage: alles vor dem 27.07. 00:00 zählt, egal zu welcher Uhrzeit heute
+        assertEquals(millis("2026-07-27T00:00"), de.trei.cambackup.compress.ageCutoffMillis(90, millis("2026-10-25T11:53"), zone))
+        assertEquals(millis("2026-07-27T00:00"), de.trei.cambackup.compress.ageCutoffMillis(90, millis("2026-10-25T23:59"), zone))
+    }
+
+    @Test fun nullHeisstOhneGrenze() =
+        assertEquals(Long.MAX_VALUE, de.trei.cambackup.compress.ageCutoffMillis(0, millis("2026-10-25T11:53"), zone))
+}

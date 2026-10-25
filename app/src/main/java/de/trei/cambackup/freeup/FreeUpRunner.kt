@@ -88,7 +88,8 @@ class FreeUpRunner(private val context: Context) {
         val doReplace = replace && !s.dryRun
         val caller = currentCoroutineContext()
         val opened = open(folderName)
-        val candidates = overviewFor(scanner.scan(s.mediaFolders), opened.index.state).candidates
+        // Nur was alt genug ist – so zählt der Fortschritt dieselben Dateien wie die Übersicht
+        val candidates = compressTargets(overviewFor(scanner.scan(s.mediaFolders), opened.index.state).candidates, s.minAgeDays, System.currentTimeMillis())
         val dirs = DirCache(opened.deviceDir)
         val cache = IndexCache.get(context)
         val now = System.currentTimeMillis()

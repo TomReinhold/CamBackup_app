@@ -237,6 +237,7 @@
     <string name="freeup_dry_running_info">Nothing on the phone is changed. Videos take a while.</string>
     <string name="freeup_dry_running_title">Dry run – nothing is changed</string>
     <string name="freeup_candidates">Backed up, still original</string>
+    <string name="freeup_targets">Will be compressed</string>
     <string name="freeup_already">Already compressed</string>
     <string name="freeup_already_value">%1$s · %2$s freed</string>
     <plurals name="freeup_kept">
@@ -249,6 +250,10 @@
     <string name="freeup_probes">%1$s as trials in the album “%2$s”</string>
     <string name="freeup_nothing">Nothing to compress.</string>
     <string name="freeup_age_all">All backed-up photos and videos are included (minimum age adjustable).</string>
+    <plurals name="freeup_age_recent">
+        <item quantity="one">%1$s from the last %2$d day stay original (adjustable).</item>
+        <item quantity="other">%1$s from the last %2$d days stay original (adjustable).</item>
+    </plurals>
     <plurals name="freeup_age">
         <item quantity="one">Only files older than %d day are included (adjustable).</item>
         <item quantity="other">Only files older than %d days are included (adjustable).</item>

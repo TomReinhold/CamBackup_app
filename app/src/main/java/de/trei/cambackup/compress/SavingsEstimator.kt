@@ -31,8 +31,6 @@ data class SavingsEstimate(
     val saved: Long get() = before - after
 }
 
-private const val DAY_MS = 24L * 60 * 60 * 1000
-
 /** Würde eine Datei bei diesen Größen ersetzt? Nur wenn die Mindest-Ersparnis erreicht wird. */
 fun worthReplacing(originalBytes: Long, compressedBytes: Long, minSavingsPercent: Int): Boolean =
     originalBytes > 0 && compressedBytes <= originalBytes * (100 - minSavingsPercent) / 100
@@ -55,8 +53,7 @@ fun estimateSavings(
     imageSamples: List<SizeSample>,
     nowMillis: Long,
 ): SavingsEstimate {
-    val cutoff = nowMillis - settings.minAgeDays * DAY_MS
-    val (eligible, tooRecent) = items.partition { it.dateTakenMillis <= cutoff }
+    val (eligible, tooRecent) = items.partition { oldEnough(it.dateTakenMillis, settings.minAgeDays, nowMillis) }
     val (videos, images) = eligible.partition { it.isVideo }
 
     // Pro Probe entscheiden, ob ersetzt würde – sonst zählt sie mit Verhältnis 1

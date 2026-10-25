@@ -234,6 +234,7 @@
     <string name="freeup_dry_running_info">Auf dem Smartphone wird dabei nichts verändert. Videos brauchen etwas Zeit.</string>
     <string name="freeup_dry_running_title">Probelauf – es wird nichts verändert</string>
     <string name="freeup_candidates">Gesichert, noch im Original</string>
+    <string name="freeup_targets">Wird verkleinert</string>
     <string name="freeup_already">Bereits verkleinert</string>
     <string name="freeup_already_value">%1$s · %2$s frei</string>
     <plurals name="freeup_kept">
@@ -246,6 +247,10 @@
     <string name="freeup_probes">%1$s zur Probe im Album „%2$s“</string>
     <string name="freeup_nothing">Nichts zu verkleinern.</string>
     <string name="freeup_age_all">Alle gesicherten Fotos und Videos werden berücksichtigt (Mindestalter einstellbar).</string>
+    <plurals name="freeup_age_recent">
+        <item quantity="one">%1$s vom letzten Tag bleiben im Original (einstellbar).</item>
+        <item quantity="other">%1$s aus den letzten %2$d Tagen bleiben im Original (einstellbar).</item>
+    </plurals>
     <plurals name="freeup_age">
         <item quantity="one">Es werden nur Dateien älter als %d Tag berücksichtigt (einstellbar).</item>
         <item quantity="other">Es werden nur Dateien älter als %d Tage berücksichtigt (einstellbar).</item>
