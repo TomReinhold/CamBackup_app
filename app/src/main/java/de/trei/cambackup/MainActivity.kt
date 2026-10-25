@@ -114,7 +114,8 @@ private fun MainScaffold() {
         topBar = {
             // Warnstreifen ganz oben auf jedem Tab; Einstellungen und Info haben darunter eine eigene
             // Titelleiste (mit Zurück auf Unterseiten)
-            Column(Modifier.statusBarsPadding()) {
+            // Deckender Hintergrund auch hinter der Statusleiste, sonst scheinen beim Scrollen die Karten durch
+            Column(Modifier.background(MaterialTheme.colorScheme.background).statusBarsPadding()) {
                 HazardStripe()
                 when (tab) {
                     Tab.OVERVIEW -> TopAppBar(
