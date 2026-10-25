@@ -5,6 +5,7 @@ import android.media.MediaExtractor
 import android.media.MediaFormat
 import android.media.MediaMetadataRetriever
 import android.net.Uri
+import android.util.Log
 import androidx.annotation.OptIn
 import androidx.media3.common.Effect
 import androidx.media3.common.MediaItem as Media3Item
@@ -127,28 +128,40 @@ class VideoShrinker(private val context: Context) {
     /**
      * Weicht die Dauer der neuen Datei ab? Manche Videos haben am Anfang eine Lücke (die Bildspur beginnt
      * erst nach gut einer Sekunde); die zählt in der Gesamtdauer des Originals mit, die neu kodierte
-     * Datei hat sie nicht. Dann ist die längste Spur maßgeblich – fehlt wirklich Inhalt, fällt es dort auf.
+     * Datei hat sie nicht. Maßgeblich ist dann der tatsächliche Inhalt: Gesamtdauer abzüglich der Lücke
+     * bzw. die längste Spur ohne Lücke – fehlt wirklich Inhalt, fällt es dort weiterhin auf.
      */
     private fun durationDiffers(resultMs: Long, originalMs: Long, original: Uri): Boolean {
         if (abs(resultMs - originalMs) <= DURATION_TOLERANCE_MS) return false
         if (resultMs > originalMs) return true
-        val content = longestTrackMs(original) ?: return true
-        return abs(resultMs - content) > DURATION_TOLERANCE_MS
+        val tracks = trackTimings(original)
+        if (tracks.isEmpty()) return true
+        val gapMs = tracks.maxOf { it.firstSampleMs }
+        val content = listOf(originalMs - gapMs) + tracks.map { it.durationMs - it.firstSampleMs } + tracks.map { it.durationMs }
+        Log.i(TAG, "Dauer: neu $resultMs, Original $originalMs, Spuren $tracks → Inhalt $content")
+        return content.none { abs(resultMs - it) <= DURATION_TOLERANCE_MS }
     }
 
-    /** Dauer der längsten Spur (ohne Lücke am Anfang) oder null, wenn sie sich nicht lesen lässt. */
-    private fun longestTrackMs(uri: Uri): Long? = runCatching {
+    private data class TrackTiming(val durationMs: Long, val firstSampleMs: Long)
+
+    /** Je Spur: angegebene Dauer und Zeitpunkt der ersten Aufnahme (Lücke am Anfang). */
+    private fun trackTimings(uri: Uri): List<TrackTiming> = runCatching {
         val extractor = MediaExtractor()
         try {
             extractor.setDataSource(context, originalUri(uri), null)
-            (0 until extractor.trackCount)
-                .map { extractor.getTrackFormat(it) }
-                .filter { it.containsKey(MediaFormat.KEY_DURATION) }
-                .maxOfOrNull { it.getLong(MediaFormat.KEY_DURATION) / 1000 }
+            (0 until extractor.trackCount).mapNotNull { i ->
+                val format = extractor.getTrackFormat(i)
+                if (!format.containsKey(MediaFormat.KEY_DURATION)) return@mapNotNull null
+                extractor.selectTrack(i)
+                extractor.seekTo(0, MediaExtractor.SEEK_TO_PREVIOUS_SYNC)
+                val first = extractor.sampleTime.coerceAtLeast(0)
+                extractor.unselectTrack(i)
+                TrackTiming(format.getLong(MediaFormat.KEY_DURATION) / 1000, first / 1000)
+            }
         } finally {
             extractor.release()
         }
-    }.getOrNull()
+    }.getOrDefault(emptyList())
 
     fun readInfo(uri: Uri): VideoInfo {
         val r = MediaMetadataRetriever()
@@ -257,5 +270,6 @@ class VideoShrinker(private val context: Context) {
     private companion object {
         /** Erlaubte Abweichung der Dauer (Rundung, Frame-Raster beim Wechsel der Bildrate). */
         const val DURATION_TOLERANCE_MS = 300L
+        const val TAG = "VideoShrinker"
     }
 }
