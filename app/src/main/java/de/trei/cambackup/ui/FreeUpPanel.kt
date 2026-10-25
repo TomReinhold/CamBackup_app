@@ -1,6 +1,7 @@
 package de.trei.cambackup.ui
 
 import de.trei.cambackup.freeup.compressTargets
+import de.trei.cambackup.compress.compressibleFormat
 import android.util.Log
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.rememberCoroutineScope
@@ -159,9 +160,10 @@ private fun OverviewView(
     onStart: () -> Unit,
 ) {
     val candidateBytes = o.candidates.sumOf { it.item.sizeBytes }
-    // Was davon alt genug ist, wird verkleinert; neuere bleiben im Original
+    // Was davon alt genug ist, wird verkleinert; neuere und andere Formate (PNG, HEIC …) bleiben im Original
     val targets = remember(o, minAgeDays) { compressTargets(o.candidates, minAgeDays, System.currentTimeMillis()) }
-    val recent = o.candidates.size - targets.size
+    val unsupported = remember(o) { o.candidates.count { !compressibleFormat(it.item) } }
+    val recent = o.candidates.size - unsupported - targets.size
     Row {
         Text(stringResource(R.string.freeup_candidates), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
         Text("${fileCount(o.candidates.size)} · ${formatBytes(candidateBytes)}", style = MaterialTheme.typography.bodyMedium)
@@ -188,6 +190,13 @@ private fun OverviewView(
     if (o.notWorth > 0) {
         Text(
             pluralStringResource(R.plurals.freeup_not_worth, o.notWorth, fileCount(o.notWorth)),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+    if (unsupported > 0) {
+        Text(
+            pluralStringResource(R.plurals.freeup_unsupported, unsupported, fileCount(unsupported)),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

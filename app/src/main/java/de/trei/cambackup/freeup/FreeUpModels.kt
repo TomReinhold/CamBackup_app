@@ -3,6 +3,7 @@ package de.trei.cambackup.freeup
 import de.trei.cambackup.settings.CompressionSettings
 import de.trei.cambackup.compress.shrinkSettingsKey
 import de.trei.cambackup.compress.oldEnough
+import de.trei.cambackup.compress.compressibleFormat
 import de.trei.cambackup.backup.phonePath
 import de.trei.cambackup.index.EntryStatus
 import de.trei.cambackup.index.IndexEntry
@@ -74,9 +75,12 @@ fun restoreCandidates(items: List<MediaItem>, index: IndexState): List<RestoreCa
         ?.let { RestoreCandidate(item, it) }
 }
 
-/** Kandidaten, die alt genug zum Verkleinern sind – nur für diese wird die Zustimmung eingeholt. */
+/**
+ * Kandidaten, die verkleinert werden: alt genug und in einem Format, das verkleinert wird – nur für diese
+ * wird die Zustimmung eingeholt und nur sie zählt die Übersicht als „wird verkleinert“.
+ */
 fun compressTargets(candidates: List<Candidate>, minAgeDays: Int, nowMillis: Long): List<Candidate> {
-    return candidates.filter { oldEnough(it.item.dateTakenMillis, minAgeDays, nowMillis) }
+    return candidates.filter { compressibleFormat(it.item) && oldEnough(it.item.dateTakenMillis, minAgeDays, nowMillis) }
 }
 
 /** Platzbedarf beim Zurückholen inkl. Reserve, damit das Smartphone nicht vollläuft. */

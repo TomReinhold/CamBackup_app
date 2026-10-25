@@ -254,6 +254,10 @@
         <item quantity="one">%s would barely get smaller with the current settings and stays original.</item>
         <item quantity="other">%s would barely get smaller with the current settings and stay original.</item>
     </plurals>
+    <plurals name="freeup_unsupported">
+        <item quantity="one">%s has a format that is not compressed (JPEG and MP4 only) and stays original.</item>
+        <item quantity="other">%s have a format that is not compressed (JPEG and MP4 only) and stay original.</item>
+    </plurals>
     <plurals name="freeup_age_recent">
         <item quantity="one">%1$s from the last %2$d day stay original (adjustable).</item>
         <item quantity="other">%1$s from the last %2$d days stay original (adjustable).</item>

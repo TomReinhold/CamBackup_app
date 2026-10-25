@@ -35,9 +35,13 @@ fun ageCutoffMillis(minAgeDays: Int, nowMillis: Long, zone: ZoneId = ZoneId.syst
 /** Alt genug zum Verkleinern? */
 fun oldEnough(dateTakenMillis: Long, minAgeDays: Int, nowMillis: Long): Boolean = dateTakenMillis < ageCutoffMillis(minAgeDays, nowMillis)
 
+/** Nur JPEG-Fotos und MP4-Videos (mit bekannter Dauer) werden verkleinert, alles andere bleibt im Original. */
+fun compressibleFormat(item: MediaItem): Boolean =
+    if (item.isVideo) item.mimeType.lowercase() == "video/mp4" && item.durationMs > 0 else item.mimeType.lowercase() == "image/jpeg"
+
 /** Prüfungen, die ohne Lesen der Datei möglich sind. */
 fun precheckImage(item: MediaItem, settings: CompressionSettings, nowMillis: Long): SkipReason? = when {
-    item.mimeType.lowercase() != "image/jpeg" -> SkipReason.UNSUPPORTED_FORMAT
+    !compressibleFormat(item) -> SkipReason.UNSUPPORTED_FORMAT
     !oldEnough(item.dateTakenMillis, settings.minAgeDays, nowMillis) -> SkipReason.TOO_RECENT
     else -> null
 }
@@ -47,7 +51,7 @@ fun precheckImage(item: MediaItem, settings: CompressionSettings, nowMillis: Lon
  * würde das Video nicht kleiner – dann gar nicht erst kodieren.
  */
 fun precheckVideo(item: MediaItem, settings: CompressionSettings, nowMillis: Long): SkipReason? = when {
-    item.mimeType.lowercase() != "video/mp4" || item.durationMs <= 0 -> SkipReason.UNSUPPORTED_FORMAT
+    !compressibleFormat(item) -> SkipReason.UNSUPPORTED_FORMAT
     !oldEnough(item.dateTakenMillis, settings.minAgeDays, nowMillis) -> SkipReason.TOO_RECENT
     !worthReplacing(item.sizeBytes, estimatedVideoBytes(item.durationMs, settings), settings.minSavingsPercent) ->
         SkipReason.TOO_LITTLE_SAVING

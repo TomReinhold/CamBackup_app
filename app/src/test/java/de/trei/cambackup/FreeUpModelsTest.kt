@@ -69,6 +69,18 @@ class FreeUpModelsTest {
         assertEquals(0, other.notWorth)
     }
 
+    @Test fun onlyJpegAndMp4AreCompressTargets() {
+        val png = item("a.png", 100).copy(mimeType = "image/png")
+        val jpg = item("b.jpg", 100)
+        val mp4 = item("c.mp4", 100).copy(mimeType = "video/mp4", isVideo = true, durationMs = 5_000)
+        val mov = item("d.mov", 100).copy(mimeType = "video/quicktime", isVideo = true, durationMs = 5_000)
+        val targets = de.trei.cambackup.freeup.compressTargets(
+            listOf(png, jpg, mp4, mov).map { de.trei.cambackup.freeup.Candidate(it, entry(it.displayName, 100)) },
+            minAgeDays = 0, nowMillis = 0,
+        )
+        assertEquals(listOf("b.jpg", "c.mp4"), targets.map { it.item.displayName })
+    }
+
     @Test fun restoreCandidatesOnlyForUntouchedCompressedFiles() {
         val index = IndexState(
             listOf(
