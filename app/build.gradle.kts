@@ -21,8 +21,8 @@ android {
         // API 30 (Android 11) wird für MediaStore.createWriteRequest benötigt
         minSdk = 30
         targetSdk = 35
-        versionCode = 5
-        versionName = "1.1.0"
+        versionCode = 6
+        versionName = "1.1.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
