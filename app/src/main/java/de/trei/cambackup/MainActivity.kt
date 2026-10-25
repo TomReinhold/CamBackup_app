@@ -1,5 +1,7 @@
 package de.trei.cambackup
 
+import androidx.compose.ui.unit.Dp
+import androidx.compose.foundation.layout.requiredSize
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -118,7 +120,7 @@ private fun MainScaffold() {
                     Tab.OVERVIEW -> TopAppBar(
                         title = {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Image(painterResource(R.drawable.ic_hard_hat), null, Modifier.size(34.dp))
+                                AppLogo()
                                 Spacer(Modifier.width(8.dp))
                                 Text(stringResource(R.string.app_name), style = MaterialTheme.typography.headlineSmall)
                             }
@@ -164,5 +166,15 @@ private fun MainScaffold() {
                 InfoScreen(bottomPadding = padding.calculateBottomPadding())
             }
         }
+    }
+}
+
+/** Das App-Symbol im Kopf: beide Ebenen des adaptiven Icons übereinander, auf den sichtbaren Bereich (72 von 108 dp) zugeschnitten. */
+@Composable
+private fun AppLogo(size: Dp = 36.dp) {
+    Box(Modifier.size(size).clip(RoundedCornerShape(size / 4)), contentAlignment = Alignment.Center) {
+        val layer = Modifier.requiredSize(size * 108 / 72)
+        Image(painterResource(R.drawable.ic_launcher_background), null, layer)
+        Image(painterResource(R.drawable.ic_launcher_foreground), null, layer)
     }
 }
