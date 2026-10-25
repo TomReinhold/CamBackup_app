@@ -1,6 +1,7 @@
 package de.trei.cambackup.compress
 
 import android.content.Context
+import android.media.MediaExtractor
 import android.media.MediaFormat
 import android.media.MediaMetadataRetriever
 import android.net.Uri
@@ -96,7 +97,7 @@ class VideoShrinker(private val context: Context) {
             // Unvollständige oder stillschweigend verschlechterte Ausgabe darf niemals ein Original ersetzen.
             // (Kann ein Encoder die Auflösung nicht, weicht Transformer sonst unbemerkt auf eine kleinere aus.)
             val problem = when {
-                abs(result.durationMs - info.durationMs) > DURATION_TOLERANCE_MS ->
+                durationDiffers(result.durationMs, info.durationMs, item.readUri) ->
                     msg(R.string.err_video_duration, result.durationMs, info.durationMs)
                 info.hasAudio && !result.hasAudio -> msg(R.string.err_video_audio)
                 abs(result.displayWidth - w) > 2 || abs(result.displayHeight - h) > 2 ->
@@ -122,6 +123,32 @@ class VideoShrinker(private val context: Context) {
             )
         }
     }
+
+    /**
+     * Weicht die Dauer der neuen Datei ab? Manche Videos haben am Anfang eine Lücke (die Bildspur beginnt
+     * erst nach gut einer Sekunde); die zählt in der Gesamtdauer des Originals mit, die neu kodierte
+     * Datei hat sie nicht. Dann ist die längste Spur maßgeblich – fehlt wirklich Inhalt, fällt es dort auf.
+     */
+    private fun durationDiffers(resultMs: Long, originalMs: Long, original: Uri): Boolean {
+        if (abs(resultMs - originalMs) <= DURATION_TOLERANCE_MS) return false
+        if (resultMs > originalMs) return true
+        val content = longestTrackMs(original) ?: return true
+        return abs(resultMs - content) > DURATION_TOLERANCE_MS
+    }
+
+    /** Dauer der längsten Spur (ohne Lücke am Anfang) oder null, wenn sie sich nicht lesen lässt. */
+    private fun longestTrackMs(uri: Uri): Long? = runCatching {
+        val extractor = MediaExtractor()
+        try {
+            extractor.setDataSource(context, originalUri(uri), null)
+            (0 until extractor.trackCount)
+                .map { extractor.getTrackFormat(it) }
+                .filter { it.containsKey(MediaFormat.KEY_DURATION) }
+                .maxOfOrNull { it.getLong(MediaFormat.KEY_DURATION) / 1000 }
+        } finally {
+            extractor.release()
+        }
+    }.getOrNull()
 
     fun readInfo(uri: Uri): VideoInfo {
         val r = MediaMetadataRetriever()
