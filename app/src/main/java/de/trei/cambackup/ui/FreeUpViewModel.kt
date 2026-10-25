@@ -99,9 +99,9 @@ class FreeUpViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /**
-     * System-Dialoge, in denen der Nutzer dem Ändern der Dateien zustimmt – nur für Dateien, für die
-     * es noch keine Zustimmung gibt, und in Portionen (sehr lange Listen passen nicht in einen Dialog).
-     * Liefert nur die Portionen; die Abfrage selbst erzeugt [writeRequest] erst direkt vor dem Anzeigen –
+     * Dateien für den System-Dialog, in dem der Nutzer dem Ändern zustimmt – nur solche, für die
+     * es noch keine Zustimmung gibt. Normalerweise alles in EINER Abfrage; ist die Liste dafür zu lang,
+     * teilt das Panel sie beim Anzeigen auf. Die Abfrage selbst erzeugt [writeRequest] erst direkt davor –
      * Android verwirft eine Abfrage, sobald die nächste angelegt wird.
      */
     suspend fun writeChunks(o: FreeUpOverview, minAgeDays: Int): List<List<Uri>> = withContext(Dispatchers.Default) {
@@ -109,7 +109,7 @@ class FreeUpViewModel(app: Application) : AndroidViewModel(app) {
         compressTargets(o.candidates, minAgeDays, System.currentTimeMillis())
             .map { it.item.uri }
             .filter { app.checkUriPermission(it, Process.myPid(), Process.myUid(), Intent.FLAG_GRANT_WRITE_URI_PERMISSION) != PackageManager.PERMISSION_GRANTED }
-            .chunked(WRITE_REQUEST_CHUNK)
+            .let { if (it.isEmpty()) emptyList() else listOf(it) }
     }
 
     fun writeRequest(uris: List<Uri>): PendingIntent =
@@ -150,6 +150,5 @@ class FreeUpViewModel(app: Application) : AndroidViewModel(app) {
     private companion object {
         const val TAG_DRY_RUN = "freeup-dryrun"
         const val TAG_COMPRESS = "freeup-compress"
-        const val WRITE_REQUEST_CHUNK = 500
     }
 }

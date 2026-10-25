@@ -1,5 +1,6 @@
 package de.trei.cambackup.ui
 
+import android.util.Log
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.rememberCoroutineScope
 import android.net.Uri
@@ -65,7 +66,8 @@ fun FreeUpPanel(folderUri: String, onFinished: () -> Unit, vm: FreeUpViewModel =
     // Ergebnis verschwindet, sobald die App verlassen wird – ohne „OK“
     LifecycleEventEffect(Lifecycle.Event.ON_STOP) { vm.dismissResult() }
 
-    // System-Dialoge „Darf CamBackup diese Dateien ändern?“ – nacheinander, erst danach wird verkleinert
+    // System-Dialog „Darf CamBackup diese Dateien ändern?“ – erst danach wird verkleinert. Normalerweise
+    // einer für alle Dateien; passt die Liste nicht in eine Abfrage, nacheinander in Hälften
     var pending by remember { mutableStateOf(emptyList<List<Uri>>()) }
     val scope = rememberCoroutineScope()
     val writeRequest = rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
@@ -74,7 +76,14 @@ fun FreeUpPanel(folderUri: String, onFinished: () -> Unit, vm: FreeUpViewModel =
         if (result.resultCode == Activity.RESULT_OK && rest.isEmpty()) vm.compress(folderUri)
     }
     LaunchedEffect(pending) {
-        pending.firstOrNull()?.let { writeRequest.launch(IntentSenderRequest.Builder(vm.writeRequest(it).intentSender).build()) }
+        val first = pending.firstOrNull() ?: return@LaunchedEffect
+        try {
+            writeRequest.launch(IntentSenderRequest.Builder(vm.writeRequest(first).intentSender).build())
+        } catch (e: Exception) {
+            // Zu lang für eine Abfrage (Datenmenge zwischen App und System): halbieren und erneut
+            Log.w("FreeUpPanel", "Zustimmung für ${first.size} Dateien nicht möglich – teile auf", e)
+            pending = if (first.size > 1) first.chunked((first.size + 1) / 2) + pending.drop(1) else emptyList()
+        }
     }
 
     FeatureCard(
