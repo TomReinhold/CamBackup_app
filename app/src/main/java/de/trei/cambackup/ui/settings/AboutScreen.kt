@@ -112,6 +112,7 @@ fun AboutScreen(onShowMetadata: () -> Unit) {
             "AndroidX DataStore" to stringResource(R.string.tab_settings),
             "AndroidX DocumentFile" to stringResource(R.string.about_lib_saf),
             "Kotlin Coroutines & Serialization" to stringResource(R.string.about_lib_kotlin),
+            "Fredoka & Nunito" to stringResource(R.string.about_lib_fonts),
         ).forEach { (name, use) -> InfoRow(name, use) }
     }
 

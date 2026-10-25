@@ -378,7 +378,8 @@
     <string name="about_id">Kennung</string>
     <string name="about_permissions">Berechtigungen verwalten</string>
     <string name="about_libraries">Open-Source-Bibliotheken</string>
-    <string name="about_libraries_license">Alle unter Apache License 2.0</string>
+    <string name="about_libraries_license">Bibliotheken unter Apache License 2.0, Schriften unter SIL Open Font License 1.1</string>
+    <string name="about_lib_fonts">Schriften</string>
     <string name="about_lib_ui">Oberfläche</string>
     <string name="about_lib_video">Videos verkleinern</string>
     <string name="about_lib_work">Arbeit im Hintergrund</string>
@@ -541,4 +542,16 @@
     <string name="err_trial_create">Probe-Datei konnte nicht angelegt werden</string>
     <string name="err_trial_write">Probe-Datei nicht beschreibbar</string>
     <string name="err_jpeg_decode">JPEG nicht dekodierbar</string>
+
+    <!-- Neues Design -->
+    <string name="chip_drive_connected">Stick verbunden</string>
+    <string name="chip_drive_missing">Kein Stick</string>
+    <string name="step_backup">Sichern</string>
+    <string name="step_free_up">Verkleinern</string>
+    <string name="step_done">Fertig</string>
+    <string name="action_next_free_up">Weiter: Verkleinern</string>
+    <string name="done_title">Alles erledigt!</string>
+    <string name="done_subtitle">Neue Fotos sichert die App, sobald du den Stick wieder einsteckst.</string>
+    <string name="done_freed">frei geworden</string>
+    <string name="done_safe">Originale sicher</string>
 </resources>

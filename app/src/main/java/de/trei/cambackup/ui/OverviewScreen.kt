@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -45,23 +44,136 @@ import de.trei.cambackup.ui.components.StackedBar
 import de.trei.cambackup.ui.components.StatusColors
 import de.trei.cambackup.util.fileCount
 import de.trei.cambackup.util.formatBytes
+import de.trei.cambackup.ui.components.StepIndicator
+import de.trei.cambackup.freeup.compressTargets
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.compose.ui.draw.clip
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.background
 
+/** Die drei Schritte der Übersicht. */
+private enum class Step { BACKUP, FREE_UP, DONE }
+
+/**
+ * Übersicht: oben die drei Schritte (Sichern · Verkleinern · Fertig), darunter immer nur EINE große
+ * Karte für den aktuellen Schritt. Welcher Schritt dran ist, ergibt sich aus Backup und Verkleinern;
+ * ein Tipp auf einen Schritt zeigt dessen Karte trotzdem an. Speichermedium, Zurückholen und die
+ * Zahlen zu Fotos und Videos stehen klein darunter.
+ */
 @Composable
 fun OverviewScreen(library: LibraryViewModel, contentPadding: PaddingValues) {
     val state by library.state.collectAsStateWithLifecycle()
+    val driveVm: DriveViewModel = viewModel()
+    val backupVm: BackupViewModel = viewModel()
+    val freeUpVm: FreeUpViewModel = viewModel()
+    val drive by driveVm.state.collectAsStateWithLifecycle()
+    val backup by backupVm.state.collectAsStateWithLifecycle()
+    val backupResult by backupVm.result.collectAsStateWithLifecycle()
+    val freeUp by freeUpVm.state.collectAsStateWithLifecycle()
+    val freeUpResult by freeUpVm.result.collectAsStateWithLifecycle()
+
     LibraryGate(state, library::refresh, contentPadding) { loaded ->
-        LazyColumn(
-            Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(
-                start = 16.dp, end = 16.dp,
-                top = contentPadding.calculateTopPadding() + 8.dp,
-                bottom = contentPadding.calculateBottomPadding() + 16.dp,
-            ),
+        val ready = drive as? DriveState.Ready
+        val folder = ready?.info?.folderUri?.toString()
+        // Beide Bereiche kennen ihren Stand auch, wenn gerade die Karte des anderen Schritts zu sehen ist
+        LaunchedEffect(folder) {
+            if (folder != null) {
+                backupVm.prepareIfIdle(folder)
+                freeUpVm.load(folder)
+            }
+        }
+        val auto = when {
+            ready == null -> Step.BACKUP
+            backup is BackupState.Running || backup is BackupState.ApplyingMissing -> Step.BACKUP
+            freeUp is FreeUpState.Working -> Step.FREE_UP
+            backupResult != null -> Step.BACKUP
+            backup !is BackupState.Ready -> Step.BACKUP
+            (backup as BackupState.Ready).let { it.plan.hasWork || it.missing.isNotEmpty() } -> Step.BACKUP
+            freeUpResult != null -> Step.FREE_UP
+            freeUp is FreeUpState.Overview -> (freeUp as FreeUpState.Overview).let {
+                if (compressTargets(it.overview.candidates, it.minAgeDays, System.currentTimeMillis()).isNotEmpty()) Step.FREE_UP else Step.DONE
+            }
+            else -> Step.FREE_UP
+        }
+        var manual by rememberSaveable { mutableStateOf<Step?>(null) }
+        // Ändert sich die Lage (Backup fertig, Stick eingesteckt …), zählt wieder der automatische Schritt
+        LaunchedEffect(auto) { manual = null }
+        val step = if (ready == null) Step.BACKUP else manual ?: auto
+
+        Column(
+            Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(
+                    start = 16.dp, end = 16.dp,
+                    top = contentPadding.calculateTopPadding() + 4.dp,
+                    bottom = contentPadding.calculateBottomPadding() + 16.dp,
+                ),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            item { CameraFolderCard(loaded.stats, loaded.driveConnected) }
-            item { DriveSection(onLibraryChanged = library::refresh) }
+            StepIndicator(
+                labels = listOf(stringResource(R.string.step_backup), stringResource(R.string.step_free_up), stringResource(R.string.step_done)),
+                current = step.ordinal,
+                done = Step.entries.filter { it.ordinal < auto.ordinal }.map { it.ordinal }.toSet(),
+                onSelect = { i -> if (ready != null) manual = Step.entries[i] },
+            )
+            if (folder == null) {
+                // Noch kein Backup-Ordner: die Karte zum Einrichten ist der erste Schritt
+                DriveSection()
+            } else {
+                when (step) {
+                    Step.BACKUP -> BackupPanel(
+                        folderUri = folder,
+                        onBackupFinished = {
+                            driveVm.refresh()
+                            library.refresh()
+                        },
+                        onNext = { manual = Step.FREE_UP },
+                    )
+                    Step.FREE_UP -> FreeUpPanel(folderUri = folder, onFinished = library::refresh)
+                    Step.DONE -> DoneCard(loaded.stats)
+                }
+                DriveSection()
+                RestorePanel(folderUri = folder, onFinished = library::refresh)
+            }
+            CameraFolderCard(loaded.stats, loaded.driveConnected)
         }
+    }
+}
+
+/** Schritt 3: alles gesichert und verkleinert. */
+@Composable
+private fun DoneCard(s: LibraryStats) {
+    FeatureCard(
+        icon = R.drawable.ic_step_done,
+        title = stringResource(R.string.done_title),
+        subtitle = stringResource(R.string.done_subtitle),
+        done = true,
+    ) {
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            StatTile(formatBytes(s.savedBytes), stringResource(R.string.done_freed), Modifier.weight(1f))
+            StatTile("${s.backedUpCount + s.compressedCount}", stringResource(R.string.done_safe), Modifier.weight(1f))
+        }
+    }
+}
+
+/** Kleine Kachel mit großer Zahl. */
+@Composable
+fun StatTile(value: String, label: String, modifier: Modifier = Modifier) {
+    Column(
+        modifier
+            .clip(RoundedCornerShape(16.dp))
+            .background(MaterialTheme.colorScheme.background)
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+    ) {
+        Text(value, style = MaterialTheme.typography.titleLarge)
+        Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
@@ -122,6 +234,7 @@ private fun CameraFolderCard(s: LibraryStats, driveConnected: Boolean) {
         icon = R.drawable.ic_smartphone,
         title = stringResource(R.string.overview_media_title),
         subtitle = stringResource(R.string.overview_media_subtitle, fileCount(s.totalCount)),
+        compact = true,
     ) {
         Row(verticalAlignment = Alignment.Bottom) {
             Text(formatBytes(s.totalBytes), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.SemiBold)

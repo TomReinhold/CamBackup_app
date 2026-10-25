@@ -1,11 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Hintergrund des App-Icons: einfarbiges Blau -->
+<!-- App-Symbol (Hintergrund): dunkler Grund, unten ein Absperrband in Orange und Schwarz -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <path
-        android:fillColor="@color/ic_launcher_bg"
-        android:pathData="M0,0h108v108h-108z" />
+    <path android:fillColor="#FF1F1A14" android:pathData="M0,0 L108,0 L108,108 L0,108 Z" />
+    <path android:fillColor="#FFFF7A1A" android:pathData="M-20,92 L-13,92 L3,76 L-4,76 Z M-6,92 L1,92 L17,76 L10,76 Z M8,92 L15,92 L31,76 L24,76 Z M22,92 L29,92 L45,76 L38,76 Z M36,92 L43,92 L59,76 L52,76 Z M50,92 L57,92 L73,76 L66,76 Z M64,92 L71,92 L87,76 L80,76 Z M78,92 L85,92 L101,76 L94,76 Z M92,92 L99,92 L115,76 L108,76 Z M106,92 L113,92 L129,76 L122,76 Z " />
 </vector>

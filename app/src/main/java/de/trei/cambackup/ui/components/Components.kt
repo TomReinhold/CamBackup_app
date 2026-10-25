@@ -43,6 +43,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import de.trei.cambackup.R
+import de.trei.cambackup.ui.theme.LocalSiteColors
 import androidx.compose.ui.unit.dp
 
 /** Farben für den Sicherungsstatus – überall gleich (Übersicht, Fotos, Legenden). */
@@ -52,7 +53,10 @@ object StatusColors {
     @Composable fun open() = MaterialTheme.colorScheme.outlineVariant
 }
 
-/** Karte mit Symbol im farbigen Kreis, Titel und optionaler Unterzeile. */
+/**
+ * Karte im Aufkleber-Stil. Groß (Schritt-Karte): oben ein Absperrband mit rundem Symbol, darunter eine
+ * große Überschrift. [compact]: nur eine Kopfzeile mit kleinem Symbol (Nebenkarten wie Speichermedium).
+ */
 @Composable
 fun FeatureCard(
     @DrawableRes icon: Int,
@@ -60,30 +64,37 @@ fun FeatureCard(
     subtitle: String? = null,
     modifier: Modifier = Modifier,
     trailing: @Composable (() -> Unit)? = null,
+    compact: Boolean = false,
+    done: Boolean = false,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    ElevatedCard(modifier.fillMaxWidth()) {
-        Column(
-            Modifier.padding(16.dp).animateContentSize(),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    Modifier.size(40.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primaryContainer),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(painterResource(icon), null, tint = MaterialTheme.colorScheme.onPrimaryContainer, modifier = Modifier.size(22.dp))
-                }
-                Spacer(Modifier.width(12.dp))
-                Column(Modifier.weight(1f)) {
-                    Text(title, style = MaterialTheme.typography.titleMedium)
-                    subtitle?.let {
-                        Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    StickerCard(modifier) {
+        Column {
+            if (!compact) SymbolBand(icon, done = done)
+            Column(
+                Modifier.padding(if (compact) 16.dp else 20.dp).animateContentSize(),
+                verticalArrangement = Arrangement.spacedBy(14.dp),
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (compact) {
+                        Box(
+                            Modifier.size(40.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(painterResource(icon), null, tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(22.dp))
+                        }
+                        Spacer(Modifier.width(12.dp))
                     }
+                    Column(Modifier.weight(1f)) {
+                        Text(title, style = if (compact) MaterialTheme.typography.titleMedium else MaterialTheme.typography.headlineSmall)
+                        subtitle?.let {
+                            Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                    trailing?.invoke()
                 }
-                trailing?.invoke()
+                content()
             }
-            content()
         }
     }
 }
@@ -147,14 +158,27 @@ private fun InfoBanner(title: String, text: String, modifier: Modifier) {
     }
 }
 
-/** Pausieren/Fortsetzen und Abbrechen unter einem Fortschrittsbalken; ohne [onPause] nur Abbrechen. */
+/** Pausieren/Fortsetzen und Abbrechen als runde Knöpfe; ohne [onPause] nur Abbrechen. */
 @Composable
-fun JobControls(paused: Boolean, onPause: ((Boolean) -> Unit)?, onCancel: () -> Unit) {
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+fun JobControls(paused: Boolean, onPause: ((Boolean) -> Unit)?, onCancel: () -> Unit, modifier: Modifier = Modifier) {
+    val site = LocalSiteColors.current
+    Row(modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(20.dp, Alignment.CenterHorizontally)) {
         onPause?.let { toggle ->
-            FilledTonalButton(onClick = { toggle(!paused) }) { Text(stringResource(if (paused) R.string.action_resume else R.string.action_pause)) }
+            RoundStickerButton(
+                icon = if (paused) R.drawable.ic_play else R.drawable.ic_pause,
+                description = stringResource(if (paused) R.string.action_resume else R.string.action_pause),
+                onClick = { toggle(!paused) },
+                fill = site.yellow,
+                onFill = site.onYellow,
+            )
         }
-        OutlinedButton(onClick = onCancel) { Text(stringResource(R.string.action_cancel)) }
+        RoundStickerButton(
+            icon = R.drawable.ic_close,
+            description = stringResource(R.string.action_cancel),
+            onClick = onCancel,
+            fill = MaterialTheme.colorScheme.surfaceContainer,
+            onFill = MaterialTheme.colorScheme.onSurface,
+        )
     }
 }
 

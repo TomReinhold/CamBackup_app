@@ -36,7 +36,10 @@ import de.trei.cambackup.backup.SpaceCheck
 import de.trei.cambackup.ui.components.Banner
 import de.trei.cambackup.ui.components.BannerTone
 import de.trei.cambackup.ui.components.FeatureCard
+import de.trei.cambackup.ui.components.HazardProgressBar
 import de.trei.cambackup.ui.components.JobControls
+import de.trei.cambackup.ui.components.JobRing
+import de.trei.cambackup.ui.components.StickerButton
 import de.trei.cambackup.ui.settings.layoutLabel
 import de.trei.cambackup.util.fileCount
 import de.trei.cambackup.util.formatBytes
@@ -44,7 +47,12 @@ import de.trei.cambackup.util.formatRemaining
 
 /** Planung, Fortschritt und Ergebnis des Backups für den erkannten Geräteordner. */
 @Composable
-fun BackupPanel(folderUri: String, onBackupFinished: () -> Unit, vm: BackupViewModel = viewModel()) {
+fun BackupPanel(
+    folderUri: String,
+    onBackupFinished: () -> Unit,
+    onNext: (() -> Unit)? = null,
+    vm: BackupViewModel = viewModel(),
+) {
     val state by vm.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
@@ -76,7 +84,7 @@ fun BackupPanel(folderUri: String, onBackupFinished: () -> Unit, vm: BackupViewM
     }
 
     FeatureCard(
-        icon = R.drawable.ic_cloud_upload,
+        icon = R.drawable.ic_step_backup,
         title = stringResource(R.string.backup_title),
         subtitle = stringResource(R.string.backup_subtitle),
     ) {
@@ -119,6 +127,9 @@ fun BackupPanel(folderUri: String, onBackupFinished: () -> Unit, vm: BackupViewM
                     showDone = result?.isComplete != true,
                     onStart = start,
                 )
+                if (!s.plan.hasWork && onNext != null) {
+                    StickerButton(stringResource(R.string.action_next_free_up), onNext, Modifier.fillMaxWidth())
+                }
             }
 
             is BackupState.ApplyingMissing -> {
@@ -130,11 +141,7 @@ fun BackupPanel(folderUri: String, onBackupFinished: () -> Unit, vm: BackupViewM
                         else -> stringResource(R.string.missing_starting)
                     },
                 )
-                if (s.total > 0) {
-                    LinearProgressIndicator(progress = { s.done.toFloat() / s.total }, modifier = Modifier.fillMaxWidth())
-                } else {
-                    LinearProgressIndicator(Modifier.fillMaxWidth())
-                }
+                HazardProgressBar(if (s.total > 0) s.done.toFloat() / s.total else null, Modifier.fillMaxWidth())
                 JobControls(missingPaused, vm::setMissingPaused, vm::cancelMissing)
             }
 
@@ -145,25 +152,18 @@ fun BackupPanel(folderUri: String, onBackupFinished: () -> Unit, vm: BackupViewM
                 }
                 if (p != null && p.moving) {
                     Text(stringResource(R.string.backup_moving_progress, minOf(p.fileIndex + 1, p.fileCount), p.fileCount))
-                    LinearProgressIndicator(
-                        progress = { if (p.fileCount > 0) p.fileIndex.toFloat() / p.fileCount else 0f },
-                        modifier = Modifier.fillMaxWidth(),
-                    )
+                    HazardProgressBar(if (p.fileCount > 0) p.fileIndex.toFloat() / p.fileCount else 0f, Modifier.fillMaxWidth())
                 } else if (p == null || p.bytesTotal == 0L) {
                     Text(stringResource(R.string.backup_starting))
-                    LinearProgressIndicator(Modifier.fillMaxWidth())
+                    HazardProgressBar(null, Modifier.fillMaxWidth())
                 } else {
-                    Row(Modifier.fillMaxWidth()) {
-                        Text(stringResource(R.string.backup_file_progress, minOf(p.fileIndex + 1, p.fileCount), p.fileCount), modifier = Modifier.weight(1f))
-                        Text(
-                            if (p.remainingSeconds >= 0) formatRemaining(p.remainingSeconds) else stringResource(R.string.backup_eta_pending),
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    LinearProgressIndicator(
-                        progress = { (p.bytesDone.toFloat() / p.bytesTotal).coerceIn(0f, 1f) },
-                        modifier = Modifier.fillMaxWidth(),
+                    val fraction = (p.bytesDone.toFloat() / p.bytesTotal).coerceIn(0f, 1f)
+                    JobRing(
+                        fraction,
+                        if (p.remainingSeconds >= 0) formatRemaining(p.remainingSeconds) else stringResource(R.string.backup_eta_pending),
                     )
+                    Text(stringResource(R.string.backup_file_progress, minOf(p.fileIndex + 1, p.fileCount), p.fileCount))
+                    HazardProgressBar(fraction, Modifier.fillMaxWidth())
                     Text(
                         stringResource(R.string.backup_bytes_progress, formatBytes(p.bytesDone / 2), formatBytes(p.bytesTotal / 2)),
                         style = MaterialTheme.typography.bodySmall,
@@ -240,15 +240,16 @@ private fun PlanView(plan: BackupPlan, space: SpaceCheck, resume: Boolean, showD
             style = MaterialTheme.typography.bodySmall,
         )
     }
-    Button(onClick = onStart, enabled = space !is SpaceCheck.NotEnough, modifier = Modifier.fillMaxWidth()) {
-        Text(
-            when {
-                resume -> stringResource(R.string.action_resume)
-                plan.toCopy.isEmpty() -> stringResource(R.string.backup_relocate_start)
-                else -> stringResource(R.string.backup_start)
-            },
-        )
-    }
+    StickerButton(
+        text = when {
+            resume -> stringResource(R.string.action_resume)
+            plan.toCopy.isEmpty() -> stringResource(R.string.backup_relocate_start)
+            else -> stringResource(R.string.backup_start)
+        },
+        onClick = onStart,
+        modifier = Modifier.fillMaxWidth(),
+        enabled = space !is SpaceCheck.NotEnough,
+    )
 }
 
 /** Ergebnis gelöschter Dateien (wiederhergestellt bzw. im Backup gelöscht). */

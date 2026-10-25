@@ -18,6 +18,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -50,6 +51,9 @@ fun InfoScreen(bottomPadding: Dp) {
                     if (showMetadata) IconButton(onClick = { showMetadata = false }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.action_back)) }
                 },
                 scrollBehavior = scrollBehavior,
+                // Statusleiste und Warnstreifen liegen schon darüber (MainActivity)
+                windowInsets = WindowInsets(0),
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
             )
         },
     ) { padding ->

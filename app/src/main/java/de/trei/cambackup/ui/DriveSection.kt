@@ -69,24 +69,40 @@ import de.trei.cambackup.util.formatBytes
 import java.text.DateFormat
 import java.time.Instant
 import java.util.Date
+import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 
 /**
- * Karten für Speichermedium (Backup-Ordner, freier Platz), Backup und Speicher freigeben.
- * [onLibraryChanged]: nach Backup/Ersetzen, damit Übersicht und Fotos neu einlesen.
+ * Karte für das Speichermedium (Backup-Ordner, freier Platz). Groß, solange noch kein Backup-Ordner
+ * verbunden ist (das ist dann der erste Schritt); danach eine kleine Zeile, die sich aufklappen lässt.
  */
 @Composable
-fun DriveSection(onLibraryChanged: () -> Unit, modifier: Modifier = Modifier, vm: DriveViewModel = viewModel()) {
+fun DriveSection(modifier: Modifier = Modifier, vm: DriveViewModel = viewModel()) {
     val state by vm.state.collectAsStateWithLifecycle()
     val pick by vm.pick.collectAsStateWithLifecycle()
     val autoFound by vm.autoFound.collectAsStateWithLifecycle()
     val pickTree = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree(), vm::onTreePicked)
+    var expanded by rememberSaveable { mutableStateOf(false) }
 
     val ready = state as? DriveState.Ready
     Column(modifier, verticalArrangement = Arrangement.spacedBy(16.dp)) {
         FeatureCard(
             icon = R.drawable.ic_usb,
-            title = stringResource(R.string.drive_title),
-            subtitle = ready?.info?.let { it.volumeLabel + if (it.path.isNotEmpty()) " / ${it.path}" else "" },
+            title = ready?.record?.displayName ?: stringResource(R.string.drive_title),
+            subtitle = ready?.info?.let { i ->
+                i.volumeLabel + (i.space?.let { " · " + stringResource(R.string.drive_free, formatBytes(it.freeBytes)) } ?: "")
+            },
+            compact = ready != null,
+            trailing = if (ready != null) {
+                {
+                    IconButton(onClick = { expanded = !expanded }) {
+                        Icon(
+                            if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                            stringResource(if (expanded) R.string.info_collapse else R.string.info_expand),
+                        )
+                    }
+                }
+            } else null,
         ) {
             autoFound?.let {
                 Banner(it, BannerTone.SUCCESS)
@@ -125,25 +141,12 @@ fun DriveSection(onLibraryChanged: () -> Unit, modifier: Modifier = Modifier, vm
                     }
                 }
 
-                is DriveState.Ready -> {
+                is DriveState.Ready -> if (expanded) {
                     DriveDetails(s.info)
                     PhoneRow(s.record, onRename = vm::rename)
                     TextButton(onClick = { pickTree.launch(null) }) { Text(stringResource(R.string.drive_pick_other_backup)) }
                 }
             }
-        }
-
-        if (ready != null) {
-            val folder = ready.info.folderUri.toString()
-            BackupPanel(
-                folderUri = folder,
-                onBackupFinished = {
-                    vm.refresh()
-                    onLibraryChanged()
-                },
-            )
-            FreeUpPanel(folderUri = folder, onFinished = onLibraryChanged)
-            RestorePanel(folderUri = folder, onFinished = onLibraryChanged)
         }
     }
 

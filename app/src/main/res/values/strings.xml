@@ -381,7 +381,8 @@
     <string name="about_id">ID</string>
     <string name="about_permissions">Manage permissions</string>
     <string name="about_libraries">Open-source libraries</string>
-    <string name="about_libraries_license">All under the Apache License 2.0</string>
+    <string name="about_libraries_license">Libraries under the Apache License 2.0, fonts under the SIL Open Font License 1.1</string>
+    <string name="about_lib_fonts">Fonts</string>
     <string name="about_lib_ui">User interface</string>
     <string name="about_lib_video">Compressing videos</string>
     <string name="about_lib_work">Background work</string>
@@ -544,4 +545,16 @@
     <string name="err_trial_create">Trial file could not be created</string>
     <string name="err_trial_write">Trial file can\'t be written</string>
     <string name="err_jpeg_decode">JPEG can\'t be decoded</string>
+
+    <!-- Neues Design -->
+    <string name="chip_drive_connected">Stick connected</string>
+    <string name="chip_drive_missing">No stick</string>
+    <string name="step_backup">Back up</string>
+    <string name="step_free_up">Compress</string>
+    <string name="step_done">Done</string>
+    <string name="action_next_free_up">Next: compress</string>
+    <string name="done_title">All done!</string>
+    <string name="done_subtitle">New photos are backed up as soon as you plug the stick in again.</string>
+    <string name="done_freed">freed</string>
+    <string name="done_safe">originals safe</string>
 </resources>

@@ -4,14 +4,34 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.unit.dp
+import de.trei.cambackup.ui.components.HazardStripe
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -49,6 +69,21 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+/** Kleines Schild oben rechts: ist der Stick verbunden? */
+@Composable
+private fun DriveChip(connected: Boolean) {
+    Text(
+        stringResource(if (connected) R.string.chip_drive_connected else R.string.chip_drive_missing),
+        style = MaterialTheme.typography.labelMedium,
+        color = if (connected) MaterialTheme.colorScheme.background else MaterialTheme.colorScheme.onSurface,
+        modifier = Modifier
+            .padding(end = 12.dp)
+            .clip(RoundedCornerShape(50))
+            .background(if (connected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.surfaceVariant)
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+    )
+}
+
 private enum class Tab(val label: Int, val icon: Int) {
     OVERVIEW(R.string.tab_overview, R.drawable.ic_dashboard),
     GALLERY(R.string.tab_gallery, R.drawable.ic_photo_library),
@@ -75,17 +110,45 @@ private fun MainScaffold() {
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         topBar = {
-            // Einstellungen und Info haben eine eigene Titelleiste (mit Zurück auf Unterseiten)
-            if (tab != Tab.SETTINGS && tab != Tab.INFO) CenterAlignedTopAppBar(title = { Text(stringResource(tab.label)) })
+            // Warnstreifen ganz oben auf jedem Tab; Einstellungen und Info haben darunter eine eigene
+            // Titelleiste (mit Zurück auf Unterseiten)
+            Column(Modifier.statusBarsPadding()) {
+                HazardStripe()
+                when (tab) {
+                    Tab.OVERVIEW -> TopAppBar(
+                        title = {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Image(painterResource(R.drawable.ic_hard_hat), null, Modifier.size(34.dp))
+                                Spacer(Modifier.width(8.dp))
+                                Text(stringResource(R.string.app_name), style = MaterialTheme.typography.headlineSmall)
+                            }
+                        },
+                        actions = { DriveChip(driveState is DriveState.Ready) },
+                        windowInsets = WindowInsets(0),
+                        colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
+                    )
+                    Tab.GALLERY -> CenterAlignedTopAppBar(
+                        title = { Text(stringResource(tab.label)) },
+                        windowInsets = WindowInsets(0),
+                        colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
+                    )
+                    Tab.SETTINGS, Tab.INFO -> Unit
+                }
+            }
         },
         bottomBar = {
-            NavigationBar {
+            NavigationBar(containerColor = MaterialTheme.colorScheme.surfaceContainer) {
                 Tab.entries.forEach { t ->
                     NavigationBarItem(
                         selected = tab == t,
                         onClick = { tab = t },
                         icon = { Icon(painterResource(t.icon), null) },
                         label = { Text(stringResource(t.label)) },
+                        colors = NavigationBarItemDefaults.colors(
+                            indicatorColor = MaterialTheme.colorScheme.primary,
+                            selectedIconColor = MaterialTheme.colorScheme.onPrimary,
+                            selectedTextColor = MaterialTheme.colorScheme.onSurface,
+                        ),
                     )
                 }
             }
@@ -94,8 +157,12 @@ private fun MainScaffold() {
         when (tab) {
             Tab.OVERVIEW -> OverviewScreen(library, padding)
             Tab.GALLERY -> GalleryScreen(library, padding, folderUri = (driveState as? DriveState.Ready)?.info?.folderUri?.toString())
-            Tab.SETTINGS -> SettingsScreen(bottomPadding = padding.calculateBottomPadding())
-            Tab.INFO -> InfoScreen(bottomPadding = padding.calculateBottomPadding())
+            Tab.SETTINGS -> Box(Modifier.padding(top = padding.calculateTopPadding())) {
+                SettingsScreen(bottomPadding = padding.calculateBottomPadding())
+            }
+            Tab.INFO -> Box(Modifier.padding(top = padding.calculateTopPadding())) {
+                InfoScreen(bottomPadding = padding.calculateBottomPadding())
+            }
         }
     }
 }

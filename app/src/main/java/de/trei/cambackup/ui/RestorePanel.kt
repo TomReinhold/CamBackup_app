@@ -16,7 +16,7 @@ import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
-import androidx.compose.material3.LinearProgressIndicator
+import de.trei.cambackup.ui.components.HazardProgressBar
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -156,7 +156,7 @@ fun RestorePanel(folderUri: String, onFinished: () -> Unit, vm: RestoreViewModel
     // Ohne verkleinerte Dateien keine Karte – außer um das Ergebnis eines eben beendeten Laufs zu zeigen
     if ((state is RestoreState.Nothing || state is RestoreState.Loading) && result == null) return
 
-    FeatureCard(icon = R.drawable.ic_restore, title = stringResource(R.string.restore_title), subtitle = stringResource(R.string.restore_subtitle)) {
+    FeatureCard(icon = R.drawable.ic_restore, title = stringResource(R.string.restore_title), subtitle = stringResource(R.string.restore_subtitle), compact = true) {
         if (state !is RestoreState.Running) {
             result?.let { r ->
                 Banner(
@@ -231,8 +231,7 @@ fun RestorePanel(folderUri: String, onFinished: () -> Unit, vm: RestoreViewModel
                         if (s.total > 0) stringResource(R.string.restore_progress, minOf(s.done + 1, s.total), s.total)
                         else stringResource(R.string.restore_starting),
                 )
-                if (s.total > 0) LinearProgressIndicator(progress = { s.done.toFloat() / s.total }, modifier = Modifier.fillMaxWidth())
-                else LinearProgressIndicator(Modifier.fillMaxWidth())
+                HazardProgressBar(if (s.total > 0) s.done.toFloat() / s.total else null, Modifier.fillMaxWidth())
                 Banner(stringResource(R.string.dont_unplug))
                 JobControls(paused, vm::setPaused, vm::cancel)
             }

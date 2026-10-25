@@ -34,7 +34,10 @@ import de.trei.cambackup.freeup.FreeUpSummary
 import de.trei.cambackup.ui.components.Banner
 import de.trei.cambackup.ui.components.BannerTone
 import de.trei.cambackup.ui.components.FeatureCard
+import de.trei.cambackup.ui.components.HazardProgressBar
 import de.trei.cambackup.ui.components.JobControls
+import de.trei.cambackup.ui.components.JobRing
+import de.trei.cambackup.ui.components.StickerButton
 import de.trei.cambackup.util.fileCount
 import de.trei.cambackup.util.formatBytes
 
@@ -71,7 +74,7 @@ fun FreeUpPanel(folderUri: String, onFinished: () -> Unit, vm: FreeUpViewModel =
     }
 
     FeatureCard(
-        icon = R.drawable.ic_compress,
+        icon = R.drawable.ic_step_compress,
         title = stringResource(R.string.freeup_title),
         subtitle = stringResource(R.string.freeup_subtitle),
     ) {
@@ -108,11 +111,9 @@ fun FreeUpPanel(folderUri: String, onFinished: () -> Unit, vm: FreeUpViewModel =
                         else -> stringResource(R.string.freeup_dry_progress, p.done + 1, p.total)
                     },
                 )
-                if (p == null || p.total == 0) {
-                    LinearProgressIndicator(Modifier.fillMaxWidth())
-                } else {
-                    LinearProgressIndicator(progress = { p.done.toFloat() / p.total }, modifier = Modifier.fillMaxWidth())
-                }
+                val fraction = if (p == null || p.total == 0) null else p.done.toFloat() / p.total
+                if (fraction != null) JobRing(fraction, caption = null)
+                HazardProgressBar(fraction, Modifier.fillMaxWidth())
                 Banner(
                     stringResource(if (s.replacing) R.string.freeup_running_info else R.string.freeup_dry_running_info),
                     title = stringResource(if (s.replacing) R.string.dont_unplug else R.string.freeup_dry_running_title),
@@ -198,9 +199,11 @@ private fun OverviewView(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
-    Button(onClick = onStart, modifier = Modifier.fillMaxWidth()) {
-        Text(stringResource(if (dryRun) R.string.freeup_dry_start else R.string.freeup_start))
-    }
+    StickerButton(
+        stringResource(if (dryRun) R.string.freeup_dry_start else R.string.freeup_start),
+        onStart,
+        Modifier.fillMaxWidth(),
+    )
 }
 
 @Composable

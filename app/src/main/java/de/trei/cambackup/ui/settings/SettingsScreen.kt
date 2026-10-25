@@ -127,6 +127,9 @@ fun SettingsScreen(bottomPadding: Dp, vm: SettingsViewModel = viewModel()) {
                     if (page != null) IconButton(onClick = { page = null }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.action_back)) }
                 },
                 scrollBehavior = scrollBehavior,
+                // Statusleiste und Warnstreifen liegen schon darüber (MainActivity)
+                windowInsets = WindowInsets(0),
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
             )
         },
     ) { padding ->
