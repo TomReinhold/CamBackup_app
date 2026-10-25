@@ -166,7 +166,6 @@ fun BackupPanel(
                         if (p.remainingSeconds >= 0) formatRemaining(p.remainingSeconds) else stringResource(R.string.backup_eta_pending),
                     )
                     Text(stringResource(R.string.backup_file_progress, minOf(p.fileIndex + 1, p.fileCount), p.fileCount))
-                    HazardProgressBar(fraction, Modifier.fillMaxWidth())
                     Text(
                         stringResource(R.string.backup_bytes_progress, formatBytes(p.bytesDone / 2), formatBytes(p.bytesTotal / 2)),
                         style = MaterialTheme.typography.bodySmall,

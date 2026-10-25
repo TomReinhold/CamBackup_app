@@ -112,8 +112,8 @@ fun FreeUpPanel(folderUri: String, onFinished: () -> Unit, vm: FreeUpViewModel =
                     },
                 )
                 val fraction = if (p == null || p.total == 0) null else p.done.toFloat() / p.total
-                if (fraction != null) JobRing(fraction, caption = null)
-                HazardProgressBar(fraction, Modifier.fillMaxWidth())
+                // Ein Fortschritt reicht: der Ring, sobald die Zahl der Dateien bekannt ist, vorher der Balken
+                if (fraction != null) JobRing(fraction, caption = null) else HazardProgressBar(null, Modifier.fillMaxWidth())
                 Banner(
                     stringResource(if (s.replacing) R.string.freeup_running_info else R.string.freeup_dry_running_info),
                     title = stringResource(if (s.replacing) R.string.dont_unplug else R.string.freeup_dry_running_title),
