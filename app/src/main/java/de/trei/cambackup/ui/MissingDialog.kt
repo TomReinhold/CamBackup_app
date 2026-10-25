@@ -1,5 +1,7 @@
 package de.trei.cambackup.ui
 
+import de.trei.cambackup.ui.gallery.VideoDialog
+import androidx.compose.foundation.clickable
 import android.net.Uri
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -169,7 +171,13 @@ private fun MissingRow(m: MissingItem, thumb: Uri?, thumbPx: Int, choice: Missin
     val date = DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date(m.latest.dateTakenMillis))
     Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(64.dp).clip(RoundedCornerShape(8.dp))) {
+            var play by remember { mutableStateOf(false) }
+            if (play && thumb != null) VideoDialog(thumb) { play = false }
+            // Videos lassen sich direkt vom Speichermedium abspielen
+            Box(
+                Modifier.size(64.dp).clip(RoundedCornerShape(8.dp))
+                    .then(if (m.isVideo && thumb != null) Modifier.clickable(onClickLabel = stringResource(R.string.viewer_play)) { play = true } else Modifier),
+            ) {
                 if (thumb != null) MediaThumbnail(thumb, thumbPx, Modifier.fillMaxSize())
                 else Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surfaceVariant) {}
                 if (m.isVideo) {

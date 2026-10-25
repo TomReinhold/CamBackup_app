@@ -1,6 +1,11 @@
 package de.trei.cambackup.ui.gallery
 
-import android.content.Intent
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
+import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -34,7 +39,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
@@ -57,11 +61,15 @@ fun MediaViewer(items: List<LibraryItem>, startIndex: Int, onClose: () -> Unit) 
         properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
     ) {
         val pager = rememberPagerState(initialPage = startIndex) { items.size }
+        var playing by remember { mutableStateOf<Uri?>(null) }
         Box(Modifier.fillMaxSize().background(Color.Black)) {
             HorizontalPager(state = pager, modifier = Modifier.fillMaxSize(), key = { items[it].media.uri.toString() }) { page ->
-                ViewerPage(items[page])
+                val uri = items[page].media.uri
+                ViewerPage(items[page], playing = playing == uri, onPlay = { playing = uri })
             }
             val current = items[pager.currentPage]
+            // Beim Weiterwischen endet die Wiedergabe
+            LaunchedEffect(pager.currentPage) { playing = null }
             // Kopfzeile
             Row(
                 Modifier
@@ -83,24 +91,24 @@ fun MediaViewer(items: List<LibraryItem>, startIndex: Int, onClose: () -> Unit) 
                 Text("${pager.currentPage + 1} / ${items.size}", color = Color.White.copy(alpha = 0.7f), style = MaterialTheme.typography.labelMedium)
                 Spacer(Modifier.width(12.dp))
             }
-            InfoPanel(current, Modifier.align(Alignment.BottomCenter))
+            // Während der Wiedergabe gehört der untere Rand der Bedienleiste des Players
+            if (playing == null) InfoPanel(current, Modifier.align(Alignment.BottomCenter))
         }
     }
 }
 
 @Composable
-private fun ViewerPage(item: LibraryItem) {
-    val context = LocalContext.current
+private fun ViewerPage(item: LibraryItem, playing: Boolean, onPlay: () -> Unit) {
+    if (playing) {
+        // Oben Platz für die Kopfzeile, unten für die Navigationsleiste
+        VideoPlayer(item.media.uri, Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing).padding(top = 48.dp))
+        return
+    }
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         MediaThumbnail(item.media.uri, 2048, Modifier.fillMaxSize(), contentScale = ContentScale.Fit, placeholder = Color.Black)
         if (item.media.isVideo) {
             FilledIconButton(
-                onClick = {
-                    context.startActivity(
-                        Intent(Intent.ACTION_VIEW).setDataAndType(item.media.uri, item.media.mimeType)
-                            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION),
-                    )
-                },
+                onClick = onPlay,
                 modifier = Modifier.size(72.dp),
                 shape = CircleShape,
                 colors = IconButtonDefaults.filledIconButtonColors(containerColor = Color.Black.copy(alpha = 0.5f)),

@@ -1,5 +1,9 @@
 package de.trei.cambackup.ui.gallery
 
+import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.ImageDecoder
+import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.util.LruCache
 import android.util.Size
@@ -42,13 +46,36 @@ fun MediaThumbnail(
     val bitmap by produceState(ThumbnailCache.get(key), key) {
         if (value == null) {
             value = withContext(Dispatchers.IO) {
-                runCatching {
-                    context.contentResolver.loadThumbnail(uri, Size(sizePx, sizePx), null).asImageBitmap()
-                }.getOrNull()
-            }?.also { ThumbnailCache.put(key, it) }
+                runCatching { context.contentResolver.loadThumbnail(uri, Size(sizePx, sizePx), null) }.getOrNull()
+                    ?: decodeDirectly(context, uri, sizePx)
+            }?.asImageBitmap()?.also { ThumbnailCache.put(key, it) }
         }
     }
     Box(modifier.background(placeholder)) {
         bitmap?.let { Image(it, contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = contentScale) }
     }
+}
+
+/**
+ * Vorschau direkt aus der Datei, wenn das System keine liefert – etwa für Dateien auf dem
+ * USB-Stick: dessen Anbieter erzeugt Vorschauen nur für Fotos, nicht für Videos.
+ */
+private fun decodeDirectly(context: Context, uri: Uri, sizePx: Int): Bitmap? {
+    val type = context.contentResolver.getType(uri).orEmpty()
+    if (!type.startsWith("image/")) {
+        val frame = runCatching {
+            MediaMetadataRetriever().use { r ->
+                r.setDataSource(context, uri)
+                r.getScaledFrameAtTime(0, MediaMetadataRetriever.OPTION_CLOSEST_SYNC, sizePx, sizePx)
+            }
+        }.getOrNull()
+        if (frame != null || type.startsWith("video/")) return frame
+    }
+    return runCatching {
+        ImageDecoder.decodeBitmap(ImageDecoder.createSource(context.contentResolver, uri)) { decoder, info, _ ->
+            val scale = sizePx.toFloat() / maxOf(info.size.width, info.size.height)
+            if (scale < 1f) decoder.setTargetSize((info.size.width * scale).toInt().coerceAtLeast(1), (info.size.height * scale).toInt().coerceAtLeast(1))
+            decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
+        }
+    }.getOrNull()
 }
