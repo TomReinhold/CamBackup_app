@@ -48,10 +48,6 @@ class ImageShrinker(private val context: Context) {
         if (isMarkedCompressed(source.getAttribute(ExifInterface.TAG_SOFTWARE))) {
             return ShrinkResult.Skipped(SkipReason.ALREADY_COMPRESSED)
         }
-        val tail = withContext(Dispatchers.IO) { readTail(item) }
-        if (looksLikeMotionPhoto(item.displayName, source.getAttribute(ExifInterface.TAG_XMP), tail)) {
-            return ShrinkResult.Skipped(SkipReason.MOTION_PHOTO)
-        }
 
         val compressed = compressor.compress(item.readUri, settings.imageMaxEdge, settings.jpegQuality)
         // Grobe Vorprüfung; EXIF fügt nur wenige KB hinzu, die genaue Prüfung folgt unten
@@ -90,20 +86,6 @@ class ImageShrinker(private val context: Context) {
     private fun readExif(item: MediaItem): ExifInterface =
         resolver.openInputStream(item.readUri)?.use { ExifInterface(it) } ?: throw AppError(R.string.err_file_unreadable, item.displayName)
 
-    /** Letzte 64 KB der Datei – dort hängen Samsung-Motion-Photos ihr Video an. */
-    private fun readTail(item: MediaItem): ByteArray? = runCatching {
-        resolver.openInputStream(item.readUri)?.use { input ->
-            val skip = (item.sizeBytes - TAIL_BYTES).coerceAtLeast(0)
-            var skipped = 0L
-            while (skipped < skip) {
-                val n = input.skip(skip - skipped)
-                if (n <= 0) break
-                skipped += n
-            }
-            input.readBytes()
-        }
-    }.getOrNull()
-
     private fun writeExif(source: ExifInterface, file: File, image: CompressedImage, keepGps: Boolean) {
         val target = ExifInterface(file)
         for (tag in tagsToCopy(ALL_TAGS, keepGps)) {
@@ -120,8 +102,6 @@ class ImageShrinker(private val context: Context) {
     }
 
     private companion object {
-        const val TAIL_BYTES = 64 * 1024L
-
         /** Alle EXIF-Feldnamen, die ExifInterface kennt (öffentliche Konstanten TAG_…). */
         val ALL_TAGS: List<String> by lazy {
             ExifInterface::class.java.fields

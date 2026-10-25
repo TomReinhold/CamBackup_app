@@ -185,6 +185,13 @@ private fun OverviewView(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
+    if (o.notWorth > 0) {
+        Text(
+            pluralStringResource(R.plurals.freeup_not_worth, o.notWorth, fileCount(o.notWorth)),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
     if (o.notBackedUp > 0) {
         Text(
             stringResource(R.string.freeup_not_backed_up, fileCount(o.notBackedUp)),

@@ -12,7 +12,6 @@ import de.trei.cambackup.settings.CompressionSettings
 enum class SkipReason(@StringRes private val textRes: Int) {
     UNSUPPORTED_FORMAT(R.string.skip_format),
     HDR_VIDEO(R.string.skip_hdr),
-    MOTION_PHOTO(R.string.skip_motion_photo),
     TOO_RECENT(R.string.skip_too_recent),
     ALREADY_COMPRESSED(R.string.skip_already_compressed),
     TOO_LITTLE_SAVING(R.string.skip_too_little_saving);
@@ -93,30 +92,10 @@ fun markSoftware(original: String?): String =
     if (original.isNullOrBlank()) COMPRESSED_MARKER else "$original ($COMPRESSED_MARKER)"
 
 /**
- * Erkennt Fotos mit eingebettetem Video:
- * - Google: XMP "MotionPhoto"/"MicroVideo", Dateinamen "….MP.jpg" bzw. "MVIMG_…"
- * - Samsung: Anhang "MotionPhoto_Data" am Dateiende
- */
-fun looksLikeMotionPhoto(displayName: String, xmp: String?, tail: ByteArray?): Boolean {
-    val name = displayName.uppercase()
-    if (name.contains(".MP.") || name.startsWith("MVIMG_")) return true
-    if (xmp != null && (xmp.contains("MotionPhoto") || xmp.contains("MicroVideo"))) return true
-    return tail != null && tail.containsAscii("MotionPhoto_Data")
-}
-
-private fun ByteArray.containsAscii(needle: String): Boolean {
-    val n = needle.toByteArray(Charsets.US_ASCII)
-    outer@ for (i in 0..size - n.size) {
-        for (j in n.indices) if (this[i + j] != n[j]) continue@outer
-        return true
-    }
-    return false
-}
-
-/**
  * EXIF-Felder, die nicht übernommen werden: Bildaufbau, Vorschaubild und Ausrichtung beschreiben
  * die neue Datei nicht mehr (die Pixel sind bereits gedreht), MakerNote/XMP enthalten
- * herstellerspezifische Offsets bzw. Motion-Photo-Verweise.
+ * herstellerspezifische Offsets bzw. Motion-Photo-Verweise (die verkleinerte Datei ist ein normales
+ * Foto; die Bewegung bleibt nur im Original auf dem Medium).
  */
 private val NOT_COPIED = setOf(
     "Orientation", "ImageWidth", "ImageLength", "PixelXDimension", "PixelYDimension",
@@ -130,3 +109,18 @@ private val NOT_COPIED = setOf(
 /** Wählt aus allen bekannten EXIF-Feldern die zu übernehmenden aus. */
 fun tagsToCopy(allTags: Collection<String>, keepGps: Boolean): List<String> =
     allTags.filter { it !in NOT_COPIED && (keepGps || !it.startsWith("GPS")) }.distinct()
+
+/**
+ * Kennung der Einstellungen, die bestimmen, wie klein eine Datei wird. Lohnte sich das Verkleinern
+ * damit nicht, wird das im Index vermerkt und erst bei geänderten Einstellungen erneut versucht.
+ */
+fun shrinkSettingsKey(s: CompressionSettings, isVideo: Boolean): String =
+    if (isVideo) {
+        "video ${s.videoCodec.name.lowercase()} ${s.videoBitrateMbps}M ${s.videoMaxShortEdge ?: "orig"}" +
+            (if (s.videoLimit30Fps) " 30fps" else "") + " min${s.minSavingsPercent}"
+    } else {
+        "jpeg q${s.jpegQuality} max${s.imageMaxEdge ?: "orig"} min${s.minSavingsPercent}"
+    }
+
+/** Gründe, die sich bei gleichen Einstellungen nicht ändern – solche Dateien nicht jedes Mal neu versuchen. */
+val NOT_WORTH_REASONS = setOf(SkipReason.TOO_LITTLE_SAVING, SkipReason.HDR_VIDEO)

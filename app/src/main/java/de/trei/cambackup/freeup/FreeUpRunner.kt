@@ -1,5 +1,8 @@
 package de.trei.cambackup.freeup
 
+import de.trei.cambackup.compress.shrinkSettingsKey
+import de.trei.cambackup.compress.SkipReason
+import de.trei.cambackup.compress.NOT_WORTH_REASONS
 import android.os.SystemClock
 import de.trei.cambackup.work.JobControl
 import android.content.Context
@@ -75,7 +78,8 @@ class FreeUpRunner(private val context: Context) {
     suspend fun overview(folderName: String): FreeUpOverview {
         val opened = open(folderName)
         IndexCache.get(context).update(opened.index.state)
-        return overviewFor(scanner.scan(settings.current().mediaFolders), opened.index.state)
+        val s = settings.current()
+        return overviewFor(scanner.scan(s.mediaFolders), opened.index.state, s)
     }
 
     /**
@@ -89,7 +93,7 @@ class FreeUpRunner(private val context: Context) {
         val caller = currentCoroutineContext()
         val opened = open(folderName)
         // Nur was alt genug ist – so zählt der Fortschritt dieselben Dateien wie die Übersicht
-        val candidates = compressTargets(overviewFor(scanner.scan(s.mediaFolders), opened.index.state).candidates, s.minAgeDays, System.currentTimeMillis())
+        val candidates = compressTargets(overviewFor(scanner.scan(s.mediaFolders), opened.index.state, s).candidates, s.minAgeDays, System.currentTimeMillis())
         val dirs = DirCache(opened.deviceDir)
         val cache = IndexCache.get(context)
         val now = System.currentTimeMillis()
@@ -113,6 +117,13 @@ class FreeUpRunner(private val context: Context) {
         }
         val eta = FreeUpEta()
         var fileStart = 0L
+        // Lohnt sich eine Datei mit diesen Einstellungen nicht, im Index vermerken – sonst wird sie bei jedem
+        // Lauf neu versucht und zählt in der Übersicht weiter als „wird verkleinert“
+        suspend fun noteNotWorth(c: Candidate, reason: SkipReason) {
+            if (doReplace && reason in NOT_WORTH_REASONS) {
+                runCatching { opened.index.record(c.entry.copy(notWorthFor = shrinkSettingsKey(s, c.item.isVideo))) }
+            }
+        }
 
         for ((i, c) in candidates.withIndex()) {
             // Die vorige Datei ist fertig – vor dem Warten auf Pause, damit Pausen nicht mitzählen
@@ -133,6 +144,7 @@ class FreeUpRunner(private val context: Context) {
             val pre = if (item.isVideo) precheckVideo(item, s, now) else precheckImage(item, s, now)
             if (pre != null) {
                 skip(pre.text)
+                noteNotWorth(c, pre)
                 continue
             }
             if (!prepareSpaceOk(context.cacheDir.usableSpace, item.sizeBytes)) {
@@ -155,7 +167,10 @@ class FreeUpRunner(private val context: Context) {
                     continue
                 }
                 when (val r = if (item.isVideo) videos.shrink(item, s, now) else images.shrink(item, s, now)) {
-                    is ShrinkResult.Skipped -> skip(r.reason.text)
+                    is ShrinkResult.Skipped -> {
+                        skip(r.reason.text)
+                        noteNotWorth(c, r.reason)
+                    }
                     is ShrinkResult.Ready -> {
                         file = r.file
                         val p = PendingReplacement(

@@ -31,6 +31,11 @@ data class IndexEntry(
     /** Original wurde bewusst zurückgeholt – nicht erneut automatisch verkleinern. */
     val keepOriginal: Boolean = false,
     /**
+     * Verkleinern lohnte sich mit diesen Einstellungen nicht (siehe [shrinkSettingsKey]) – wird erst wieder
+     * versucht, wenn sich die Einstellungen ändern.
+     */
+    val notWorthFor: String? = null,
+    /**
      * Nur im Journal: markiert einen entfernten Eintrag (Sicherung wurde gelöscht). Das Journal
      * wird nur angehängt, daher wird Entfernen als eigene Zeile vermerkt.
      */

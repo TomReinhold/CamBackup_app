@@ -146,7 +146,7 @@ class ImageShrinkerTest {
         assertEquals(ShrinkResult.Skipped(SkipReason.ALREADY_COMPRESSED), shrinker.shrink(itemFor(again), CompressionSettings()))
     }
 
-    @Test fun skipsRecentHeicMotionAndSmallSavings() = runBlocking {
+    @Test fun skipsRecentHeicAndSmallSavingsButCompressesMotionPhotos() = runBlocking {
         val photo = createPhoto()
         assertEquals(
             ShrinkResult.Skipped(SkipReason.TOO_RECENT),
@@ -157,7 +157,8 @@ class ImageShrinkerTest {
             shrinker.shrink(itemFor(photo, mime = "image/heic"), CompressionSettings()),
         )
         val motion = createPhoto(name = "PXL_20240101_120000000.MP.jpg")
-        assertEquals(ShrinkResult.Skipped(SkipReason.MOTION_PHOTO), shrinker.shrink(itemFor(motion), CompressionSettings()))
+        // Bewegte Fotos werden wie normale verkleinert – die Bewegung bleibt nur im Original auf dem Medium
+        assertTrue(shrinker.shrink(itemFor(motion), CompressionSettings()) is ShrinkResult.Ready)
         // Qualität 95 in Originalgröße spart bei einem Q100-Bild sicher keine 90 %
         assertEquals(
             ShrinkResult.Skipped(SkipReason.TOO_LITTLE_SAVING),

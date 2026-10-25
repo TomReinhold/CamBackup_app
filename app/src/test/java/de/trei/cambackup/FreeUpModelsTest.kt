@@ -55,6 +55,20 @@ class FreeUpModelsTest {
         assertEquals(1, o.keptOriginal)
     }
 
+    @Test fun notWorthOnlyForSameSettings() {
+        val s = de.trei.cambackup.settings.CompressionSettings(jpegQuality = 85)
+        val key = de.trei.cambackup.compress.shrinkSettingsKey(s, isVideo = false)
+        val index = IndexState(listOf(entry("a.jpg", 100).copy(notWorthFor = key)))
+        // gleiche Einstellungen: nicht erneut versuchen
+        val same = overviewFor(listOf(item("a.jpg", 100)), index, s)
+        assertEquals(0, same.candidates.size)
+        assertEquals(1, same.notWorth)
+        // andere Qualität: wieder ein Kandidat
+        val other = overviewFor(listOf(item("a.jpg", 100)), index, s.copy(jpegQuality = 60))
+        assertEquals(1, other.candidates.size)
+        assertEquals(0, other.notWorth)
+    }
+
     @Test fun restoreCandidatesOnlyForUntouchedCompressedFiles() {
         val index = IndexState(
             listOf(

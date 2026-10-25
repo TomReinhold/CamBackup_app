@@ -3,7 +3,6 @@ package de.trei.cambackup
 import android.net.Uri
 import de.trei.cambackup.compress.SkipReason
 import de.trei.cambackup.compress.isMarkedCompressed
-import de.trei.cambackup.compress.looksLikeMotionPhoto
 import de.trei.cambackup.compress.markSoftware
 import de.trei.cambackup.compress.parseIso6709
 import de.trei.cambackup.compress.parseVideoDate
@@ -45,14 +44,6 @@ class ShrinkRulesTest {
         assertTrue(isMarkedCompressed(markSoftware("x")))
         assertFalse(isMarkedCompressed("HDR+ 1.0"))
         assertFalse(isMarkedCompressed(null))
-    }
-
-    @Test fun motionPhotos() {
-        assertTrue(looksLikeMotionPhoto("PXL_20240101_120000000.MP.jpg", null, null))
-        assertTrue(looksLikeMotionPhoto("MVIMG_20190101_1.jpg", null, null))
-        assertTrue(looksLikeMotionPhoto("IMG.jpg", "<x GCamera:MotionPhoto=\"1\"/>", null))
-        assertTrue(looksLikeMotionPhoto("IMG.jpg", null, "xxMotionPhoto_Dataxx".toByteArray()))
-        assertFalse(looksLikeMotionPhoto("IMG_20240101.jpg", "<x:xmpmeta/>", "plain".toByteArray()))
     }
 
     private fun video(size: Long, durationMs: Long, mime: String = "video/mp4", ageDays: Int = 60) =

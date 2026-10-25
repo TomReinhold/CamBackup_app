@@ -1,5 +1,7 @@
 package de.trei.cambackup.freeup
 
+import de.trei.cambackup.settings.CompressionSettings
+import de.trei.cambackup.compress.shrinkSettingsKey
 import de.trei.cambackup.compress.oldEnough
 import de.trei.cambackup.backup.phonePath
 import de.trei.cambackup.index.EntryStatus
@@ -55,6 +57,8 @@ data class FreeUpOverview(
     val notBackedUp: Int,
     /** Original bewusst zurückgeholt – wird nicht erneut verkleinert. */
     val keptOriginal: Int = 0,
+    /** Lohnt sich mit den aktuellen Einstellungen nicht (zu wenig Ersparnis) – bleibt im Original. */
+    val notWorth: Int = 0,
 )
 
 /** Eine verkleinerte Datei, deren Original vom Medium zurückgeholt werden kann. */
@@ -95,12 +99,13 @@ fun prepareSpaceOk(freeBytes: Long, originalBytes: Long): Boolean = freeBytes >=
  * kommen als Kandidaten in Frage (Größe muss der gesicherten entsprechen; der Hash wird vor dem
  * Verkleinern zusätzlich geprüft).
  */
-fun overviewFor(items: List<MediaItem>, index: IndexState): FreeUpOverview {
+fun overviewFor(items: List<MediaItem>, index: IndexState, settings: CompressionSettings? = null): FreeUpOverview {
     val candidates = mutableListOf<Candidate>()
     var compressed = 0
     var compressedSaved = 0L
     var notBackedUp = 0
     var kept = 0
+    var notWorth = 0
     for (item in items) {
         val entries = index.forPhonePath(item.phonePath)
         val asCompressed = entries.lastOrNull { it.status == EntryStatus.COMPRESSED && it.compressedSize == item.sizeBytes }
@@ -111,11 +116,13 @@ fun overviewFor(items: List<MediaItem>, index: IndexState): FreeUpOverview {
                 compressedSaved += asCompressed.originalSize - item.sizeBytes
             }
             asOriginal != null && asOriginal.keepOriginal -> kept++
+            asOriginal != null && settings != null &&
+                asOriginal.notWorthFor == shrinkSettingsKey(settings, item.isVideo) -> notWorth++
             asOriginal != null -> candidates += Candidate(item, asOriginal)
             else -> notBackedUp++
         }
     }
-    return FreeUpOverview(candidates, compressed, compressedSaved, notBackedUp, kept)
+    return FreeUpOverview(candidates, compressed, compressedSaved, notBackedUp, kept, notWorth)
 }
 
 /**

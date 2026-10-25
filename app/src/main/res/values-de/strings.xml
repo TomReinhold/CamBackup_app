@@ -247,6 +247,10 @@
     <string name="freeup_probes">%1$s zur Probe im Album „%2$s“</string>
     <string name="freeup_nothing">Nichts zu verkleinern.</string>
     <string name="freeup_age_all">Alle gesicherten Fotos und Videos werden berücksichtigt (Mindestalter einstellbar).</string>
+    <plurals name="freeup_not_worth">
+        <item quantity="one">%s würde mit den aktuellen Einstellungen kaum kleiner und bleibt im Original.</item>
+        <item quantity="other">%s würden mit den aktuellen Einstellungen kaum kleiner und bleiben im Original.</item>
+    </plurals>
     <plurals name="freeup_age_recent">
         <item quantity="one">%1$s vom letzten Tag bleiben im Original (einstellbar).</item>
         <item quantity="other">%1$s aus den letzten %2$d Tagen bleiben im Original (einstellbar).</item>
@@ -438,7 +442,6 @@
     <!-- Gründe, nicht zu verkleinern -->
     <string name="skip_format">Format wird nicht verkleinert (nur JPEG und MP4)</string>
     <string name="skip_hdr">HDR-Video – nur mit Codec HEVC verkleinerbar</string>
-    <string name="skip_motion_photo">Bewegtes Foto – eingebettetes Video bliebe nicht erhalten</string>
     <string name="skip_too_recent">Jünger als das Mindestalter</string>
     <string name="skip_already_compressed">Bereits von CamBackup verkleinert</string>
     <string name="skip_too_little_saving">Ersparnis unter dem Mindestwert</string>

@@ -250,6 +250,10 @@
     <string name="freeup_probes">%1$s as trials in the album “%2$s”</string>
     <string name="freeup_nothing">Nothing to compress.</string>
     <string name="freeup_age_all">All backed-up photos and videos are included (minimum age adjustable).</string>
+    <plurals name="freeup_not_worth">
+        <item quantity="one">%s would barely get smaller with the current settings and stays original.</item>
+        <item quantity="other">%s would barely get smaller with the current settings and stay original.</item>
+    </plurals>
     <plurals name="freeup_age_recent">
         <item quantity="one">%1$s from the last %2$d day stay original (adjustable).</item>
         <item quantity="other">%1$s from the last %2$d days stay original (adjustable).</item>
@@ -441,7 +445,6 @@
     <!-- Gründe, nicht zu verkleinern -->
     <string name="skip_format">Format is not compressed (JPEG and MP4 only)</string>
     <string name="skip_hdr">HDR video – can only be compressed with the HEVC codec</string>
-    <string name="skip_motion_photo">Motion photo – the embedded video would not be kept</string>
     <string name="skip_too_recent">Younger than the minimum age</string>
     <string name="skip_already_compressed">Already compressed by CamBackup</string>
     <string name="skip_too_little_saving">Saving below the minimum</string>
